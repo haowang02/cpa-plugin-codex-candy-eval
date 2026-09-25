@@ -8,13 +8,15 @@
     :root {
       --bg: #f2f5f3; --surface: #ffffff; --sunken: #f7f9f8; --ink: #15201b; --muted: #66726c; --faint: #a0aaa5; --line: #e1e7e4;
       --apple: #2b9a58; --apple-ink: #1d7a43; --apple-soft: #e5f4ea; --apple-soft-hover: #d5ecdd; --peach: #e0533f; --peach-soft: #fceae6;
-      --shadow: 0 1px 2px rgb(21 32 27 / 4%), 0 12px 32px -18px rgb(21 32 27 / 18%);
+      --peach-soft-hover: #f9dcd5; --band: #f3f6f4;
+      --shadow: 0 1px 2px rgb(21 32 27 / 4%), 0 12px 32px -18px rgb(21 32 27 / 18%); --float: 0 10px 30px -8px rgb(21 32 27 / 25%);
       color-scheme: light;
     }
     :root[data-theme="dark"] {
       --bg: #0e1311; --surface: #161c19; --sunken: #121715; --ink: #e5ebe8; --muted: #94a19b; --faint: #5d6963; --line: #252d29;
       --apple: #4cc27f; --apple-ink: #7ad7a0; --apple-soft: #173424; --apple-soft-hover: #1e4430; --peach: #f07a66; --peach-soft: #3a1f1a;
-      --shadow: none;
+      --peach-soft-hover: #4a2720; --band: #1b221f;
+      --shadow: none; --float: 0 10px 30px -8px rgb(0 0 0 / 60%);
       color-scheme: dark;
     }
     * { box-sizing: border-box; }
@@ -70,7 +72,26 @@
     .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; height: 32px; padding: 0 12px; }
     .btn.ghost:hover:not(:disabled) { background: transparent; border-color: var(--muted); }
     .btn.ghost .icon { width: 14px; height: 14px; color: var(--muted); }
+    .btn.danger { background: var(--peach-soft); color: var(--peach); }
+    .btn.danger:hover:not(:disabled) { background: var(--peach-soft-hover); }
     .btn:disabled { opacity: .55; cursor: default; }
+    .toolbar .btn.ghost { height: 36px; }
+
+    dialog.confirm { width: min(400px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: var(--float); }
+    dialog.confirm::backdrop { background: rgb(10 16 13 / 40%); }
+    dialog.confirm h2 { margin: 0 0 6px; font-size: 16px; }
+    dialog.confirm p { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .dialog-actions .btn { height: 34px; }
+
+    .tip {
+      position: fixed; z-index: 10; max-width: 320px; padding: 10px 12px; pointer-events: none;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--float); font-size: 12px;
+    }
+    .tip-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .tip-meta { color: var(--muted); }
+    .tip-text { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .tip-text.error { color: var(--peach); }
 
     .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 4px 10px; }
     .legend .grow { flex: 1; }
@@ -113,16 +134,17 @@
     .rate b { font-size: 17px; font-weight: 600; }
     .rate small { display: block; color: var(--faint); font-size: 12px; }
     .marks { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; min-height: 15px; }
+    .mark-hit { display: inline-flex; padding: 1px; border-radius: 50%; cursor: default; }
+    .mark-hit:hover { background: var(--band); }
     .action { text-align: right; }
 
     .details { padding: 4px 18px 16px; background: var(--sunken); }
     .history { display: grid; gap: 8px; }
-    .entry { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
-    .entry .mark { margin-top: 2px; }
-    .entry-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 12px; }
-    .entry-meta .when { color: var(--ink); }
-    .entry pre { margin: 6px 0 0; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 12.5px; line-height: 1.6; }
-    .entry pre.error { color: var(--peach); }
+    .entry { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 12px; background: var(--band); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .entry-head .when { color: var(--ink); }
+    .entry-body { margin: 0; padding: 12px 14px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 13px; line-height: 1.65; }
+    .entry-body.error { color: var(--peach); }
 
     .empty, .notice { padding: 40px 20px; text-align: center; color: var(--muted); }
     .notice.error { color: var(--peach); }
@@ -145,7 +167,7 @@
       .toolbar .spacer { display: none; }
       .toolbar .field { flex: 1 1 120px; }
       .toolbar .field select, .toolbar .field input { width: 100%; min-width: 0; }
-      .toolbar .btn { flex: 1 1 100%; }
+      .toolbar .btn { flex: 1 1 140px; }
       .legend .grow { flex-basis: 100%; }
     }
   </style>
@@ -188,6 +210,7 @@
         <label class="field"><span>每个账号测试次数</span><input id="runs" class="mono" type="number" min="1" max="10" value="1"></label>
         <div class="spacer"></div>
         <button id="run-all" class="btn" type="submit"></button>
+        <button id="clear" class="btn ghost" type="button"></button>
       </form>
 
       <div class="legend">
@@ -211,6 +234,18 @@
         <div id="rows"><div class="notice">正在加载…</div></div>
       </section>
     </div>
+
+    <dialog id="confirm-clear" class="confirm">
+      <form method="dialog">
+        <h2>清空全部测试记录？</h2>
+        <p>所有账号的历史测试结果都会被删除，且无法恢复。正在进行的测试不受影响，完成后会照常记录。</p>
+        <div class="dialog-actions">
+          <button class="btn ghost" value="cancel" autofocus>取消</button>
+          <button class="btn danger" value="confirm">清空记录</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="tip" class="tip" role="tooltip" hidden></div>
   </main>
 
   <script>
@@ -236,10 +271,11 @@
       "circle-alert": '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
       "loader-circle": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
       play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+      "trash-2": '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
     };
-    const icon = (name, cls = "", title = "") =>
+    const icon = (name, cls = "", label = "") =>
       `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"` +
-      (title ? ` role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>` : ` aria-hidden="true">`) + `${ICONS[name]}</svg>`;
+      (label ? ` role="img" aria-label="${esc(label)}">` : ` aria-hidden="true">`) + `${ICONS[name]}</svg>`;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -302,10 +338,9 @@
 
     class AuthError extends Error {}
 
-    async function api(path, body) {
-      const init = { cache: "no-store", headers: { Authorization: "Bearer " + key } };
+    async function api(path, { method = "GET", body } = {}) {
+      const init = { method, cache: "no-store", headers: { Authorization: "Bearer " + key } };
       if (body !== undefined) {
-        init.method = "POST";
         init.headers["Content-Type"] = "application/json";
         init.body = JSON.stringify(body);
       }
@@ -352,13 +387,15 @@
     const MARK = { ok: "circle-check", bad: "circle-x", err: "circle-alert" };
     const fmtNum = (n) => (n ? Number(n).toLocaleString("en-US") : "0");
     const fmtSec = (ms) => (ms / 1000).toFixed(1) + "s";
-    function fmtTime(iso) {
+    function fmtTime(iso, withYear = false) {
       const d = new Date(iso);
       const p = (n) => String(n).padStart(2, "0");
-      return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      return `${withYear ? d.getFullYear() + "-" : ""}${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
     }
     const oneLine = (s) => String(s || "").replace(/\s+/g, " ").trim();
     const mark = (r, extra = "") => icon(MARK[kind(r)], `mark ${kind(r)} ${extra}`, `${fmtTime(r.time)} · ${r.model} ${r.effort} · ${VERDICT[kind(r)]}`);
+    const verdict = (r) => `<span class="verdict ${kind(r)}">${icon(MARK[kind(r)])}${VERDICT[kind(r)]}</span>`;
+    const tokens = (r) => `输入 ${fmtNum(r.input_tokens)} · 输出 ${fmtNum(r.output_tokens)} · 推理 ${fmtNum(r.reasoning_tokens)}`;
 
     function renderRow(a) {
       const results = a.results;
@@ -368,24 +405,24 @@
       const open = expanded.has(a.id);
 
       const latest = last
-        ? `<div class="latest-top"><span class="verdict ${kind(last)}">${icon(MARK[kind(last)])}${VERDICT[kind(last)]}</span>
+        ? `<div class="latest-top">${verdict(last)}
              <span class="meta mono">${esc(`${last.model} · ${last.effort} · ${fmtSec(last.duration_ms)}`)}${last.error ? "" : ` · 推理 ${fmtNum(last.reasoning_tokens)}`}</span></div>
            <div class="snippet">${esc(oneLine(last.error || last.answer))}</div>`
         : `<span class="none">尚未测试</span>`;
       const rate = graded.length
         ? `<b class="mono">${Math.round((correct / graded.length) * 100)}%</b><small class="mono">${correct}/${graded.length}</small>`
         : `<span class="none">—</span>`;
-      const marks = results.map((r) => mark(r, scopeMatch(r) ? "" : "dim")).join("");
+      const marks = results.map((r, i) => `<span class="mark-hit" data-auth="${esc(a.id)}" data-i="${i}">${mark(r, scopeMatch(r) ? "" : "dim")}</span>`).join("");
       const action = a.running
         ? `<button class="btn ghost" type="button" disabled>${icon("loader-circle", "spin")}测试中 <span class="mono">${a.running.done}/${a.running.total}</span></button>`
         : `<button class="btn ghost" type="button" data-run="${esc(a.id)}">${icon("play")}测试</button>`;
 
       const history = [...results].reverse().map((r) => `
-        <div class="entry">${mark(r)}<div>
-          <div class="entry-meta mono"><span class="when">${esc(fmtTime(r.time))}</span><span>${esc(r.model)} · ${esc(r.effort)}</span><span>用时 ${fmtSec(r.duration_ms)}</span>
-            ${r.error ? "" : `<span>输入 ${fmtNum(r.input_tokens)}</span><span>输出 ${fmtNum(r.output_tokens)}</span><span>推理 ${fmtNum(r.reasoning_tokens)}</span>`}</div>
-          <pre class="${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
-        </div></div>`).join("");
+        <div class="entry">
+          <div class="entry-head">${verdict(r)}<span class="when mono">${esc(fmtTime(r.time, true))}</span><span class="mono">${esc(r.model)} · ${esc(r.effort)}</span>
+            <span class="mono">用时 ${fmtSec(r.duration_ms)}</span>${r.error ? "" : `<span class="mono">${tokens(r)}</span>`}</div>
+          <pre class="entry-body ${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
+        </div>`).join("");
 
       return `<div class="row ${open ? "open" : ""}">
         <div class="row-main" data-row="${esc(a.id)}">
@@ -407,6 +444,8 @@
       const enabled = auths.filter((a) => !a.disabled).length;
       $("run-all").innerHTML = `${icon("play")}测试全部 (${enabled})`;
       $("run-all").disabled = !enabled || auths.every((a) => a.disabled || a.running);
+      $("clear").disabled = auths.every((a) => !a.results.length);
+      hideTip();
       const focused = document.activeElement?.closest?.("[data-toggle], [data-run]");
       const focusSelector = focused && (focused.dataset.toggle !== undefined
         ? `[data-toggle="${CSS.escape(focused.dataset.toggle)}"]` : `[data-run="${CSS.escape(focused.dataset.run)}"]`);
@@ -432,7 +471,7 @@
       savePrefs();
       $("flash").textContent = "";
       try {
-        await api(BASE + "/run", { ...body, model: $("model").value, effort: $("effort").value, runs: runs() });
+        await api(BASE + "/run", { method: "POST", body: { ...body, model: $("model").value, effort: $("effort").value, runs: runs() } });
       } catch (err) {
         if (err instanceof AuthError) return showLogin(err.message);
         $("flash").textContent = "开始测试失败：" + err.message;
@@ -461,6 +500,48 @@
       fillModels();
       load();
     }
+
+    function showTip(target) {
+      const r = auths.find((a) => a.id === target.dataset.auth)?.results[target.dataset.i];
+      if (!r) return;
+      const tip = $("tip");
+      tip.innerHTML = `<div class="tip-head">${verdict(r)}<span class="mono">${esc(fmtTime(r.time, true))}</span></div>
+        <div class="tip-meta mono">${esc(r.model)} · ${esc(r.effort)} · 用时 ${fmtSec(r.duration_ms)}</div>
+        ${r.error ? "" : `<div class="tip-meta mono">${tokens(r)}</div>`}
+        <div class="tip-text ${r.error ? "error" : ""}">${esc(oneLine(r.error || r.answer))}</div>`;
+      tip.hidden = false;
+      const box = target.getBoundingClientRect();
+      const { width, height } = tip.getBoundingClientRect();
+      const left = Math.min(Math.max(box.left + box.width / 2 - width / 2, 8), innerWidth - width - 8);
+      const top = box.top - height - 8 >= 8 ? box.top - height - 8 : box.bottom + 8;
+      tip.style.left = left + "px";
+      tip.style.top = top + "px";
+    }
+    function hideTip() { $("tip").hidden = true; }
+    $("rows").addEventListener("mouseover", (e) => {
+      const target = e.target.closest("[data-auth]");
+      target ? showTip(target) : hideTip();
+    });
+    $("rows").addEventListener("mouseleave", hideTip);
+    addEventListener("scroll", hideTip, true);
+
+    const CLEAR_LABEL = icon("trash-2") + "清空历史";
+    $("clear").innerHTML = CLEAR_LABEL;
+    $("clear").addEventListener("click", () => {
+      $("confirm-clear").returnValue = ""; // Esc keeps the previous value, which must never count as a confirmation.
+      $("confirm-clear").showModal();
+    });
+    $("confirm-clear").addEventListener("close", async () => {
+      if ($("confirm-clear").returnValue !== "confirm") return;
+      $("flash").textContent = "";
+      try {
+        await api(BASE + "/results", { method: "DELETE" });
+      } catch (err) {
+        if (err instanceof AuthError) return showLogin(err.message);
+        $("flash").textContent = "清空历史失败：" + err.message;
+      }
+      load();
+    });
 
     $("login-form").addEventListener("submit", (e) => {
       e.preventDefault();

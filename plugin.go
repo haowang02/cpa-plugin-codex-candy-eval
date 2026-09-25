@@ -18,7 +18,7 @@ import (
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.1.2"
+	pluginVersion  = "0.1.3"
 	abiVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
@@ -158,6 +158,7 @@ func handleMethod(method string, request []byte) (response []byte) {
 			"routes": []map[string]string{
 				{"Method": http.MethodGet, "Path": managementBase + "/state", "Description": "View Codex candy test results"},
 				{"Method": http.MethodPost, "Path": managementBase + "/run", "Description": "Run the candy test on Codex auth files"},
+				{"Method": http.MethodDelete, "Path": managementBase + "/results", "Description": "Clear Codex candy test results"},
 			},
 			"resources": []map[string]string{
 				{"Path": uiPath, "Menu": "Codex 糖果测试", "Description": "用糖果题测试 Codex 认证文件是否降智"},
@@ -194,6 +195,12 @@ func handleManagement(req managementRequest) managementResponse {
 		return stateResponse()
 	case req.Method == http.MethodPost && path == managementBase+"/run":
 		return runResponse(req.Body)
+	case req.Method == http.MethodDelete && path == managementBase+"/results":
+		mu.Lock()
+		defer mu.Unlock()
+		results = map[string][]result{}
+		saveStateLocked()
+		return jsonResponse(http.StatusOK, map[string]bool{"cleared": true})
 	default:
 		return jsonError(http.StatusNotFound, "Route not found: "+req.Method+" "+req.Path)
 	}

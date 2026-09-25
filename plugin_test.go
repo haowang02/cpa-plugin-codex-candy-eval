@@ -153,6 +153,18 @@ func TestRunAllAndState(t *testing.T) {
 	if len(results["a.json"]) != 2 {
 		t.Fatalf("state file not reloaded: %v", results)
 	}
+
+	// Clearing removes the history from memory and from the state file.
+	if status, _ := manage(t, http.MethodDelete, managementBase+"/results", nil); status != http.StatusOK {
+		t.Fatalf("clear results = %d", status)
+	}
+	mu.Lock()
+	loaded, results = false, map[string][]result{"stale": {{}}}
+	mu.Unlock()
+	loadState()
+	if len(results) != 0 {
+		t.Fatalf("results not cleared: %v", results)
+	}
 }
 
 func TestRunSingleAndValidation(t *testing.T) {
