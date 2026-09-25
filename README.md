@@ -6,8 +6,36 @@
 
 ## 安装
 
-1. 从 [Releases](https://github.com/haowang02/cpa-plugin-codex-candy-eval/releases/latest) 下载与 CPA 运行平台对应的压缩包，解压后把插件文件放进 CPA 的 `plugins` 目录（Docker 部署时放进映射到 `/CLIProxyAPI/plugins` 的目录）。
-2. 在 CPA 管理面板的「插件管理」中启用 `cpa-codex-candy-eval`。
+在 CPA 根目录运行，插件会安装到当前目录的 `plugins/`。Docker 部署时，在挂载到容器 `/CLIProxyAPI/plugins` 的 `plugins` 目录的上一级目录运行。
+
+macOS 和 Linux：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/haowang02/cpa-plugin-codex-candy-eval/main/install.sh | sh
+```
+
+Windows 请先停止 CPA，再在 PowerShell 中运行：
+
+```powershell
+irm https://raw.githubusercontent.com/haowang02/cpa-plugin-codex-candy-eval/main/install.ps1 | iex
+```
+
+也可以从 [Releases](https://github.com/haowang02/cpa-plugin-codex-candy-eval/releases/latest) 下载对应平台的压缩包，解压后将插件文件放入 `plugins/`。
+
+## 配置
+
+在 CPA 的 `config.yaml` 中启用插件，保存后 CPA 会自动加载：
+
+```yaml
+plugins:
+  enabled: true
+  dir: "plugins"
+  configs:
+    cpa-codex-candy-eval:
+      enabled: true
+```
+
+插件没有其他配置项。升级插件后需要重启 CPA。
 
 ## 使用
 

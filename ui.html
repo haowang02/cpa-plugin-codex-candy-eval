@@ -35,7 +35,6 @@
     @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 
     header { margin-bottom: 20px; }
-    .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
     h1 .icon { width: 26px; height: 26px; color: var(--apple); }
     .lede { margin: 6px 0 0; color: var(--muted); }
@@ -178,13 +177,8 @@
 <body>
   <main>
     <header>
-      <div class="header-row">
-        <div>
-          <h1><i data-icon="candy"></i>Codex 糖果测试</h1>
-          <p class="lede">让每个 Codex 账号解同一道糖果题，答出 <b class="mono">21</b> 即为正确，用来发现降智账号。</p>
-        </div>
-        <button id="mask" class="btn ghost" type="button" hidden></button>
-      </div>
+      <h1><i data-icon="candy"></i>Codex 糖果测试</h1>
+      <p class="lede">让每个 Codex 账号解同一道糖果题，答出 <b class="mono">21</b> 即为正确，用来发现降智账号。</p>
       <details class="problem">
         <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
         <div class="problem-body">
@@ -219,6 +213,7 @@
         <div class="spacer"></div>
         <button id="run-all" class="btn" type="submit"></button>
         <button id="clear" class="btn ghost" type="button"></button>
+        <button id="mask" class="btn ghost" type="button"></button>
       </form>
 
       <div class="legend">
@@ -493,7 +488,6 @@
     function showLogin(message) {
       clearTimeout(pollTimer);
       $("app").hidden = true;
-      $("mask").hidden = true;
       $("login").hidden = false;
       $("login-error").hidden = !message;
       $("login-error").textContent = message || "";
@@ -503,7 +497,6 @@
     async function start() {
       $("login").hidden = true;
       $("app").hidden = false;
-      $("mask").hidden = false;
       try {
         models = ((await api("/v0/management/model-definitions/codex")).models || []).filter((m) => !HIDDEN_MODEL(m.id));
       } catch (err) {
