@@ -35,6 +35,7 @@
     @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 
     header { margin-bottom: 20px; }
+    .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
     h1 .icon { width: 26px; height: 26px; color: var(--apple); }
     .lede { margin: 6px 0 0; color: var(--muted); }
@@ -118,6 +119,8 @@
     .toggle .chev { color: var(--faint); }
     .toggle .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .account .file { padding-left: 20px; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account .name, .account .file { transition: filter .15s; }
+    .masked .account .name, .masked .account .file { filter: blur(5px); user-select: none; }
     .tag { flex: none; padding: 0 6px; border-radius: 6px; background: var(--sunken); border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 500; }
 
     .latest { min-width: 0; }
@@ -175,8 +178,13 @@
 <body>
   <main>
     <header>
-      <h1><i data-icon="candy"></i>Codex 糖果测试</h1>
-      <p class="lede">让每个 Codex 账号解同一道糖果题，答出 <b class="mono">21</b> 即为正确，用来发现降智账号。</p>
+      <div class="header-row">
+        <div>
+          <h1><i data-icon="candy"></i>Codex 糖果测试</h1>
+          <p class="lede">让每个 Codex 账号解同一道糖果题，答出 <b class="mono">21</b> 即为正确，用来发现降智账号。</p>
+        </div>
+        <button id="mask" class="btn ghost" type="button" hidden></button>
+      </div>
       <details class="problem">
         <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
         <div class="problem-body">
@@ -253,6 +261,7 @@
     const BASE = "/v0/management/plugins/cpa-codex-candy-eval";
     const KEY_STORE = "cpa-codex-candy-eval.key";
     const PREF_STORE = "cpa-codex-candy-eval.prefs";
+    const MASK_STORE = "cpa-codex-candy-eval.masked";
     const DEFAULT_MODEL = "gpt-5.6-sol";
     const DEFAULT_EFFORT = "low";
     const DEFAULT_EFFORTS = ["low", "medium", "high", "xhigh"];
@@ -271,6 +280,8 @@
       "circle-alert": '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
       "loader-circle": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
       play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+      eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+      "eye-off": '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
       "trash-2": '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
     };
     const icon = (name, cls = "", label = "") =>
@@ -482,6 +493,7 @@
     function showLogin(message) {
       clearTimeout(pollTimer);
       $("app").hidden = true;
+      $("mask").hidden = true;
       $("login").hidden = false;
       $("login-error").hidden = !message;
       $("login-error").textContent = message || "";
@@ -491,6 +503,7 @@
     async function start() {
       $("login").hidden = true;
       $("app").hidden = false;
+      $("mask").hidden = false;
       try {
         models = ((await api("/v0/management/model-definitions/codex")).models || []).filter((m) => !HIDDEN_MODEL(m.id));
       } catch (err) {
@@ -524,6 +537,16 @@
     });
     $("rows").addEventListener("mouseleave", hideTip);
     addEventListener("scroll", hideTip, true);
+
+    /* Masking only blurs the account column in this browser, e.g. before sharing a screenshot. */
+    function setMasked(masked) {
+      document.body.classList.toggle("masked", masked);
+      $("mask").setAttribute("aria-pressed", masked);
+      $("mask").innerHTML = masked ? icon("eye") + "取消脱敏" : icon("eye-off") + "脱敏";
+      try { masked ? localStorage.setItem(MASK_STORE, "1") : localStorage.removeItem(MASK_STORE); } catch (_) {}
+    }
+    try { setMasked(localStorage.getItem(MASK_STORE) === "1"); } catch (_) { setMasked(false); }
+    $("mask").addEventListener("click", () => setMasked(!document.body.classList.contains("masked")));
 
     const CLEAR_LABEL = icon("trash-2") + "清空历史";
     $("clear").innerHTML = CLEAR_LABEL;

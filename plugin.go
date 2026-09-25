@@ -18,7 +18,7 @@ import (
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.1.4"
+	pluginVersion  = "0.1.5"
 	abiVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
