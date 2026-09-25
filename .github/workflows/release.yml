@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Check tag matches plugin version
+        run: grep -q "pluginVersion *= \"${GITHUB_REF_NAME#v}\"" plugin.go
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  build:
+    name: Build ${{ matrix.os }}-${{ matrix.arch }}
+    needs: check
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, arch: amd64, runner: ubuntu-24.04, ext: so, image: quay.io/pypa/manylinux2014_x86_64 }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm, ext: so, image: quay.io/pypa/manylinux2014_aarch64 }
+          - { os: darwin, arch: amd64, runner: macos-15-intel, ext: dylib }
+          - { os: darwin, arch: arm64, runner: macos-15, ext: dylib }
+          - { os: windows, arch: amd64, runner: windows-2025, ext: dll }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # manylinux2014 (glibc 2.17) keeps the plugin loadable on older Linux distributions.
+      - name: Build Linux plugin
+        if: matrix.os == 'linux'
+        run: |
+          mkdir -p dist
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/src" -w /src -v "$(go env GOROOT):/opt/go:ro" \
+            -e GOROOT=/opt/go -e HOME=/tmp -e GOFLAGS=-buildvcs=false \
+            ${{ matrix.image }} \
+            /opt/go/bin/go build -trimpath -ldflags="-s -w" -tags cshared -buildmode=c-shared -o dist/cpa-codex-candy-eval.so .
+
+      - name: Build plugin
+        if: matrix.os != 'linux'
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+        run: go build -trimpath -ldflags="-s -w" -tags cshared -buildmode=c-shared -o dist/cpa-codex-candy-eval.${{ matrix.ext }} .
+
+      - name: Package
+        if: matrix.os != 'windows'
+        run: tar -czf cpa-codex-candy-eval_${{ matrix.os }}_${{ matrix.arch }}.tar.gz -C dist cpa-codex-candy-eval.${{ matrix.ext }}
+
+      - name: Package
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/cpa-codex-candy-eval.dll -DestinationPath cpa-codex-candy-eval_windows_amd64.zip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: cpa-codex-candy-eval_${{ matrix.os }}_${{ matrix.arch }}.*
+          if-no-files-found: error
+
+  release:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Generate checksums
+        working-directory: assets
+        run: sha256sum * > checksums.txt
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: assets/*
+          generate_release_notes: true

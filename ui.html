@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 糖果测试</title>
+  <style>
+    :root {
+      --bg: #f2f5f3; --surface: #ffffff; --sunken: #f7f9f8; --ink: #15201b; --muted: #66726c; --faint: #a0aaa5; --line: #e1e7e4;
+      --apple: #2b9a58; --apple-ink: #1d7a43; --apple-soft: #e5f4ea; --apple-soft-hover: #d5ecdd; --peach: #e0533f; --peach-soft: #fceae6;
+      --shadow: 0 1px 2px rgb(21 32 27 / 4%), 0 12px 32px -18px rgb(21 32 27 / 18%);
+      color-scheme: light;
+    }
+    :root[data-theme="dark"] {
+      --bg: #0e1311; --surface: #161c19; --sunken: #121715; --ink: #e5ebe8; --muted: #94a19b; --faint: #5d6963; --line: #252d29;
+      --apple: #4cc27f; --apple-ink: #7ad7a0; --apple-soft: #173424; --apple-soft-hover: #1e4430; --peach: #f07a66; --peach-soft: #3a1f1a;
+      --shadow: none;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px 24px 56px; }
+    button, input, select { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--apple); outline-offset: 2px; }
+    .icon { width: 16px; height: 16px; flex: none; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+    header { margin-bottom: 20px; }
+    h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+    h1 .icon { width: 26px; height: 26px; color: var(--apple); }
+    .lede { margin: 6px 0 0; color: var(--muted); }
+    .lede b { color: var(--ink); font-weight: 600; }
+    details.problem { margin-top: 10px; }
+    details.problem summary { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; color: var(--muted); font-size: 13px; list-style: none; }
+    details.problem summary::-webkit-details-marker { display: none; }
+    details.problem summary:hover { color: var(--ink); }
+    .chev { width: 15px; height: 15px; transition: transform .15s; }
+    details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate(90deg); }
+    .problem-body {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: start;
+      margin-top: 10px; padding: 14px 16px; max-width: 800px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    }
+    .problem-body p { margin: 0; }
+    .problem-body table { grid-column: 1; justify-self: start; border-collapse: collapse; font-size: 13px; }
+    .problem-body th, .problem-body td { padding: 4px 14px 4px 0; text-align: left; font-weight: 500; }
+    .problem-body td { text-align: right; }
+    .problem-body thead th { color: var(--muted); font-weight: 500; text-align: right; }
+
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; padding: 14px 16px; margin-bottom: 14px; }
+    .field { display: grid; gap: 4px; }
+    .field span { color: var(--muted); font-size: 12px; }
+    .field select, .field input { height: 36px; padding: 0 10px; min-width: 120px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
+    .field input[type="number"] { width: 84px; min-width: 0; }
+    .field select#model { min-width: 200px; }
+    .toolbar .spacer { flex: 1; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 9px;
+      border: 1px solid transparent; background: var(--apple-soft); color: var(--apple-ink); font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) { background: var(--apple-soft-hover); }
+    .btn .icon { width: 15px; height: 15px; }
+    .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; height: 32px; padding: 0 12px; }
+    .btn.ghost:hover:not(:disabled) { background: transparent; border-color: var(--muted); }
+    .btn.ghost .icon { width: 14px; height: 14px; color: var(--muted); }
+    .btn:disabled { opacity: .55; cursor: default; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 4px 10px; }
+    .legend .grow { flex: 1; }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .legend .flash { color: var(--peach); }
+    .legend .flash:empty { display: none; }
+
+    .mark { width: 15px; height: 15px; flex: none; }
+    .mark.ok { color: var(--apple); }
+    .mark.bad { color: var(--peach); }
+    .mark.err { color: var(--faint); }
+    .mark.dim { opacity: .3; }
+
+    .table-head, .row-main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.7fr) 96px 180px 128px; gap: 16px; align-items: center; }
+    .table-head { padding: 10px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .table-head > :first-child { padding-left: 20px; }
+    .row { border-bottom: 1px solid var(--line); }
+    .row:last-child { border-bottom: 0; }
+    .row-main { padding: 14px 18px; cursor: pointer; }
+    .row-main:hover, .row.open .row-main { background: var(--sunken); }
+    .account { min-width: 0; }
+    .account .email { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .toggle { display: inline-flex; align-items: center; gap: 4px; min-width: 0; padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: left; }
+    .toggle .chev { color: var(--faint); }
+    .toggle .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account .file { padding-left: 20px; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tag { flex: none; padding: 0 6px; border-radius: 6px; background: var(--sunken); border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 500; }
+
+    .latest { min-width: 0; }
+    .latest-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .verdict { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 1px 8px 1px 6px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .verdict .icon { width: 13px; height: 13px; }
+    .verdict.ok { background: var(--apple-soft); color: var(--apple-ink); }
+    .verdict.bad { background: var(--peach-soft); color: var(--peach); }
+    .verdict.err { background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
+    .meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .snippet { margin-top: 2px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .none { color: var(--faint); }
+
+    .rate b { font-size: 17px; font-weight: 600; }
+    .rate small { display: block; color: var(--faint); font-size: 12px; }
+    .marks { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; min-height: 15px; }
+    .action { text-align: right; }
+
+    .details { padding: 4px 18px 16px; background: var(--sunken); }
+    .history { display: grid; gap: 8px; }
+    .entry { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+    .entry .mark { margin-top: 2px; }
+    .entry-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 12px; }
+    .entry-meta .when { color: var(--ink); }
+    .entry pre { margin: 6px 0 0; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 12.5px; line-height: 1.6; }
+    .entry pre.error { color: var(--peach); }
+
+    .empty, .notice { padding: 40px 20px; text-align: center; color: var(--muted); }
+    .notice.error { color: var(--peach); }
+    .login { max-width: 380px; margin: 12vh auto 0; padding: 24px; }
+    .login h2 { margin: 0 0 6px; font-size: 17px; }
+    .login p { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+    .login form { display: flex; gap: 8px; }
+    .login input { flex: 1; height: 36px; padding: 0 10px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
+    .login .error { margin: 10px 0 0; color: var(--peach); }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 820px) {
+      main { padding: 20px 14px 40px; }
+      .problem-body { grid-template-columns: minmax(0, 1fr); }
+      .problem-body .btn { justify-self: start; }
+      .table-head { display: none; }
+      .row-main { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "account action" "latest latest" "rate marks"; gap: 10px 12px; }
+      .account { grid-area: account; } .latest { grid-area: latest; } .rate { grid-area: rate; } .marks { grid-area: marks; justify-content: flex-end; } .action { grid-area: action; }
+      .rate b { font-size: 15px; } .rate small { display: inline; margin-left: 6px; }
+      .toolbar .spacer { display: none; }
+      .toolbar .field { flex: 1 1 120px; }
+      .toolbar .field select, .toolbar .field input { width: 100%; min-width: 0; }
+      .toolbar .btn { flex: 1 1 100%; }
+      .legend .grow { flex-basis: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1><i data-icon="candy"></i>Codex 糖果测试</h1>
+      <p class="lede">让每个 Codex 账号解同一道糖果题，答出 <b class="mono">21</b> 即为正确，用来发现降智账号。</p>
+      <details class="problem">
+        <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
+        <div class="problem-body">
+          <p id="question"></p>
+          <button id="copy" class="btn ghost" type="button"></button>
+          <table class="mono">
+            <thead><tr><th></th><th>苹果味</th><th>桃子味</th><th>西瓜味</th></tr></thead>
+            <tbody>
+              <tr><th>圆形</th><td>7</td><td>9</td><td>8</td></tr>
+              <tr><th>五角星形</th><td>7</td><td>6</td><td>4</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </header>
+
+    <section id="login" class="card login" hidden>
+      <h2>连接 CPA</h2>
+      <p>输入 CPA 管理密钥。在 CPA 管理面板中打开此页时会自动使用面板的密钥。</p>
+      <form id="login-form">
+        <input id="login-key" type="password" autocomplete="current-password" placeholder="管理密钥" aria-label="管理密钥" required>
+        <button class="btn" type="submit">连接</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+    </section>
+
+    <div id="app" hidden>
+      <form id="toolbar" class="card toolbar">
+        <label class="field"><span>模型</span><select id="model"></select></label>
+        <label class="field"><span>推理强度</span><select id="effort"></select></label>
+        <label class="field"><span>每个账号测试次数</span><input id="runs" class="mono" type="number" min="1" max="10" value="1"></label>
+        <div class="spacer"></div>
+        <button id="run-all" class="btn" type="submit"></button>
+      </form>
+
+      <div class="legend">
+        <span><i data-icon="circle-check" data-class="mark ok"></i>答对</span>
+        <span><i data-icon="circle-x" data-class="mark bad"></i>答错</span>
+        <span><i data-icon="circle-alert" data-class="mark err"></i>请求出错</span>
+        <span><i data-icon="circle-check" data-class="mark ok dim"></i>其他模型或推理强度</span>
+        <span class="grow"></span>
+        <span id="flash" class="flash" role="alert"></span>
+        <span id="rate-scope"></span>
+      </div>
+
+      <section class="card">
+        <div class="table-head">
+          <div>账号</div>
+          <div>最近一次</div>
+          <div>正确率</div>
+          <div>最近 20 次</div>
+          <div></div>
+        </div>
+        <div id="rows"><div class="notice">正在加载…</div></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    "use strict";
+    const BASE = "/v0/management/plugins/cpa-codex-candy-eval";
+    const KEY_STORE = "cpa-codex-candy-eval.key";
+    const PREF_STORE = "cpa-codex-candy-eval.prefs";
+    const DEFAULT_MODEL = "gpt-5.6-sol";
+    const DEFAULT_EFFORT = "low";
+    const DEFAULT_EFFORTS = ["low", "medium", "high", "xhigh"];
+    const HIDDEN_MODEL = (id) => id.startsWith("gpt-image-") || id === "codex-auto-review";
+    // The exact prompt sent to the models, injected by the plugin.
+    const PROMPT = /*CANDY_PROMPT*/"";
+
+    // Lucide icons (https://lucide.dev, ISC license).
+    const ICONS = {
+      candy: '<path d="M10 7v10.9"/><path d="M14 6.1V17"/><path d="M16 7V3a1 1 0 0 1 1.707-.707 2.5 2.5 0 0 0 2.152.717 1 1 0 0 1 1.131 1.131 2.5 2.5 0 0 0 .717 2.152A1 1 0 0 1 21 8h-4"/><path d="M16.536 7.465a5 5 0 0 0-7.072 0l-2 2a5 5 0 0 0 0 7.07 5 5 0 0 0 7.072 0l2-2a5 5 0 0 0 0-7.07"/><path d="M8 17v4a1 1 0 0 1-1.707.707 2.5 2.5 0 0 0-2.152-.717 1 1 0 0 1-1.131-1.131 2.5 2.5 0 0 0-.717-2.152A1 1 0 0 1 3 16h4"/>',
+      "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+      copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+      check: '<path d="M20 6 9 17l-5-5"/>',
+      "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
+      "circle-x": '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+      "circle-alert": '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+      "loader-circle": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+      play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+    };
+    const icon = (name, cls = "", title = "") =>
+      `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"` +
+      (title ? ` role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>` : ` aria-hidden="true">`) + `${ICONS[name]}</svg>`;
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+    let key = "";
+    let auths = [];
+    let models = [];
+    let pollTimer = 0;
+    const expanded = new Set();
+
+    document.querySelectorAll("[data-icon]").forEach((el) => { el.outerHTML = icon(el.dataset.icon, el.dataset.class); });
+    $("question").textContent = PROMPT.split("\n\n")[1] || "";
+
+    const COPY_LABEL = icon("copy") + "复制题目";
+    $("copy").innerHTML = COPY_LABEL;
+    $("copy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(PROMPT);
+      } catch (_) {
+        const area = Object.assign(document.createElement("textarea"), { value: PROMPT });
+        area.style.cssText = "position:fixed;opacity:0";
+        document.body.append(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+      $("copy").innerHTML = icon("check") + "已复制";
+      setTimeout(() => { $("copy").innerHTML = COPY_LABEL; }, 1600);
+    });
+
+    /* The CPA management panel keeps its settings in (optionally obfuscated) localStorage on the same origin. */
+    function panelValue(name) {
+      try {
+        let raw = localStorage.getItem(name);
+        if (!raw) return null;
+        const prefix = "enc::v1::";
+        if (raw.startsWith(prefix)) {
+          const secret = new TextEncoder().encode("cli-proxy-api-webui::secure-storage|" + location.host + "|" + navigator.userAgent);
+          const bin = atob(raw.slice(prefix.length));
+          const bytes = Uint8Array.from(bin, (c, i) => c.charCodeAt(0) ^ secret[i % secret.length]);
+          raw = new TextDecoder().decode(bytes);
+        }
+        return JSON.parse(raw);
+      } catch (_) { return null; }
+    }
+
+    function applyTheme() {
+      const theme = panelValue("cli-proxy-theme")?.state?.theme;
+      const dark = theme === "dark" || (theme !== "white" && matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    }
+    applyTheme();
+    addEventListener("storage", applyTheme);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+
+    function panelKey() {
+      const k = panelValue("cli-proxy-auth")?.state?.managementKey ?? panelValue("managementKey");
+      return typeof k === "string" ? k.trim() : "";
+    }
+
+    class AuthError extends Error {}
+
+    async function api(path, body) {
+      const init = { cache: "no-store", headers: { Authorization: "Bearer " + key } };
+      if (body !== undefined) {
+        init.method = "POST";
+        init.headers["Content-Type"] = "application/json";
+        init.body = JSON.stringify(body);
+      }
+      const resp = await fetch(path, init);
+      const text = await resp.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch (_) {}
+      if (resp.status === 401) throw new AuthError("管理密钥无效，请重新输入。");
+      if (!resp.ok) {
+        const err = data?.error;
+        throw new Error((typeof err === "string" ? err : err?.message) || text || "HTTP " + resp.status);
+      }
+      return data;
+    }
+
+    function prefs() {
+      try { return JSON.parse(localStorage.getItem(PREF_STORE)) || {}; } catch (_) { return {}; }
+    }
+    function savePrefs() {
+      try { localStorage.setItem(PREF_STORE, JSON.stringify({ model: $("model").value, effort: $("effort").value, runs: runs() })); } catch (_) {}
+    }
+    const runs = () => Math.min(Math.max(parseInt($("runs").value, 10) || 1, 1), 10);
+
+    function fillModels() {
+      const saved = prefs();
+      const ids = models.map((m) => m.id);
+      if (saved.model && !ids.includes(saved.model)) ids.unshift(saved.model);
+      if (!ids.includes(DEFAULT_MODEL)) ids.unshift(DEFAULT_MODEL);
+      $("model").innerHTML = ids.map((id) => `<option>${esc(id)}</option>`).join("");
+      $("model").value = saved.model || DEFAULT_MODEL;
+      if (saved.runs) $("runs").value = saved.runs;
+      fillEfforts(saved.effort || DEFAULT_EFFORT);
+    }
+
+    function fillEfforts(preferred) {
+      const levels = models.find((m) => m.id === $("model").value)?.thinking?.levels || DEFAULT_EFFORTS;
+      $("effort").innerHTML = levels.map((l) => `<option>${esc(l)}</option>`).join("");
+      $("effort").value = levels.includes(preferred) ? preferred : levels.includes(DEFAULT_EFFORT) ? DEFAULT_EFFORT : levels[0];
+    }
+
+    const scopeMatch = (r) => r.model === $("model").value && r.effort === $("effort").value;
+    const kind = (r) => (r.error ? "err" : r.ok ? "ok" : "bad");
+    const VERDICT = { ok: "答对", bad: "答错", err: "出错" };
+    const MARK = { ok: "circle-check", bad: "circle-x", err: "circle-alert" };
+    const fmtNum = (n) => (n ? Number(n).toLocaleString("en-US") : "0");
+    const fmtSec = (ms) => (ms / 1000).toFixed(1) + "s";
+    function fmtTime(iso) {
+      const d = new Date(iso);
+      const p = (n) => String(n).padStart(2, "0");
+      return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+    const oneLine = (s) => String(s || "").replace(/\s+/g, " ").trim();
+    const mark = (r, extra = "") => icon(MARK[kind(r)], `mark ${kind(r)} ${extra}`, `${fmtTime(r.time)} · ${r.model} ${r.effort} · ${VERDICT[kind(r)]}`);
+
+    function renderRow(a) {
+      const results = a.results;
+      const last = results[results.length - 1];
+      const graded = results.filter((r) => scopeMatch(r) && !r.error);
+      const correct = graded.filter((r) => r.ok).length;
+      const open = expanded.has(a.id);
+
+      const latest = last
+        ? `<div class="latest-top"><span class="verdict ${kind(last)}">${icon(MARK[kind(last)])}${VERDICT[kind(last)]}</span>
+             <span class="meta mono">${esc(`${last.model} · ${last.effort} · ${fmtSec(last.duration_ms)}`)}${last.error ? "" : ` · 推理 ${fmtNum(last.reasoning_tokens)}`}</span></div>
+           <div class="snippet">${esc(oneLine(last.error || last.answer))}</div>`
+        : `<span class="none">尚未测试</span>`;
+      const rate = graded.length
+        ? `<b class="mono">${Math.round((correct / graded.length) * 100)}%</b><small class="mono">${correct}/${graded.length}</small>`
+        : `<span class="none">—</span>`;
+      const marks = results.map((r) => mark(r, scopeMatch(r) ? "" : "dim")).join("");
+      const action = a.running
+        ? `<button class="btn ghost" type="button" disabled>${icon("loader-circle", "spin")}测试中 <span class="mono">${a.running.done}/${a.running.total}</span></button>`
+        : `<button class="btn ghost" type="button" data-run="${esc(a.id)}">${icon("play")}测试</button>`;
+
+      const history = [...results].reverse().map((r) => `
+        <div class="entry">${mark(r)}<div>
+          <div class="entry-meta mono"><span class="when">${esc(fmtTime(r.time))}</span><span>${esc(r.model)} · ${esc(r.effort)}</span><span>用时 ${fmtSec(r.duration_ms)}</span>
+            ${r.error ? "" : `<span>输入 ${fmtNum(r.input_tokens)}</span><span>输出 ${fmtNum(r.output_tokens)}</span><span>推理 ${fmtNum(r.reasoning_tokens)}</span>`}</div>
+          <pre class="${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
+        </div></div>`).join("");
+
+      return `<div class="row ${open ? "open" : ""}">
+        <div class="row-main" data-row="${esc(a.id)}">
+          <div class="account">
+            <div class="email"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>${a.disabled ? `<span class="tag">已禁用</span>` : ""}</div>
+            <div class="file mono">${esc(a.name)}</div>
+          </div>
+          <div class="latest">${latest}</div>
+          <div class="rate">${rate}</div>
+          <div class="marks">${marks}</div>
+          <div class="action">${action}</div>
+        </div>
+        ${open ? `<div class="details"><div class="history">${history || `<div class="empty">还没有测试记录，点击「测试」开始。</div>`}</div></div>` : ""}
+      </div>`;
+    }
+
+    function render() {
+      $("rate-scope").textContent = `正确率按 ${$("model").value} · ${$("effort").value} 统计`;
+      const enabled = auths.filter((a) => !a.disabled).length;
+      $("run-all").innerHTML = `${icon("play")}测试全部 (${enabled})`;
+      $("run-all").disabled = !enabled || auths.every((a) => a.disabled || a.running);
+      const focused = document.activeElement?.closest?.("[data-toggle], [data-run]");
+      const focusSelector = focused && (focused.dataset.toggle !== undefined
+        ? `[data-toggle="${CSS.escape(focused.dataset.toggle)}"]` : `[data-run="${CSS.escape(focused.dataset.run)}"]`);
+      $("rows").innerHTML = auths.length
+        ? auths.map(renderRow).join("")
+        : `<div class="empty">没有 Codex 认证文件。在 CPA 中添加 Codex 账号后刷新此页。</div>`;
+      if (focusSelector) $("rows").querySelector(focusSelector)?.focus();
+    }
+
+    async function load() {
+      clearTimeout(pollTimer);
+      try {
+        auths = (await api(BASE + "/state")).auths || [];
+        render();
+      } catch (err) {
+        if (err instanceof AuthError) return showLogin(err.message);
+        $("rows").innerHTML = `<div class="notice error">读取测试结果失败：${esc(err.message)}</div>`;
+      }
+      pollTimer = setTimeout(load, auths.some((a) => a.running) ? 2500 : 20000);
+    }
+
+    async function run(body) {
+      savePrefs();
+      $("flash").textContent = "";
+      try {
+        await api(BASE + "/run", { ...body, model: $("model").value, effort: $("effort").value, runs: runs() });
+      } catch (err) {
+        if (err instanceof AuthError) return showLogin(err.message);
+        $("flash").textContent = "开始测试失败：" + err.message;
+      }
+      load();
+    }
+
+    function showLogin(message) {
+      clearTimeout(pollTimer);
+      $("app").hidden = true;
+      $("login").hidden = false;
+      $("login-error").hidden = !message;
+      $("login-error").textContent = message || "";
+      $("login-key").focus();
+    }
+
+    async function start() {
+      $("login").hidden = true;
+      $("app").hidden = false;
+      try {
+        models = ((await api("/v0/management/model-definitions/codex")).models || []).filter((m) => !HIDDEN_MODEL(m.id));
+      } catch (err) {
+        if (err instanceof AuthError) return showLogin(err.message);
+        models = [];
+      }
+      fillModels();
+      load();
+    }
+
+    $("login-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      key = $("login-key").value.trim();
+      try { sessionStorage.setItem(KEY_STORE, key); } catch (_) {}
+      start();
+    });
+    $("toolbar").addEventListener("submit", (e) => { e.preventDefault(); run({ all: true }); });
+    $("model").addEventListener("change", () => { fillEfforts($("effort").value); savePrefs(); render(); });
+    $("effort").addEventListener("change", () => { savePrefs(); render(); });
+    $("runs").addEventListener("change", () => { $("runs").value = runs(); savePrefs(); });
+    $("rows").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-run]");
+      if (btn) { btn.disabled = true; return run({ auth_ids: [btn.dataset.run] }); }
+      const row = e.target.closest("[data-row]");
+      if (!row) return;
+      const id = row.dataset.row;
+      expanded.has(id) ? expanded.delete(id) : expanded.add(id);
+      render();
+    });
+
+    key = panelKey() || sessionStorage.getItem(KEY_STORE) || "";
+    key ? start() : showLogin("");
+  </script>
+</body>
+</html>
