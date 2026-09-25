@@ -18,7 +18,7 @@ import (
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.1.6"
+	pluginVersion  = "0.1.7"
 	abiVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
@@ -36,7 +36,7 @@ var hostCall func(method string, payload any) (json.RawMessage, error)
 //go:embed ui.html
 var uiTemplate []byte
 
-// uiHTML is the web UI with the prompt injected, so the page shows and copies exactly what models receive.
+// uiHTML carries candyPrompt so the page shows and copies the exact prompt.
 var uiHTML = func() []byte {
 	prompt, _ := json.Marshal(candyPrompt)
 	return bytes.Replace(uiTemplate, []byte(`/*CANDY_PROMPT*/""`), prompt, 1)
@@ -51,7 +51,7 @@ const candyPrompt = `不使用任何外部工具回答以下问题：
 五角星形   7      6      4
 `
 
-// Lucide "candy" icon (https://lucide.dev, ISC license); hosts render it through an img element.
+// Lucide "candy" icon. Hosts render it in an img element, so the stroke color is fixed.
 const logoSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#72787c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><style>@media (prefers-color-scheme: dark) { :root { stroke: #9c9d9b; } }</style><path d="M10 7v10.9"/><path d="M14 6.1V17"/><path d="M16 7V3a1 1 0 0 1 1.707-.707 2.5 2.5 0 0 0 2.152.717 1 1 0 0 1 1.131 1.131 2.5 2.5 0 0 0 .717 2.152A1 1 0 0 1 21 8h-4"/><path d="M16.536 7.465a5 5 0 0 0-7.072 0l-2 2a5 5 0 0 0 0 7.07 5 5 0 0 0 7.072 0l2-2a5 5 0 0 0 0-7.07"/><path d="M8 17v4a1 1 0 0 1-1.707.707 2.5 2.5 0 0 0-2.152-.717 1 1 0 0 1-1.131-1.131 2.5 2.5 0 0 0-.717-2.152A1 1 0 0 1 3 16h4"/></svg>`
 
 func main() {}
@@ -83,7 +83,6 @@ type managementResponse struct {
 type authFile struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	Type     string `json:"type"`
 	Provider string `json:"provider"`
 	Email    string `json:"email"`
 	Disabled bool   `json:"disabled"`
@@ -170,7 +169,7 @@ func handleMethod(method string, request []byte) (response []byte) {
 			return errorEnvelope("invalid_request", err.Error(), http.StatusBadRequest)
 		}
 		return okEnvelope(handleManagement(req))
-	case "plugin.quiesce", "plugin.shutdown":
+	case "plugin.quiesce":
 		return okEnvelope(map[string]any{})
 	default:
 		return errorEnvelope("unknown_method", "Unsupported plugin method: "+method, http.StatusNotFound)
@@ -373,9 +372,6 @@ func hasStandalone21(text string) bool {
 }
 
 func codexAuths() ([]authFile, error) {
-	if hostCall == nil {
-		return nil, fmt.Errorf("宿主回调不可用")
-	}
 	raw, err := hostCall("host.auth.list", map[string]any{})
 	if err != nil {
 		return nil, fmt.Errorf("读取认证文件失败：%w", err)
@@ -388,7 +384,7 @@ func codexAuths() ([]authFile, error) {
 	}
 	auths := list.Files[:0]
 	for _, file := range list.Files {
-		if strings.EqualFold(file.Provider, "codex") || strings.EqualFold(file.Type, "codex") {
+		if strings.EqualFold(file.Provider, "codex") {
 			auths = append(auths, file)
 		}
 	}
@@ -422,7 +418,7 @@ func saveStateLocked() {
 	if err == nil {
 		err = os.Rename(tmp, statePath)
 	}
-	if err != nil && hostCall != nil {
+	if err != nil {
 		_, _ = hostCall("host.log", map[string]any{"level": "warn", "message": pluginID + ": save state failed: " + err.Error()})
 	}
 }

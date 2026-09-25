@@ -260,6 +260,7 @@
     const DEFAULT_MODEL = "gpt-5.6-sol";
     const DEFAULT_EFFORT = "low";
     const DEFAULT_EFFORTS = ["low", "medium", "high", "xhigh"];
+    const SEP = "\u2009·\u2009";
     const HIDDEN_MODEL = (id) => id.startsWith("gpt-image-") || id === "codex-auto-review";
     // The exact prompt sent to the models, injected by the plugin.
     const PROMPT = /*CANDY_PROMPT*/"";
@@ -312,7 +313,7 @@
       setTimeout(() => { $("copy").innerHTML = COPY_LABEL; }, 1600);
     });
 
-    /* The CPA management panel keeps its settings in (optionally obfuscated) localStorage on the same origin. */
+    // The CPA management panel keeps its state in same-origin localStorage, optionally obfuscated.
     function panelValue(name) {
       try {
         let raw = localStorage.getItem(name);
@@ -338,7 +339,7 @@
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
     function panelKey() {
-      const k = panelValue("cli-proxy-auth")?.state?.managementKey ?? panelValue("managementKey");
+      const k = panelValue("cli-proxy-auth")?.state?.managementKey;
       return typeof k === "string" ? k.trim() : "";
     }
 
@@ -362,12 +363,14 @@
       return data;
     }
 
-    function prefs() {
-      try { return JSON.parse(localStorage.getItem(PREF_STORE)) || {}; } catch (_) { return {}; }
+    function stored(name) {
+      try { return JSON.parse(localStorage.getItem(name)); } catch (_) { return null; }
     }
-    function savePrefs() {
-      try { localStorage.setItem(PREF_STORE, JSON.stringify({ model: $("model").value, effort: $("effort").value, runs: runs() })); } catch (_) {}
+    function store(name, value) {
+      try { localStorage.setItem(name, JSON.stringify(value)); } catch (_) {}
     }
+    const prefs = () => stored(PREF_STORE) || {};
+    const savePrefs = () => store(PREF_STORE, { model: $("model").value, effort: $("effort").value, runs: runs() });
     const runs = () => Math.min(Math.max(parseInt($("runs").value, 10) || 1, 1), 10);
 
     function fillModels() {
@@ -399,9 +402,9 @@
       return `${withYear ? d.getFullYear() + "-" : ""}${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
     }
     const oneLine = (s) => String(s || "").replace(/\s+/g, " ").trim();
-    const mark = (r, extra = "") => icon(MARK[kind(r)], `mark ${kind(r)} ${extra}`, `${fmtTime(r.time)} · ${r.model} ${r.effort} · ${VERDICT[kind(r)]}`);
+    const mark = (r, extra = "") => icon(MARK[kind(r)], `mark ${kind(r)} ${extra}`, `${fmtTime(r.time)}${SEP}${r.model}${SEP}${r.effort}${SEP}${VERDICT[kind(r)]}`);
     const verdict = (r) => `<span class="verdict ${kind(r)}">${icon(MARK[kind(r)])}${VERDICT[kind(r)]}</span>`;
-    const tokens = (r) => `输入 ${fmtNum(r.input_tokens)} · 输出 ${fmtNum(r.output_tokens)} · 推理 ${fmtNum(r.reasoning_tokens)}`;
+    const tokens = (r) => `输入 ${fmtNum(r.input_tokens)}${SEP}输出 ${fmtNum(r.output_tokens)}${SEP}推理 ${fmtNum(r.reasoning_tokens)}`;
 
     function renderRow(a) {
       const results = a.results;
@@ -412,7 +415,7 @@
 
       const latest = last
         ? `<div class="latest-top">${verdict(last)}
-             <span class="meta mono">${esc(`${last.model} · ${last.effort} · ${fmtSec(last.duration_ms)}`)}${last.error ? "" : ` · 推理 ${fmtNum(last.reasoning_tokens)}`}</span></div>
+             <span class="meta mono">${esc(`${last.model}${SEP}${last.effort}${SEP}${fmtSec(last.duration_ms)}`)}${last.error ? "" : `${SEP}推理 ${fmtNum(last.reasoning_tokens)}`}</span></div>
            <div class="snippet">${esc(oneLine(last.error || last.answer))}</div>`
         : `<span class="none">尚未测试</span>`;
       const rate = graded.length
@@ -425,7 +428,7 @@
 
       const history = [...results].reverse().map((r) => `
         <div class="entry">
-          <div class="entry-head">${verdict(r)}<span class="when mono">${esc(fmtTime(r.time, true))}</span><span class="mono">${esc(r.model)} · ${esc(r.effort)}</span>
+          <div class="entry-head">${verdict(r)}<span class="when mono">${esc(fmtTime(r.time, true))}</span><span class="mono">${esc(r.model)}${SEP}${esc(r.effort)}</span>
             <span class="mono">用时 ${fmtSec(r.duration_ms)}</span>${r.error ? "" : `<span class="mono">${tokens(r)}</span>`}</div>
           <pre class="entry-body ${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
         </div>`).join("");
@@ -446,7 +449,7 @@
     }
 
     function render() {
-      $("rate-scope").textContent = `正确率按 ${$("model").value} · ${$("effort").value} 统计`;
+      $("rate-scope").textContent = `正确率按 ${$("model").value}${SEP}${$("effort").value} 统计`;
       const enabled = auths.filter((a) => !a.disabled).length;
       $("run-all").innerHTML = `${icon("play")}测试全部 (${enabled})`;
       $("run-all").disabled = !enabled || auths.every((a) => a.disabled || a.running);
@@ -501,7 +504,6 @@
         models = ((await api("/v0/management/model-definitions/codex")).models || []).filter((m) => !HIDDEN_MODEL(m.id));
       } catch (err) {
         if (err instanceof AuthError) return showLogin(err.message);
-        models = [];
       }
       fillModels();
       load();
@@ -512,7 +514,7 @@
       if (!r) return;
       const tip = $("tip");
       tip.innerHTML = `<div class="tip-head">${verdict(r)}<span class="mono">${esc(fmtTime(r.time, true))}</span></div>
-        <div class="tip-meta mono">${esc(r.model)} · ${esc(r.effort)} · 用时 ${fmtSec(r.duration_ms)}</div>
+        <div class="tip-meta mono">${esc(r.model)}${SEP}${esc(r.effort)}${SEP}用时 ${fmtSec(r.duration_ms)}</div>
         ${r.error ? "" : `<div class="tip-meta mono">${tokens(r)}</div>`}
         <div class="tip-text ${r.error ? "error" : ""}">${esc(oneLine(r.error || r.answer))}</div>`;
       tip.hidden = false;
@@ -531,20 +533,22 @@
     $("rows").addEventListener("mouseleave", hideTip);
     addEventListener("scroll", hideTip, true);
 
-    /* Masking only blurs the account column in this browser, e.g. before sharing a screenshot. */
     function setMasked(masked) {
       document.body.classList.toggle("masked", masked);
       $("mask").setAttribute("aria-pressed", masked);
       $("mask").innerHTML = masked ? icon("eye") + "取消脱敏" : icon("eye-off") + "脱敏";
-      try { masked ? localStorage.setItem(MASK_STORE, "1") : localStorage.removeItem(MASK_STORE); } catch (_) {}
     }
-    try { setMasked(localStorage.getItem(MASK_STORE) === "1"); } catch (_) { setMasked(false); }
-    $("mask").addEventListener("click", () => setMasked(!document.body.classList.contains("masked")));
+    setMasked(stored(MASK_STORE) === true);
+    $("mask").addEventListener("click", () => {
+      const masked = !document.body.classList.contains("masked");
+      setMasked(masked);
+      store(MASK_STORE, masked);
+    });
 
     const CLEAR_LABEL = icon("trash-2") + "清空历史";
     $("clear").innerHTML = CLEAR_LABEL;
     $("clear").addEventListener("click", () => {
-      $("confirm-clear").returnValue = ""; // Esc keeps the previous value, which must never count as a confirmation.
+      $("confirm-clear").returnValue = ""; // Esc keeps the previous returnValue.
       $("confirm-clear").showModal();
     });
     $("confirm-clear").addEventListener("close", async () => {
