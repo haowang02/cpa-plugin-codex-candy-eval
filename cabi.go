@@ -67,7 +67,7 @@ import (
 
 //export cliproxy_plugin_init
 func cliproxy_plugin_init(host *C.cliproxy_host_api, api *C.cliproxy_plugin_api) C.int {
-	if api == nil {
+	if api == nil || host == nil || host.abi_version != C.uint32_t(abiVersion) || host.call == nil || host.free_buffer == nil {
 		return 1
 	}
 	C.store_host_api(host)
@@ -100,7 +100,7 @@ func callHost(method string, payload any) (json.RawMessage, error) {
 	if err := json.Unmarshal(C.GoBytes(response.ptr, C.int(response.len)), &env); err != nil {
 		return nil, fmt.Errorf("parse host call %s response: %w", method, err)
 	}
-	if !env.OK {
+	if code != 0 || !env.OK {
 		if env.Error != nil {
 			return nil, fmt.Errorf("%s: %s", env.Error.Code, env.Error.Message)
 		}

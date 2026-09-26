@@ -18,7 +18,7 @@ import (
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.1.7"
+	pluginVersion  = "0.1.8"
 	abiVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
@@ -81,11 +81,13 @@ type managementResponse struct {
 }
 
 type authFile struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Provider string `json:"provider"`
-	Email    string `json:"email"`
-	Disabled bool   `json:"disabled"`
+	ID        string `json:"id"`
+	AuthIndex string `json:"auth_index"`
+	Name      string `json:"name"`
+	Provider  string `json:"provider"`
+	Email     string `json:"email"`
+	PlanType  string `json:"plan_type,omitempty"`
+	Disabled  bool   `json:"disabled"`
 }
 
 type result struct {
@@ -110,6 +112,7 @@ type authView struct {
 	ID       string    `json:"id"`
 	Name     string    `json:"name"`
 	Email    string    `json:"email,omitempty"`
+	PlanType string    `json:"plan_type,omitempty"`
 	Disabled bool      `json:"disabled"`
 	Running  *progress `json:"running,omitempty"`
 	Results  []result  `json:"results"`
@@ -130,7 +133,6 @@ var (
 	running = map[string]*progress{}
 )
 
-// handleMethod answers one host RPC call with an encoded envelope.
 func handleMethod(method string, request []byte) (response []byte) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -197,8 +199,12 @@ func handleManagement(req managementRequest) managementResponse {
 	case req.Method == http.MethodDelete && path == managementBase+"/results":
 		mu.Lock()
 		defer mu.Unlock()
+		previous := results
 		results = map[string][]result{}
-		saveStateLocked()
+		if err := saveStateLocked(); err != nil {
+			results = previous
+			return jsonError(http.StatusInternalServerError, "清空记录失败："+err.Error())
+		}
 		return jsonResponse(http.StatusOK, map[string]bool{"cleared": true})
 	default:
 		return jsonError(http.StatusNotFound, "Route not found: "+req.Method+" "+req.Path)
@@ -210,21 +216,65 @@ func stateResponse() managementResponse {
 	if err != nil {
 		return jsonError(http.StatusBadGateway, err.Error())
 	}
+	// Host calls must stay outside the results lock.
+	for i := range auths {
+		auths[i].PlanType = authPlanType(auths[i])
+	}
 	mu.Lock()
 	defer mu.Unlock()
 	views := make([]authView, 0, len(auths))
 	for _, auth := range auths {
-		view := authView{ID: auth.ID, Name: auth.Name, Email: auth.Email, Disabled: auth.Disabled, Results: results[auth.ID]}
+		view := authView{ID: auth.ID, Name: auth.Name, Email: auth.Email, PlanType: auth.PlanType, Disabled: auth.Disabled, Results: results[auth.ID]}
 		if view.Results == nil {
 			view.Results = []result{}
 		}
-		if p := running[auth.ID]; p != nil {
-			copied := *p
-			view.Running = &copied
-		}
+		view.Running = running[auth.ID]
 		views = append(views, view)
 	}
 	return jsonResponse(http.StatusOK, map[string]any{"auths": views})
+}
+
+func authPlanType(auth authFile) string {
+	if plan := strings.TrimSpace(auth.PlanType); plan != "" {
+		return plan
+	}
+	if auth.AuthIndex == "" {
+		return ""
+	}
+	raw, err := hostCall("host.auth.get", map[string]string{"auth_index": auth.AuthIndex})
+	if err != nil {
+		return ""
+	}
+	var file struct {
+		JSON struct {
+			PlanType string `json:"plan_type"`
+			IDToken  string `json:"id_token"`
+		} `json:"json"`
+	}
+	if json.Unmarshal(raw, &file) != nil {
+		return ""
+	}
+	if plan := strings.TrimSpace(file.JSON.PlanType); plan != "" {
+		return plan
+	}
+	parts := strings.Split(file.JSON.IDToken, ".")
+	if len(parts) != 3 {
+		return ""
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
+	if err != nil {
+		return ""
+	}
+	// These claims are used for a display label, never for authorization.
+	var claims struct {
+		Auth struct {
+			PlanType string `json:"chatgpt_plan_type"`
+		} `json:"https://api.openai.com/auth"`
+	}
+	if json.Unmarshal(payload, &claims) != nil {
+		return ""
+	}
+	return strings.TrimSpace(claims.Auth.PlanType)
 }
 
 func runResponse(body []byte) managementResponse {
@@ -282,8 +332,11 @@ func runAuth(id, model, effort string, runs int) {
 		history := append(results[id], r)
 		results[id] = history[max(len(history)-historyLimit, 0):]
 		running[id].Done++
-		saveStateLocked()
+		err := saveStateLocked()
 		mu.Unlock()
+		if err != nil {
+			_, _ = hostCall("host.log", map[string]any{"level": "warn", "message": pluginID + ": save state failed: " + err.Error()})
+		}
 	}
 }
 
@@ -408,19 +461,20 @@ func loadState() {
 	}
 	if json.Unmarshal(data, &state) == nil && state.Results != nil {
 		results = state.Results
+		for id, history := range results {
+			results[id] = history[max(len(history)-historyLimit, 0):]
+		}
 	}
 }
 
-func saveStateLocked() {
+func saveStateLocked() error {
 	data, _ := json.Marshal(map[string]any{"results": results})
 	tmp := statePath + ".tmp"
 	err := os.WriteFile(tmp, data, 0o600)
 	if err == nil {
 		err = os.Rename(tmp, statePath)
 	}
-	if err != nil {
-		_, _ = hostCall("host.log", map[string]any{"level": "warn", "message": pluginID + ": save state failed: " + err.Error()})
-	}
+	return err
 }
 
 func truncate(text string, limit int) string {

@@ -32,7 +32,6 @@
     .icon { width: 16px; height: 16px; flex: none; }
     .spin { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 
     header { margin-bottom: 20px; }
     h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
@@ -46,22 +45,22 @@
     .chev { width: 15px; height: 15px; transition: transform .15s; }
     details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate(90deg); }
     .problem-body {
-      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: start;
-      margin-top: 10px; padding: 14px 16px; max-width: 800px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+      position: relative; margin-top: 10px; background: var(--sunken); border: 1px solid var(--line); border-radius: 12px;
     }
-    .problem-body p { margin: 0; }
-    .problem-body table { grid-column: 1; justify-self: start; border-collapse: collapse; font-size: 13px; }
-    .problem-body th, .problem-body td { padding: 4px 14px 4px 0; text-align: left; font-weight: 500; }
-    .problem-body td { text-align: right; }
-    .problem-body thead th { color: var(--muted); font-weight: 500; text-align: right; }
+    .problem-body pre { margin: 0; padding: 16px 52px 16px 16px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.75; }
+    .problem-body code { font: inherit; }
+    .copy-btn { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: 0; transition: opacity .15s, color .15s; }
+    .problem-body:hover .copy-btn, .problem-body:focus-within .copy-btn, .copy-btn.copied { opacity: 1; }
+    .copy-btn:hover, .copy-btn.copied { color: var(--apple); border-color: currentColor; }
+    @media (hover: none) { .copy-btn { opacity: 1; } }
 
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
     .toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; padding: 14px 16px; margin-bottom: 14px; }
-    .field { display: grid; gap: 4px; }
+    .field { display: grid; gap: 4px; min-width: 0; }
     .field span { color: var(--muted); font-size: 12px; }
     .field select, .field input { height: 36px; padding: 0 10px; min-width: 120px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
     .field input[type="number"] { width: 84px; min-width: 0; }
-    .field select#model { min-width: 200px; }
+    .field .model-select { width: 200px; }
     .toolbar .spacer { flex: 1; }
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 9px;
@@ -85,12 +84,13 @@
     .dialog-actions .btn { height: 34px; }
 
     .tip {
-      position: fixed; z-index: 10; max-width: 320px; padding: 10px 12px; pointer-events: none;
+      position: fixed; z-index: 10; max-width: min(320px, calc(100vw - 16px)); padding: 10px 12px; pointer-events: none;
       background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--float); font-size: 12px;
     }
-    .tip-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-    .tip-meta { color: var(--muted); }
-    .tip-text { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .tip-head, .latest-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .tip-head { margin-bottom: 6px; }
+    .tip .metrics { margin-top: 6px; }
+    .tip-text { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
     .tip-text.error { color: var(--peach); }
 
     .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 4px 10px; }
@@ -98,6 +98,7 @@
     .legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
     .legend .flash { color: var(--peach); }
     .legend .flash:empty { display: none; }
+    .legend .flash, .legend #rate-scope { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 
     .mark { width: 15px; height: 15px; flex: none; }
     .mark.ok { color: var(--apple); }
@@ -105,7 +106,7 @@
     .mark.err { color: var(--faint); }
     .mark.dim { opacity: .3; }
 
-    .table-head, .row-main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.7fr) 96px 180px 128px; gap: 16px; align-items: center; }
+    .table-head, .row-main { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr) 76px 208px 118px; gap: 14px; align-items: center; }
     .table-head { padding: 10px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
     .table-head > :first-child { padding-left: 20px; }
     .row { border-bottom: 1px solid var(--line); }
@@ -113,31 +114,34 @@
     .row-main { padding: 14px 18px; cursor: pointer; }
     .row-main:hover, .row.open .row-main { background: var(--sunken); }
     .account { min-width: 0; }
-    .account .email { display: flex; align-items: center; gap: 6px; min-width: 0; }
-    .toggle { display: inline-flex; align-items: center; gap: 4px; min-width: 0; padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: left; }
+    .toggle { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: left; }
     .toggle .chev { color: var(--faint); }
     .toggle .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .account .file { padding-left: 20px; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .account .name, .account .file { transition: filter .15s; }
-    .masked .account .name, .masked .account .file { filter: blur(5px); user-select: none; }
-    .tag { flex: none; padding: 0 6px; border-radius: 6px; background: var(--sunken); border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 500; }
+    .account .tags { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 20px; margin-top: 4px; }
+    .account .name { transition: filter .15s; }
+    .masked .account .name { filter: blur(5px); user-select: none; }
+    .tag { max-width: 100%; padding: 0 6px; border-radius: 6px; background: var(--sunken); border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .latest { min-width: 0; }
-    .latest-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .verdict { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 1px 8px 1px 6px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-    .verdict .icon { width: 13px; height: 13px; }
+    .verdict .icon, .metric .icon, .model-meta .icon { width: 13px; height: 13px; }
     .verdict.ok { background: var(--apple-soft); color: var(--apple-ink); }
     .verdict.bad { background: var(--peach-soft); color: var(--peach); }
     .verdict.err { background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
     .meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .snippet { margin-top: 2px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .metrics { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; max-width: 100%; color: var(--muted); font-size: 12px; }
+    .latest .metrics { margin-top: 5px; }
+    .metric { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .model-meta { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; }
+    .model-meta .meta { min-width: 0; }
     .none { color: var(--faint); }
 
     .rate b { font-size: 17px; font-weight: 600; }
     .rate small { display: block; color: var(--faint); font-size: 12px; }
-    .marks { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; min-height: 15px; }
-    .mark-hit { display: inline-flex; padding: 1px; border-radius: 50%; cursor: default; }
-    .mark-hit:hover { background: var(--band); }
+    .marks { display: grid; grid-template-columns: repeat(auto-fit, 19px); gap: 2px; align-items: center; width: 100%; max-width: 208px; min-width: 0; min-height: 19px; }
+    .mark-hit { display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px; padding: 2px; border: 0; border-radius: 50%; background: transparent; cursor: help; transition: transform .15s, background .15s, box-shadow .15s; }
+    .mark-hit:hover, .mark-hit:focus-visible { position: relative; z-index: 1; background: var(--surface); box-shadow: 0 0 0 2px var(--line); transform: scale(1.2); }
+    .mark-hit:hover .mark, .mark-hit:focus-visible .mark { opacity: 1; }
     .action { text-align: right; }
 
     .details { padding: 4px 18px 16px; background: var(--sunken); }
@@ -145,7 +149,12 @@
     .entry { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
     .entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 12px; background: var(--band); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
     .entry-head .when { color: var(--ink); }
-    .entry-body { margin: 0; padding: 12px 14px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 13px; line-height: 1.65; }
+    .entry-answer { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.65; }
+    .answer-toggle { display: inline-flex; align-items: center; gap: 2px; flex: none; padding: 0 3px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+    .answer-toggle:hover { color: var(--apple-ink); background: var(--apple-soft); }
+    .entry-answer.expanded .chev { transform: rotate(90deg); }
+    .entry-body { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }
+    .entry-answer.expanded .entry-body { white-space: pre-wrap; overflow-wrap: anywhere; }
     .entry-body.error { color: var(--peach); }
 
     .empty, .notice { padding: 40px 20px; text-align: center; color: var(--muted); }
@@ -154,23 +163,29 @@
     .login h2 { margin: 0 0 6px; font-size: 17px; }
     .login p { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
     .login form { display: flex; gap: 8px; }
-    .login input { flex: 1; height: 36px; padding: 0 10px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
+    .login input { flex: 1; min-width: 0; height: 36px; padding: 0 10px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
     .login .error { margin: 10px 0 0; color: var(--peach); }
     [hidden] { display: none !important; }
 
-    @media (max-width: 820px) {
+    @media (max-width: 1000px) {
       main { padding: 20px 14px 40px; }
-      .problem-body { grid-template-columns: minmax(0, 1fr); }
-      .problem-body .btn { justify-self: start; }
       .table-head { display: none; }
       .row-main { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "account action" "latest latest" "rate marks"; gap: 10px 12px; }
-      .account { grid-area: account; } .latest { grid-area: latest; } .rate { grid-area: rate; } .marks { grid-area: marks; justify-content: flex-end; } .action { grid-area: action; }
+      .account { grid-area: account; } .latest { grid-area: latest; } .rate { grid-area: rate; } .marks { grid-area: marks; width: 208px; } .action { grid-area: action; }
       .rate b { font-size: 15px; } .rate small { display: inline; margin-left: 6px; }
       .toolbar .spacer { display: none; }
       .toolbar .field { flex: 1 1 120px; }
       .toolbar .field select, .toolbar .field input { width: 100%; min-width: 0; }
       .toolbar .btn { flex: 1 1 140px; }
       .legend .grow { flex-basis: 100%; }
+    }
+    @media (max-width: 480px) {
+      .row-main { grid-template-areas: "account account" "latest latest" "rate action" "marks marks"; }
+      .marks { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .spin { animation: none; }
+      .mark-hit, .copy-btn, .chev, .account .name { transition: none; }
     }
   </style>
 </head>
@@ -182,15 +197,8 @@
       <details class="problem">
         <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
         <div class="problem-body">
-          <p id="question"></p>
-          <button id="copy" class="btn ghost" type="button"></button>
-          <table class="mono">
-            <thead><tr><th></th><th>苹果味</th><th>桃子味</th><th>西瓜味</th></tr></thead>
-            <tbody>
-              <tr><th>圆形</th><td>7</td><td>9</td><td>8</td></tr>
-              <tr><th>五角星形</th><td>7</td><td>6</td><td>4</td></tr>
-            </tbody>
-          </table>
+          <pre class="mono"><code id="question"></code></pre>
+          <button id="copy" class="copy-btn" type="button" aria-label="复制题目" title="复制题目"></button>
         </div>
       </details>
     </header>
@@ -207,12 +215,12 @@
 
     <div id="app" hidden>
       <form id="toolbar" class="card toolbar">
-        <label class="field"><span>模型</span><select id="model"></select></label>
+        <label class="field"><span>模型</span><select id="model" class="model-select"></select></label>
         <label class="field"><span>推理强度</span><select id="effort"></select></label>
         <label class="field"><span>每个账号测试次数</span><input id="runs" class="mono" type="number" min="1" max="10" value="1"></label>
         <div class="spacer"></div>
-        <button id="run-all" class="btn" type="submit"></button>
-        <button id="clear" class="btn ghost" type="button"></button>
+        <button id="run-all" class="btn" type="submit" disabled></button>
+        <button id="clear" class="btn ghost" type="button" disabled></button>
         <button id="mask" class="btn ghost" type="button"></button>
       </form>
 
@@ -260,7 +268,6 @@
     const DEFAULT_MODEL = "gpt-5.6-sol";
     const DEFAULT_EFFORT = "low";
     const DEFAULT_EFFORTS = ["low", "medium", "high", "xhigh"];
-    const SEP = "\u2009·\u2009";
     const HIDDEN_MODEL = (id) => id.startsWith("gpt-image-") || id === "codex-auto-review";
     // The exact prompt sent to the models, injected by the plugin.
     const PROMPT = /*CANDY_PROMPT*/"";
@@ -271,6 +278,12 @@
       "chevron-right": '<path d="m9 18 6-6-6-6"/>',
       copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
       check: '<path d="M20 6 9 17l-5-5"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+      "arrow-down": '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+      "arrow-up": '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+      brain: '<path d="M12 18V5a3 3 0 0 0-5.997-.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 18V5a3 3 0 0 1 5.997-.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4M6 17a4 4 0 0 1-1.967-.767M18 17a4 4 0 0 0 1.967-.767"/>',
+      calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+      cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
       "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
       "circle-x": '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
       "circle-alert": '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
@@ -280,9 +293,8 @@
       "eye-off": '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
       "trash-2": '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
     };
-    const icon = (name, cls = "", label = "") =>
-      `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"` +
-      (label ? ` role="img" aria-label="${esc(label)}">` : ` aria-hidden="true">`) + `${ICONS[name]}</svg>`;
+    const icon = (name, cls = "") =>
+      `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -291,26 +303,51 @@
     let auths = [];
     let models = [];
     let pollTimer = 0;
+    let loadVersion = 0;
+    let loadError = "";
+    let pending = false;
+    let tipTarget = null;
     const expanded = new Set();
+    const expandedAnswers = new Set();
 
     document.querySelectorAll("[data-icon]").forEach((el) => { el.outerHTML = icon(el.dataset.icon, el.dataset.class); });
-    $("question").textContent = PROMPT.split("\n\n")[1] || "";
+    $("question").textContent = PROMPT;
 
-    const COPY_LABEL = icon("copy") + "复制题目";
+    const COPY_LABEL = icon("copy");
+    let copyTimer = 0;
     $("copy").innerHTML = COPY_LABEL;
     $("copy").addEventListener("click", async () => {
       try {
-        await navigator.clipboard.writeText(PROMPT);
+        try {
+          await navigator.clipboard.writeText(PROMPT);
+        } catch (_) {
+          const area = Object.assign(document.createElement("textarea"), { value: PROMPT });
+          area.style.cssText = "position:fixed;opacity:0";
+          document.body.append(area);
+          try {
+            area.select();
+            if (!document.execCommand("copy")) throw new Error("copy failed");
+          } finally {
+            area.remove();
+            $("copy").focus();
+          }
+        }
       } catch (_) {
-        const area = Object.assign(document.createElement("textarea"), { value: PROMPT });
-        area.style.cssText = "position:fixed;opacity:0";
-        document.body.append(area);
-        area.select();
-        document.execCommand("copy");
-        area.remove();
+        $("copy").setAttribute("aria-label", "复制失败，请重试");
+        $("copy").title = "复制失败，请重试";
+        return;
       }
-      $("copy").innerHTML = icon("check") + "已复制";
-      setTimeout(() => { $("copy").innerHTML = COPY_LABEL; }, 1600);
+      clearTimeout(copyTimer);
+      $("copy").innerHTML = icon("check");
+      $("copy").classList.add("copied");
+      $("copy").setAttribute("aria-label", "已复制");
+      $("copy").title = "已复制";
+      copyTimer = setTimeout(() => {
+        $("copy").innerHTML = COPY_LABEL;
+        $("copy").classList.remove("copied");
+        $("copy").setAttribute("aria-label", "复制题目");
+        $("copy").title = "复制题目";
+      }, 1600);
     });
 
     // The CPA management panel keeps its state in same-origin localStorage, optionally obfuscated.
@@ -331,7 +368,7 @@
 
     function applyTheme() {
       const theme = panelValue("cli-proxy-theme")?.state?.theme;
-      const dark = theme === "dark" || (theme !== "white" && matchMedia("(prefers-color-scheme: dark)").matches);
+      const dark = theme === "dark" || (theme !== "white" && theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
     }
     applyTheme();
@@ -375,17 +412,19 @@
 
     function fillModels() {
       const saved = prefs();
-      const ids = models.map((m) => m.id);
-      if (saved.model && !ids.includes(saved.model)) ids.unshift(saved.model);
+      const ids = [...new Set(models.map((m) => m.id))];
+      const preferred = typeof saved.model === "string" && !HIDDEN_MODEL(saved.model) ? saved.model : DEFAULT_MODEL;
+      if (preferred && !ids.includes(preferred)) ids.unshift(preferred);
       if (!ids.includes(DEFAULT_MODEL)) ids.unshift(DEFAULT_MODEL);
       $("model").innerHTML = ids.map((id) => `<option>${esc(id)}</option>`).join("");
-      $("model").value = saved.model || DEFAULT_MODEL;
-      if (saved.runs) $("runs").value = saved.runs;
+      $("model").value = preferred || DEFAULT_MODEL;
+      if (saved.runs) { $("runs").value = saved.runs; $("runs").value = runs(); }
       fillEfforts(saved.effort || DEFAULT_EFFORT);
     }
 
     function fillEfforts(preferred) {
-      const levels = models.find((m) => m.id === $("model").value)?.thinking?.levels || DEFAULT_EFFORTS;
+      const configured = models.find((m) => m.id === $("model").value)?.thinking?.levels;
+      const levels = configured?.length ? configured : DEFAULT_EFFORTS;
       $("effort").innerHTML = levels.map((l) => `<option>${esc(l)}</option>`).join("");
       $("effort").value = levels.includes(preferred) ? preferred : levels.includes(DEFAULT_EFFORT) ? DEFAULT_EFFORT : levels[0];
     }
@@ -402,9 +441,25 @@
       return `${withYear ? d.getFullYear() + "-" : ""}${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
     }
     const oneLine = (s) => String(s || "").replace(/\s+/g, " ").trim();
-    const mark = (r, extra = "") => icon(MARK[kind(r)], `mark ${kind(r)} ${extra}`, `${fmtTime(r.time)}${SEP}${r.model}${SEP}${r.effort}${SEP}${VERDICT[kind(r)]}`);
+    const modelName = (r) => r.effort ? `${r.model}(${r.effort})` : r.model;
+    const modelMeta = (r) => `<span class="model-meta" title="${esc(modelName(r))}">${icon("cpu")}<span class="meta mono">${esc(modelName(r))}</span></span>`;
     const verdict = (r) => `<span class="verdict ${kind(r)}">${icon(MARK[kind(r)])}${VERDICT[kind(r)]}</span>`;
-    const tokens = (r) => `输入 ${fmtNum(r.input_tokens)}${SEP}输出 ${fmtNum(r.output_tokens)}${SEP}推理 ${fmtNum(r.reasoning_tokens)}`;
+    const metric = (name, label, value) => `<span class="metric mono" title="${esc(label)}" aria-label="${esc(`${label} ${value}`)}">${icon(name)}<span>${esc(value)}</span></span>`;
+    const metrics = (r) => metric("clock", "用时", fmtSec(r.duration_ms)) +
+      metric("arrow-down", "输入 tokens", fmtNum(r.input_tokens)) +
+      metric("arrow-up", "输出 tokens", fmtNum(r.output_tokens)) +
+      metric("brain", "推理 tokens", fmtNum(r.reasoning_tokens));
+    const PLAN_NAMES = {
+      free: "Free", plus: "Plus", team: "Team", pro: "Pro 20x",
+      prolite: "Pro 5x", "pro-lite": "Pro 5x", pro_lite: "Pro 5x",
+      self_serve_business_prolite: "Business Premium",
+    };
+    function planName(plan) {
+      const name = String(plan || "").trim();
+      return Object.hasOwn(PLAN_NAMES, name.toLowerCase()) ? PLAN_NAMES[name.toLowerCase()] : name || "其他";
+    }
+    const answerKey = (id, r) => JSON.stringify([id, r.time, r.model, r.effort]);
+    const answerToggle = (open) => `${icon("chevron-right", "chev")}${open ? "收起" : "展开"}`;
 
     function renderRow(a) {
       const results = a.results;
@@ -415,29 +470,37 @@
 
       const latest = last
         ? `<div class="latest-top">${verdict(last)}
-             <span class="meta mono">${esc(`${last.model}${SEP}${last.effort}${SEP}${fmtSec(last.duration_ms)}`)}${last.error ? "" : `${SEP}推理 ${fmtNum(last.reasoning_tokens)}`}</span></div>
-           <div class="snippet">${esc(oneLine(last.error || last.answer))}</div>`
+             ${modelMeta(last)}</div>
+           <div class="metrics">${metrics(last)}</div>`
         : `<span class="none">尚未测试</span>`;
       const rate = graded.length
         ? `<b class="mono">${Math.round((correct / graded.length) * 100)}%</b><small class="mono">${correct}/${graded.length}</small>`
         : `<span class="none">—</span>`;
-      const marks = results.map((r, i) => `<span class="mark-hit" data-auth="${esc(a.id)}" data-i="${i}">${mark(r, scopeMatch(r) ? "" : "dim")}</span>`).join("");
+      const marks = results.map((r, i) => `<button class="mark-hit" type="button" data-auth="${esc(a.id)}" data-i="${i}" aria-label="${esc(`${fmtTime(r.time)} ${modelName(r)} ${VERDICT[kind(r)]}`)}">${icon(MARK[kind(r)], `mark ${kind(r)} ${scopeMatch(r) ? "" : "dim"}`)}</button>`).join("");
       const action = a.running
         ? `<button class="btn ghost" type="button" disabled>${icon("loader-circle", "spin")}测试中 <span class="mono">${a.running.done}/${a.running.total}</span></button>`
-        : `<button class="btn ghost" type="button" data-run="${esc(a.id)}">${icon("play")}测试</button>`;
+        : `<button class="btn ghost" type="button" data-run="${esc(a.id)}" ${pending ? "disabled" : ""}>${icon("play")}测试</button>`;
 
-      const history = [...results].reverse().map((r) => `
+      const history = open ? [...results].reverse().map((r, i) => {
+        const key = answerKey(a.id, r);
+        const answerOpen = expandedAnswers.has(key);
+        const bodyID = `answer-${encodeURIComponent(a.id)}-${i}`;
+        return `
         <div class="entry">
-          <div class="entry-head">${verdict(r)}<span class="when mono">${esc(fmtTime(r.time, true))}</span><span class="mono">${esc(r.model)}${SEP}${esc(r.effort)}</span>
-            <span class="mono">用时 ${fmtSec(r.duration_ms)}</span>${r.error ? "" : `<span class="mono">${tokens(r)}</span>`}</div>
-          <pre class="entry-body ${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
-        </div>`).join("");
+          <div class="entry-head">${verdict(r)}<span class="when">${metric("calendar", "测试时间", fmtTime(r.time, true))}</span>${modelMeta(r)}
+            <span class="metrics">${metrics(r)}</span></div>
+          <div class="entry-answer ${answerOpen ? "expanded" : ""}">
+            <button class="answer-toggle" type="button" data-answer="${esc(key)}" aria-expanded="${answerOpen}" aria-controls="${esc(bodyID)}" aria-label="${answerOpen ? "收起文本" : "展开文本"}">${answerToggle(answerOpen)}</button>
+            <pre id="${esc(bodyID)}" class="entry-body ${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
+          </div>
+        </div>`;
+      }).join("") : "";
 
       return `<div class="row ${open ? "open" : ""}">
         <div class="row-main" data-row="${esc(a.id)}">
           <div class="account">
-            <div class="email"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>${a.disabled ? `<span class="tag">已禁用</span>` : ""}</div>
-            <div class="file mono">${esc(a.name)}</div>
+            <button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
+            <div class="tags"><span class="tag">${esc(planName(a.plan_type))}</span>${a.disabled ? `<span class="tag">已停用</span>` : ""}</div>
           </div>
           <div class="latest">${latest}</div>
           <div class="rate">${rate}</div>
@@ -449,47 +512,74 @@
     }
 
     function render() {
-      $("rate-scope").textContent = `正确率按 ${$("model").value}${SEP}${$("effort").value} 统计`;
+      $("rate-scope").textContent = `正确率按 ${modelName({ model: $("model").value, effort: $("effort").value })} 统计`;
       const enabled = auths.filter((a) => !a.disabled).length;
       $("run-all").innerHTML = `${icon("play")}测试全部 (${enabled})`;
-      $("run-all").disabled = !enabled || auths.every((a) => a.disabled || a.running);
-      $("clear").disabled = auths.every((a) => !a.results.length);
+      $("run-all").disabled = pending || !enabled || auths.every((a) => a.disabled || a.running);
+      $("clear").disabled = pending || auths.every((a) => !a.results.length);
       hideTip();
-      const focused = document.activeElement?.closest?.("[data-toggle], [data-run]");
-      const focusSelector = focused && (focused.dataset.toggle !== undefined
-        ? `[data-toggle="${CSS.escape(focused.dataset.toggle)}"]` : `[data-run="${CSS.escape(focused.dataset.run)}"]`);
+      const focused = document.activeElement?.closest?.("[data-toggle], [data-run], [data-answer], [data-auth]");
+      const focusAttr = focused && ["data-toggle", "data-run", "data-answer", "data-auth"].find((attr) => focused.hasAttribute(attr));
+      const focusSelector = focusAttr && `[${focusAttr}="${CSS.escape(focused.getAttribute(focusAttr))}"]` +
+        (focusAttr === "data-auth" ? `[data-i="${focused.dataset.i}"]` : "");
       $("rows").innerHTML = auths.length
         ? auths.map(renderRow).join("")
         : `<div class="empty">没有 Codex 认证文件。在 CPA 中添加 Codex 账号后刷新此页。</div>`;
-      if (focusSelector) $("rows").querySelector(focusSelector)?.focus();
+      if (focusSelector) $("rows").querySelector(focusSelector)?.focus({ preventScroll: true });
     }
 
     async function load() {
+      const version = ++loadVersion;
       clearTimeout(pollTimer);
       try {
-        auths = (await api(BASE + "/state")).auths || [];
+        const data = await api(BASE + "/state");
+        if (version !== loadVersion) return;
+        auths = data.auths || [];
+        if ($("flash").textContent === loadError) $("flash").textContent = "";
+        loadError = "";
+        const ids = new Set(auths.map((a) => a.id));
+        const answers = new Set(auths.flatMap((a) => a.results.map((r) => answerKey(a.id, r))));
+        for (const id of expanded) if (!ids.has(id)) expanded.delete(id);
+        for (const id of expandedAnswers) if (!answers.has(id)) expandedAnswers.delete(id);
         render();
       } catch (err) {
+        if (version !== loadVersion) return;
         if (err instanceof AuthError) return showLogin(err.message);
-        $("rows").innerHTML = `<div class="notice error">读取测试结果失败：${esc(err.message)}</div>`;
+        loadError = "读取测试结果失败：" + err.message;
+        if (auths.length) $("flash").textContent = loadError;
+        else $("rows").innerHTML = `<div class="notice error">${esc(loadError)}</div>`;
       }
       pollTimer = setTimeout(load, auths.some((a) => a.running) ? 2500 : 20000);
     }
 
-    async function run(body) {
-      savePrefs();
+    async function update(path, options, errorPrefix) {
+      if (pending) return;
+      pending = true;
+      ++loadVersion;
+      clearTimeout(pollTimer);
       $("flash").textContent = "";
+      render();
       try {
-        await api(BASE + "/run", { method: "POST", body: { ...body, model: $("model").value, effort: $("effort").value, runs: runs() } });
+        await api(BASE + path, options);
       } catch (err) {
         if (err instanceof AuthError) return showLogin(err.message);
-        $("flash").textContent = "开始测试失败：" + err.message;
+        $("flash").textContent = errorPrefix + "：" + err.message;
+      } finally {
+        if (!$("app").hidden) await load();
+        pending = false;
+        if (!$("app").hidden && auths.length) render();
       }
-      load();
+    }
+
+    function run(body) {
+      savePrefs();
+      return update("/run", { method: "POST", body: { ...body, model: $("model").value, effort: $("effort").value, runs: runs() } }, "开始测试失败");
     }
 
     function showLogin(message) {
+      ++loadVersion;
       clearTimeout(pollTimer);
+      hideTip();
       $("app").hidden = true;
       $("login").hidden = false;
       $("login-error").hidden = !message;
@@ -498,11 +588,16 @@
     }
 
     async function start() {
+      clearTimeout(pollTimer);
+      const version = ++loadVersion;
       $("login").hidden = true;
       $("app").hidden = false;
       try {
-        models = ((await api("/v0/management/model-definitions/codex")).models || []).filter((m) => !HIDDEN_MODEL(m.id));
+        const data = await api("/v0/management/model-definitions/codex");
+        if (version !== loadVersion) return;
+        models = (data.models || []).filter((m) => !HIDDEN_MODEL(m.id));
       } catch (err) {
+        if (version !== loadVersion) return;
         if (err instanceof AuthError) return showLogin(err.message);
       }
       fillModels();
@@ -512,26 +607,41 @@
     function showTip(target) {
       const r = auths.find((a) => a.id === target.dataset.auth)?.results[target.dataset.i];
       if (!r) return;
+      hideTip();
       const tip = $("tip");
-      tip.innerHTML = `<div class="tip-head">${verdict(r)}<span class="mono">${esc(fmtTime(r.time, true))}</span></div>
-        <div class="tip-meta mono">${esc(r.model)}${SEP}${esc(r.effort)}${SEP}用时 ${fmtSec(r.duration_ms)}</div>
-        ${r.error ? "" : `<div class="tip-meta mono">${tokens(r)}</div>`}
+      tip.innerHTML = `<div class="tip-head">${verdict(r)}${modelMeta(r)}</div>
+        <div class="metrics">${metric("calendar", "测试时间", fmtTime(r.time, true))}</div>
+        <div class="metrics">${metrics(r)}</div>
         <div class="tip-text ${r.error ? "error" : ""}">${esc(oneLine(r.error || r.answer))}</div>`;
       tip.hidden = false;
       const box = target.getBoundingClientRect();
       const { width, height } = tip.getBoundingClientRect();
       const left = Math.min(Math.max(box.left + box.width / 2 - width / 2, 8), innerWidth - width - 8);
-      const top = box.top - height - 8 >= 8 ? box.top - height - 8 : box.bottom + 8;
+      const top = box.top - height - 8 >= 8 ? box.top - height - 8 : Math.max(8, Math.min(box.bottom + 8, innerHeight - height - 8));
       tip.style.left = left + "px";
       tip.style.top = top + "px";
+      target.setAttribute("aria-describedby", "tip");
+      tipTarget = target;
     }
-    function hideTip() { $("tip").hidden = true; }
+    function hideTip() {
+      $("tip").hidden = true;
+      tipTarget?.removeAttribute("aria-describedby");
+      tipTarget = null;
+    }
     $("rows").addEventListener("mouseover", (e) => {
       const target = e.target.closest("[data-auth]");
+      if (target?.contains(e.relatedTarget)) return;
       target ? showTip(target) : hideTip();
     });
     $("rows").addEventListener("mouseleave", hideTip);
+    $("rows").addEventListener("focusin", (e) => {
+      const target = e.target.closest("[data-auth]");
+      target ? showTip(target) : hideTip();
+    });
+    $("rows").addEventListener("focusout", hideTip);
+    $("rows").addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
     addEventListener("scroll", hideTip, true);
+    addEventListener("resize", hideTip);
 
     function setMasked(masked) {
       document.body.classList.toggle("masked", masked);
@@ -545,22 +655,14 @@
       store(MASK_STORE, masked);
     });
 
-    const CLEAR_LABEL = icon("trash-2") + "清空历史";
-    $("clear").innerHTML = CLEAR_LABEL;
+    $("clear").innerHTML = icon("trash-2") + "清空历史";
     $("clear").addEventListener("click", () => {
       $("confirm-clear").returnValue = ""; // Esc keeps the previous returnValue.
       $("confirm-clear").showModal();
     });
-    $("confirm-clear").addEventListener("close", async () => {
+    $("confirm-clear").addEventListener("close", () => {
       if ($("confirm-clear").returnValue !== "confirm") return;
-      $("flash").textContent = "";
-      try {
-        await api(BASE + "/results", { method: "DELETE" });
-      } catch (err) {
-        if (err instanceof AuthError) return showLogin(err.message);
-        $("flash").textContent = "清空历史失败：" + err.message;
-      }
-      load();
+      update("/results", { method: "DELETE" }, "清空历史失败");
     });
 
     $("login-form").addEventListener("submit", (e) => {
@@ -574,8 +676,21 @@
     $("effort").addEventListener("change", () => { savePrefs(); render(); });
     $("runs").addEventListener("change", () => { $("runs").value = runs(); savePrefs(); });
     $("rows").addEventListener("click", (e) => {
+      const hit = e.target.closest("[data-auth]");
+      if (hit) return showTip(hit);
+      const answer = e.target.closest("[data-answer]");
+      if (answer) {
+        const key = answer.dataset.answer;
+        const open = !expandedAnswers.has(key);
+        open ? expandedAnswers.add(key) : expandedAnswers.delete(key);
+        answer.closest(".entry-answer").classList.toggle("expanded", open);
+        answer.setAttribute("aria-expanded", open);
+        answer.setAttribute("aria-label", open ? "收起文本" : "展开文本");
+        answer.innerHTML = answerToggle(open);
+        return;
+      }
       const btn = e.target.closest("[data-run]");
-      if (btn) { btn.disabled = true; return run({ auth_ids: [btn.dataset.run] }); }
+      if (btn) return run({ auth_ids: [btn.dataset.run] });
       const row = e.target.closest("[data-row]");
       if (!row) return;
       const id = row.dataset.row;
@@ -583,7 +698,8 @@
       render();
     });
 
-    key = panelKey() || sessionStorage.getItem(KEY_STORE) || "";
+    key = panelKey();
+    if (!key) { try { key = sessionStorage.getItem(KEY_STORE) || ""; } catch (_) {} }
     key ? start() : showLogin("");
   </script>
 </body>
