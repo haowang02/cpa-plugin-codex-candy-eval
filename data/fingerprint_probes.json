@@ -1,0 +1,196 @@
+[
+  {
+    "id": "random-number-1-100:en",
+    "kind": "int",
+    "lo": 1,
+    "hi": 100,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "Name a random number between 1 and 100.",
+      "Pick a random number from 1 to 100.",
+      "Give me a random number between 1 and 100.",
+      "Choose any number between 1 and 100 at random."
+    ]
+  },
+  {
+    "id": "random-number-1-100:zh",
+    "kind": "int",
+    "lo": 1,
+    "hi": 100,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "说一个 1 到 100 之间的随机数。",
+      "随机挑一个 1 到 100 的数字。",
+      "给我一个 1 至 100 之间的随机数字。",
+      "从 1 到 100 里随便选一个数。"
+    ]
+  },
+  {
+    "id": "random-color:en",
+    "kind": "color",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "Name a random color.",
+      "Pick a color at random.",
+      "Give me one random color."
+    ]
+  },
+  {
+    "id": "random-animal:en",
+    "kind": "word",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "Name a random animal.",
+      "Pick an animal at random.",
+      "Give me one random animal."
+    ]
+  },
+  {
+    "id": "random-number-1-10:en",
+    "kind": "int",
+    "lo": 1,
+    "hi": 10,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "Name a random number between 1 and 10.",
+      "Pick a random number from 1 to 10.",
+      "Give me a random number between 1 and 10."
+    ]
+  },
+  {
+    "id": "random-letter:en",
+    "kind": "letter",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "Name a random letter of the alphabet.",
+      "Pick a random letter from A to Z.",
+      "Give me one random letter."
+    ]
+  },
+  {
+    "id": "random-color:zh",
+    "kind": "color",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "说一个随机的颜色。",
+      "随便说一种颜色。",
+      "随机挑一个颜色告诉我。"
+    ]
+  },
+  {
+    "id": "coin-flip:en",
+    "kind": "coin",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "Flip a coin. Answer heads or tails.",
+      "Toss a coin and tell me the result: heads or tails.",
+      "Imagine flipping a coin. Which side came up, heads or tails?"
+    ]
+  },
+  {
+    "id": "favorite-number:en",
+    "kind": "int",
+    "lo": 0,
+    "hi": 10000,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "What is your favorite number?",
+      "Tell me your favourite number.",
+      "If you had to pick a favorite number, what would it be?"
+    ]
+  },
+  {
+    "id": "random-city:en",
+    "kind": "word",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "Answer with exactly one word. No punctuation, no explanation.",
+    "prompts": [
+      "Name a random city.",
+      "Pick a city at random.",
+      "Give me the name of one random city."
+    ]
+  },
+  {
+    "id": "random-number-1-10:zh",
+    "kind": "int",
+    "lo": 1,
+    "hi": 10,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "说一个 1 到 10 之间的随机数。",
+      "随机挑一个 1 到 10 的数字。",
+      "从 1 到 10 里随便选一个数。"
+    ]
+  },
+  {
+    "id": "coin-flip:zh",
+    "kind": "coin",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "抛一枚硬币，回答正面还是反面。",
+      "掷一次硬币，告诉我结果：正面或反面。",
+      "想象抛硬币，落地是正面还是反面？"
+    ]
+  },
+  {
+    "id": "random-letter:zh",
+    "kind": "letter",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "说一个随机的英文字母。",
+      "从 A 到 Z 里随便挑一个字母。",
+      "随机给我一个英文字母。"
+    ]
+  },
+  {
+    "id": "random-animal:zh",
+    "kind": "word",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "说一个随机的动物。",
+      "随便说一种动物。",
+      "随机挑一个动物告诉我。"
+    ]
+  },
+  {
+    "id": "random-city:zh",
+    "kind": "word",
+    "lo": 0,
+    "hi": 0,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "说一个随机的城市。",
+      "随便说一座城市。",
+      "随机挑一个城市告诉我。"
+    ]
+  },
+  {
+    "id": "favorite-number:zh",
+    "kind": "int",
+    "lo": 0,
+    "hi": 10000,
+    "instructions": "只回答一个词，不要标点，不要解释。",
+    "prompts": [
+      "你最喜欢的数字是什么？",
+      "说说你最爱的数字。",
+      "如果必须选一个最喜欢的数字，你选哪个？"
+    ]
+  }
+]

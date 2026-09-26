@@ -102,7 +102,7 @@ func callHost(method string, payload any) (json.RawMessage, error) {
 	}
 	if code != 0 || !env.OK {
 		if env.Error != nil {
-			return nil, fmt.Errorf("%s: %s", env.Error.Code, env.Error.Message)
+			return nil, env.Error
 		}
 		return nil, fmt.Errorf("host call %s failed", method)
 	}
@@ -132,4 +132,4 @@ func cliproxyPluginFree(ptr unsafe.Pointer, _ C.size_t) {
 }
 
 //export cliproxyPluginShutdown
-func cliproxyPluginShutdown() {}
+func cliproxyPluginShutdown() { quiesce() }

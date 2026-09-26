@@ -1,5 +1,5 @@
-// Command cpa-codex-candy-eval is a CLIProxyAPI plugin that asks Codex auth
-// files a candy counting problem (answer: 21) to spot degraded accounts.
+// Command cpa-codex-candy-eval tests Codex accounts using candy reasoning
+// and statistical model fingerprints.
 package main
 
 import (
@@ -9,26 +9,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 )
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.1.8"
+	pluginVersion  = "0.1.9"
 	abiVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
 	uiPath         = "/v0/resource/plugins/" + pluginID + "/ui"
-	historyLimit   = 20
-	maxRuns        = 10
 )
-
-// Relative to the CLIProxyAPI working directory, next to the plugin files.
-var statePath = "plugins/" + pluginID + "-state.json"
 
 // hostCall is installed by the C ABI bridge.
 var hostCall func(method string, payload any) (json.RawMessage, error)
@@ -36,25 +29,25 @@ var hostCall func(method string, payload any) (json.RawMessage, error)
 //go:embed ui.html
 var uiTemplate []byte
 
-// uiHTML carries candyPrompt so the page shows and copies the exact prompt.
 var uiHTML = func() []byte {
-	prompt, _ := json.Marshal(candyPrompt)
-	return bytes.Replace(uiTemplate, []byte(`/*CANDY_PROMPT*/""`), prompt, 1)
+	models := make([]string, 0, len(fingerprintBaselines))
+	for _, baseline := range fingerprintBaselines {
+		models = append(models, baseline.Model)
+	}
+	config, _ := json.Marshal(map[string]any{"models": models, "modes": fingerprintModes, "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
+	return bytes.Replace(uiTemplate, []byte(`/*FINGERPRINT_CONFIG*/{}`), config, 1)
 }()
-
-const candyPrompt = `不使用任何外部工具回答以下问题：
-
-在一个黑色的袋子里放有三种口味的糖果，每种糖果有两种不同的形状（圆形和五角星形，不同的形状靠手感可以分辨）。现已知不同口味的糖和不同形状的数量统计如下表。参赛者需要在活动前决定摸出的糖果数目，那么，最少取出多少个糖果才能保证手中同时拥有不同形状的苹果味和桃子味的糖？（同时手中有圆形苹果味匹配五角星桃子味糖果，或者有圆形桃子味匹配五角星苹果味糖果都满足要求）
-
-        苹果味  桃子味  西瓜味
-圆形       7      9      8
-五角星形   7      6      4
-`
 
 // Lucide "candy" icon. Hosts render it in an img element, so the stroke color is fixed.
 const logoSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#72787c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><style>@media (prefers-color-scheme: dark) { :root { stroke: #9c9d9b; } }</style><path d="M10 7v10.9"/><path d="M14 6.1V17"/><path d="M16 7V3a1 1 0 0 1 1.707-.707 2.5 2.5 0 0 0 2.152.717 1 1 0 0 1 1.131 1.131 2.5 2.5 0 0 0 .717 2.152A1 1 0 0 1 21 8h-4"/><path d="M16.536 7.465a5 5 0 0 0-7.072 0l-2 2a5 5 0 0 0 0 7.07 5 5 0 0 0 7.072 0l2-2a5 5 0 0 0 0-7.07"/><path d="M8 17v4a1 1 0 0 1-1.707.707 2.5 2.5 0 0 0-2.152-.717 1 1 0 0 1-1.131-1.131 2.5 2.5 0 0 0-.717-2.152A1 1 0 0 1 3 16h4"/></svg>`
 
 func main() {}
+
+var (
+	mu        sync.Mutex
+	tasks     sync.WaitGroup
+	quiescing bool
+)
 
 type envelope struct {
 	OK     bool            `json:"ok"`
@@ -67,6 +60,8 @@ type envelopeError struct {
 	Message    string `json:"message"`
 	HTTPStatus int    `json:"http_status,omitempty"`
 }
+
+func (e *envelopeError) Error() string { return e.Code + ": " + e.Message }
 
 type managementRequest struct {
 	Method string `json:"Method"`
@@ -90,48 +85,17 @@ type authFile struct {
 	Disabled  bool   `json:"disabled"`
 }
 
-type result struct {
-	Time            time.Time `json:"time"`
-	Model           string    `json:"model"`
-	Effort          string    `json:"effort"`
-	OK              bool      `json:"ok"`
-	Answer          string    `json:"answer,omitempty"`
-	Error           string    `json:"error,omitempty"`
-	InputTokens     int64     `json:"input_tokens"`
-	OutputTokens    int64     `json:"output_tokens"`
-	ReasoningTokens int64     `json:"reasoning_tokens"`
-	DurationMS      int64     `json:"duration_ms"`
-}
-
-type progress struct {
-	Done  int `json:"done"`
-	Total int `json:"total"`
-}
-
 type authView struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Email    string    `json:"email,omitempty"`
-	PlanType string    `json:"plan_type,omitempty"`
-	Disabled bool      `json:"disabled"`
-	Running  *progress `json:"running,omitempty"`
-	Results  []result  `json:"results"`
+	ID                 string               `json:"id"`
+	Name               string               `json:"name"`
+	Email              string               `json:"email,omitempty"`
+	PlanType           string               `json:"plan_type,omitempty"`
+	Disabled           bool                 `json:"disabled"`
+	Running            *candyProgress       `json:"running,omitempty"`
+	Results            []candyResult        `json:"results"`
+	FingerprintRunning *fingerprintProgress `json:"fingerprint_running,omitempty"`
+	Fingerprints       []fingerprintResult  `json:"fingerprints"`
 }
-
-type runRequest struct {
-	AuthIDs []string `json:"auth_ids"`
-	All     bool     `json:"all"`
-	Model   string   `json:"model"`
-	Effort  string   `json:"effort"`
-	Runs    int      `json:"runs"`
-}
-
-var (
-	mu      sync.Mutex
-	loaded  bool
-	results = map[string][]result{}
-	running = map[string]*progress{}
-)
 
 func handleMethod(method string, request []byte) (response []byte) {
 	defer func() {
@@ -142,6 +106,9 @@ func handleMethod(method string, request []byte) (response []byte) {
 	switch method {
 	case "plugin.register", "plugin.reconfigure":
 		loadState()
+		mu.Lock()
+		quiescing = false
+		mu.Unlock()
 		return okEnvelope(map[string]any{
 			"schema_version": schemaVersion,
 			"metadata": map[string]any{
@@ -157,12 +124,15 @@ func handleMethod(method string, request []byte) (response []byte) {
 	case "management.register":
 		return okEnvelope(map[string]any{
 			"routes": []map[string]string{
-				{"Method": http.MethodGet, "Path": managementBase + "/state", "Description": "View Codex candy test results"},
+				{"Method": http.MethodGet, "Path": managementBase + "/state", "Description": "View Codex test results"},
 				{"Method": http.MethodPost, "Path": managementBase + "/run", "Description": "Run the candy test on Codex auth files"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/results", "Description": "Clear Codex candy test results"},
+				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/run", "Description": "Collect and compare Codex fingerprints"},
+				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/cancel", "Description": "Stop fingerprint collection"},
+				{"Method": http.MethodDelete, "Path": managementBase + "/fingerprint/results", "Description": "Clear fingerprint history"},
 			},
 			"resources": []map[string]string{
-				{"Path": uiPath, "Menu": "Codex 糖果测试", "Description": "用糖果题测试 Codex 认证文件是否降智"},
+				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果题与模型指纹测试 Codex 认证文件"},
 			},
 		})
 	case "management.handle":
@@ -172,6 +142,7 @@ func handleMethod(method string, request []byte) (response []byte) {
 		}
 		return okEnvelope(handleManagement(req))
 	case "plugin.quiesce":
+		quiesce()
 		return okEnvelope(map[string]any{})
 	default:
 		return errorEnvelope("unknown_method", "Unsupported plugin method: "+method, http.StatusNotFound)
@@ -195,17 +166,15 @@ func handleManagement(req managementRequest) managementResponse {
 	case req.Method == http.MethodGet && path == managementBase+"/state":
 		return stateResponse()
 	case req.Method == http.MethodPost && path == managementBase+"/run":
-		return runResponse(req.Body)
+		return candyRunResponse(req.Body)
+	case req.Method == http.MethodPost && path == managementBase+"/fingerprint/run":
+		return fingerprintRunResponse(req.Body)
+	case req.Method == http.MethodPost && path == managementBase+"/fingerprint/cancel":
+		return fingerprintCancelResponse(req.Body)
+	case req.Method == http.MethodDelete && path == managementBase+"/fingerprint/results":
+		return clearHistoryResponse(true)
 	case req.Method == http.MethodDelete && path == managementBase+"/results":
-		mu.Lock()
-		defer mu.Unlock()
-		previous := results
-		results = map[string][]result{}
-		if err := saveStateLocked(); err != nil {
-			results = previous
-			return jsonError(http.StatusInternalServerError, "清空记录失败："+err.Error())
-		}
-		return jsonResponse(http.StatusOK, map[string]bool{"cleared": true})
+		return clearHistoryResponse(false)
 	default:
 		return jsonError(http.StatusNotFound, "Route not found: "+req.Method+" "+req.Path)
 	}
@@ -224,14 +193,19 @@ func stateResponse() managementResponse {
 	defer mu.Unlock()
 	views := make([]authView, 0, len(auths))
 	for _, auth := range auths {
-		view := authView{ID: auth.ID, Name: auth.Name, Email: auth.Email, PlanType: auth.PlanType, Disabled: auth.Disabled, Results: results[auth.ID]}
+		view := authView{ID: auth.ID, Name: auth.Name, Email: auth.Email, PlanType: auth.PlanType, Disabled: auth.Disabled, Results: candyResults[auth.ID]}
 		if view.Results == nil {
-			view.Results = []result{}
+			view.Results = []candyResult{}
 		}
-		view.Running = running[auth.ID]
+		view.Running = candyRunning[auth.ID]
+		view.FingerprintRunning = fingerprintRunning[auth.ID]
+		view.Fingerprints = fingerprintResults[auth.ID]
+		if view.Fingerprints == nil {
+			view.Fingerprints = []fingerprintResult{}
+		}
 		views = append(views, view)
 	}
-	return jsonResponse(http.StatusOK, map[string]any{"auths": views})
+	return jsonResponse(http.StatusOK, map[string]any{"auths": views, "storage_error": storageError})
 }
 
 func authPlanType(auth authFile) string {
@@ -277,153 +251,6 @@ func authPlanType(auth authFile) string {
 	return strings.TrimSpace(claims.Auth.PlanType)
 }
 
-func runResponse(body []byte) managementResponse {
-	var req runRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		return jsonError(http.StatusBadRequest, "请求格式错误："+err.Error())
-	}
-	req.Model = strings.TrimSpace(req.Model)
-	req.Effort = strings.TrimSpace(req.Effort)
-	if req.Model == "" {
-		return jsonError(http.StatusBadRequest, "请选择模型")
-	}
-	req.Runs = min(max(req.Runs, 1), maxRuns)
-	auths, err := codexAuths()
-	if err != nil {
-		return jsonError(http.StatusBadGateway, err.Error())
-	}
-	wanted := map[string]bool{}
-	for _, id := range req.AuthIDs {
-		wanted[id] = true
-	}
-	var targets []string
-	for _, auth := range auths {
-		if (req.All && !auth.Disabled) || wanted[auth.ID] {
-			targets = append(targets, auth.ID)
-		}
-	}
-	if len(targets) == 0 {
-		return jsonError(http.StatusBadRequest, "没有可测试的 Codex 认证文件")
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	started := 0
-	for _, id := range targets {
-		if running[id] != nil {
-			continue
-		}
-		running[id] = &progress{Total: req.Runs}
-		started++
-		go runAuth(id, req.Model, req.Effort, req.Runs)
-	}
-	return jsonResponse(http.StatusOK, map[string]int{"started": started})
-}
-
-// runAuth tests one auth file serially; different auth files run in parallel.
-func runAuth(id, model, effort string, runs int) {
-	defer func() {
-		mu.Lock()
-		delete(running, id)
-		mu.Unlock()
-	}()
-	for range runs {
-		r := evaluate(id, model, effort)
-		mu.Lock()
-		history := append(results[id], r)
-		results[id] = history[max(len(history)-historyLimit, 0):]
-		running[id].Done++
-		err := saveStateLocked()
-		mu.Unlock()
-		if err != nil {
-			_, _ = hostCall("host.log", map[string]any{"level": "warn", "message": pluginID + ": save state failed: " + err.Error()})
-		}
-	}
-}
-
-func evaluate(authID, model, effort string) result {
-	r := result{Time: time.Now().UTC(), Model: model, Effort: effort}
-	payload := map[string]any{"model": model, "input": candyPrompt, "stream": false}
-	if effort != "" {
-		payload["reasoning"] = map[string]string{"effort": effort}
-	}
-	body, _ := json.Marshal(payload)
-	start := time.Now()
-	raw, err := hostCall("host.model.execute", map[string]any{
-		"entry_protocol":  "openai-response",
-		"exit_protocol":   "openai-response",
-		"model":           model,
-		"stream":          false,
-		"body":            body,
-		"forced_provider": "codex",
-		"auth_id":         authID,
-	})
-	r.DurationMS = time.Since(start).Milliseconds()
-	if err != nil {
-		r.Error = truncate(err.Error(), 500)
-		return r
-	}
-	var resp struct {
-		StatusCode int    `json:"status_code"`
-		Body       []byte `json:"body"`
-	}
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		r.Error = "解析宿主响应失败：" + err.Error()
-		return r
-	}
-	if resp.StatusCode >= 300 {
-		r.Error = truncate(fmt.Sprintf("HTTP %d: %s", resp.StatusCode, resp.Body), 500)
-		return r
-	}
-	var out struct {
-		Output []struct {
-			Type    string `json:"type"`
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
-		} `json:"output"`
-		Usage struct {
-			InputTokens         int64 `json:"input_tokens"`
-			OutputTokens        int64 `json:"output_tokens"`
-			OutputTokensDetails struct {
-				ReasoningTokens int64 `json:"reasoning_tokens"`
-			} `json:"output_tokens_details"`
-		} `json:"usage"`
-	}
-	if err := json.Unmarshal(resp.Body, &out); err != nil {
-		r.Error = truncate("解析模型响应失败："+string(resp.Body), 500)
-		return r
-	}
-	var answer strings.Builder
-	for _, item := range out.Output {
-		for _, part := range item.Content {
-			if item.Type == "message" && part.Type == "output_text" {
-				answer.WriteString(part.Text)
-			}
-		}
-	}
-	r.Answer = truncate(answer.String(), 4000)
-	r.OK = hasStandalone21(answer.String())
-	r.InputTokens = out.Usage.InputTokens
-	r.OutputTokens = out.Usage.OutputTokens
-	r.ReasoningTokens = out.Usage.OutputTokensDetails.ReasoningTokens
-	if r.Answer == "" {
-		r.Error = "模型没有返回文本"
-	}
-	return r
-}
-
-// hasStandalone21 reports whether "21" appears without adjacent digits.
-func hasStandalone21(text string) bool {
-	isDigit := func(i int) bool { return i >= 0 && i < len(text) && text[i] >= '0' && text[i] <= '9' }
-	for i := 0; i+1 < len(text); i++ {
-		if text[i] == '2' && text[i+1] == '1' && !isDigit(i-1) && !isDigit(i+2) {
-			return true
-		}
-	}
-	return false
-}
-
 func codexAuths() ([]authFile, error) {
 	raw, err := hostCall("host.auth.list", map[string]any{})
 	if err != nil {
@@ -445,36 +272,33 @@ func codexAuths() ([]authFile, error) {
 	return auths, nil
 }
 
-func loadState() {
-	mu.Lock()
-	defer mu.Unlock()
-	if loaded {
-		return
-	}
-	loaded = true
-	data, err := os.ReadFile(statePath)
+func selectedCodexAuths(ids []string, all bool) ([]authFile, error) {
+	auths, err := codexAuths()
 	if err != nil {
-		return
+		return nil, err
 	}
-	var state struct {
-		Results map[string][]result `json:"results"`
+	wanted := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		wanted[id] = true
 	}
-	if json.Unmarshal(data, &state) == nil && state.Results != nil {
-		results = state.Results
-		for id, history := range results {
-			results[id] = history[max(len(history)-historyLimit, 0):]
+	selected := auths[:0]
+	for _, auth := range auths {
+		if !auth.Disabled && (all || wanted[auth.ID]) {
+			selected = append(selected, auth)
 		}
 	}
+	return selected, nil
 }
 
-func saveStateLocked() error {
-	data, _ := json.Marshal(map[string]any{"results": results})
-	tmp := statePath + ".tmp"
-	err := os.WriteFile(tmp, data, 0o600)
-	if err == nil {
-		err = os.Rename(tmp, statePath)
+func quiesce() {
+	mu.Lock()
+	quiescing = true
+	for _, p := range fingerprintRunning {
+		p.Phase = "cancelling"
+		p.cancel()
 	}
-	return err
+	mu.Unlock()
+	tasks.Wait()
 }
 
 func truncate(text string, limit int) string {
@@ -500,7 +324,10 @@ func errorEnvelope(code, message string, status int) []byte {
 }
 
 func jsonResponse(status int, v any) managementResponse {
-	body, _ := json.Marshal(v)
+	body, err := json.Marshal(v)
+	if err != nil {
+		return jsonError(http.StatusInternalServerError, "编码响应失败："+err.Error())
+	}
 	return managementResponse{StatusCode: status, Headers: http.Header{"Content-Type": {"application/json; charset=utf-8"}}, Body: body}
 }
 

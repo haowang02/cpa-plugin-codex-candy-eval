@@ -1,14 +1,14 @@
-# Codex 糖果测试（CLIProxyAPI 插件）
+# Codex 降智测试（CLIProxyAPI 插件）
 
-在 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（CPA）的管理面板里，用一道糖果数学题测试你的 Codex 账号是否降智。题目来自 [codex-candy-eval](https://github.com/haowang02/codex-candy-eval)，正确答案是 **21**。
+在 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（CPA）的管理面板里，通过「糖果测试」和「指纹测试」检查 Codex 账号的回答表现。支持单个认证文件与批量测试。
 
-![example](./images/example.png)
+![fingerprint](fingerprint.png)
 
 ## 安装
 
-在 CPA 工作目录运行，插件会安装到 `plugins/<系统>/<架构>/`，文件名包含版本号，与 CPA 插件商店保持一致。例如 Linux x64 的 v0.1.8 安装路径为 `plugins/linux/amd64/cpa-codex-candy-eval-v0.1.8.so`；macOS 使用 `darwin/<架构>/` 和 `.dylib`，Windows 使用 `windows/amd64/` 和 `.dll`。
+在运行 CPA 的机器上，进入 CPA 工作目录，执行对应的安装命令。
 
-Docker 部署时，在挂载到容器 `/CLIProxyAPI/plugins` 的 `plugins` 目录的上一级目录运行。脚本按执行环境选择系统和架构，因此执行环境需与 CPA 容器匹配；跨平台部署可通过 CPA 管理面板安装，或手动下载容器平台对应的插件。
+Docker 用户可通过 CPA 插件商店安装。使用脚本时，请在挂载的 `plugins` 目录的上一级目录运行，并确保执行环境与 CPA 容器的系统和架构一致。
 
 macOS 和 Linux：
 
@@ -24,11 +24,9 @@ irm https://raw.githubusercontent.com/haowang02/cpa-plugin-codex-candy-eval/main
 
 也可以从 [Releases](https://github.com/haowang02/cpa-plugin-codex-candy-eval/releases/latest) 下载对应平台的压缩包，解压后将插件文件重命名为 `cpa-codex-candy-eval-v<版本号>.<扩展名>`，放入对应的 `plugins/<系统>/<架构>/` 目录。
 
-CPA 仍兼容直接放在 `plugins/` 根目录的插件，但同一插件的带版本号文件优先于无版本号文件。测试记录仍保存在 `plugins/cpa-codex-candy-eval-state.json`，无需随动态库移动。
-
 ## 配置
 
-在 CPA 的 `config.yaml` 中启用插件，保存后 CPA 会自动加载。`plugins.dir` 保持为插件根目录，CPA 会自动查找当前系统和架构的子目录：
+在 CPA 的 `config.yaml` 中启用插件：
 
 ```yaml
 plugins:
@@ -39,18 +37,40 @@ plugins:
       enabled: true
 ```
 
-升级插件后需要重启 CPA。
-
-若此前通过插件商店安装，`plugins.configs.cpa-codex-candy-eval.store` 中的 `version`（或 `release-tag`）可能固定了加载版本。脚本只安装文件；升级时需通过管理面板切换版本，或同步更新配置中的 `store.version` 和 `store.release-tag`。
+升级后重启 CPA，在管理面板左侧打开「Codex 降智测试」。通过插件商店安装的用户，请在商店中切换到新版本。
 
 ## 使用
 
-选择模型、推理强度和测试次数，测试单个账号或全部已启用的账号。
+### 糖果测试
 
-- 回答中出现 21 即判为答对，正确率按当前所选的模型和推理强度统计。
-- 每个账号保留最近 20 次测试记录。
-- 点击「脱敏」可以模糊账号列，方便截图分享。
-- 每次测试都会消耗被测账号的额度。
+选择模型、推理强度和次数，点击账号旁的「测试」，勾选账号后「测试所选」，或直接「测试全部」。正确答案为 **21**，页面会显示每次回答和正确率。
+
+### 指纹测试
+
+选择模型和模式，点击账号旁的「采集」。也可以勾选多个账号后「采集所选」，或直接「采集全部」。完成后会用图标和简短结论展示结果，疑似替换时会显示对应模型。
+
+| 模式 | 每个账号的请求数 | 适用情况 |
+| --- | ---: | --- |
+| 快速 | **60 次** | 初步检查 |
+| 标准 | **200 次** | 日常测试 |
+| 严格 | **400 次** | 结果不明确时复测 |
+
+默认使用快速模式，单账号并发为 **2**，可设为 1–6。推理强度固定为 `low`，无需设置。采集过程中可以点击「停止」，已发出的请求会执行完毕。失败请求会自动重试，实际请求数可能增加。
+
+**如何看结果：**
+
+- **与所选模型一致**：未发现与所选模型的正常指纹有明显差异。
+- **疑似模型替换**：回答特征更符合其他模型，结果中会直接显示模型名称。
+- **与所选模型有差异**：回答特征发生变化，暂时无法归因到某个模型。
+- **暂无法判断 / 有效回答不足 / 结果不稳定**：当前结果不足以判断，建议使用严格模式复测。
+
+点击账号可查看历史结果，点击「查看详情」可查看详细比对指标。指纹反映回答特征，不能单独证明模型身份或能力。
+
+### 记录与额度
+
+- 测试会消耗账号额度。
+- 每个账号保留最近 20 次糖果测试和 5 组指纹测试，刷新或重启后仍可查看。
+- 两类历史可分别清空。
 
 ## 致谢
 

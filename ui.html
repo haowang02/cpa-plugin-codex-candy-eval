@@ -3,19 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Codex 糖果测试</title>
+  <title>Codex 降智测试</title>
   <style>
+    /* Theme and base */
     :root {
+      --list-padding: 22px; --list-gap: 16px; --list-checkbox: 22px;
       --bg: #f2f5f3; --surface: #ffffff; --sunken: #f7f9f8; --ink: #15201b; --muted: #66726c; --faint: #a0aaa5; --line: #e1e7e4;
       --apple: #2b9a58; --apple-ink: #1d7a43; --apple-soft: #e5f4ea; --apple-soft-hover: #d5ecdd; --peach: #e0533f; --peach-soft: #fceae6;
-      --peach-soft-hover: #f9dcd5; --band: #f3f6f4;
+      --peach-soft-hover: #f9dcd5; --band: #f3f6f4; --warning-ink: #ad701e; --warning-soft: #fcf3df;
       --shadow: 0 1px 2px rgb(21 32 27 / 4%), 0 12px 32px -18px rgb(21 32 27 / 18%); --float: 0 10px 30px -8px rgb(21 32 27 / 25%);
       color-scheme: light;
     }
     :root[data-theme="dark"] {
       --bg: #0e1311; --surface: #161c19; --sunken: #121715; --ink: #e5ebe8; --muted: #94a19b; --faint: #5d6963; --line: #252d29;
       --apple: #4cc27f; --apple-ink: #7ad7a0; --apple-soft: #173424; --apple-soft-hover: #1e4430; --peach: #f07a66; --peach-soft: #3a1f1a;
-      --peach-soft-hover: #4a2720; --band: #1b221f;
+      --peach-soft-hover: #4a2720; --band: #1b221f; --warning-ink: #e7bd77; --warning-soft: #332a1b;
       --shadow: none; --float: 0 10px 30px -8px rgb(0 0 0 / 60%);
       color-scheme: dark;
     }
@@ -29,15 +31,45 @@
     main { max-width: 1120px; margin: 0 auto; padding: 32px 24px 56px; }
     button, input, select { font: inherit; color: inherit; }
     :focus-visible { outline: 2px solid var(--apple); outline-offset: 2px; }
-    .icon { width: 16px; height: 16px; flex: none; }
+    .icon { display: block; width: 16px; height: 16px; flex: none; }
     .spin { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    [hidden] { display: none !important; }
 
+    /* Shared controls */
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+    .toolbar { display: grid; grid-template-columns: 200px var(--mode-width, 120px) 84px minmax(0, 1fr); align-items: end; gap: 12px 16px; padding: 14px 16px; margin-bottom: 14px; }
+    .toolbar > .btn { justify-self: end; min-width: 138px; }
+    .field { display: grid; gap: 4px; min-width: 0; width: 100%; }
+    .field-label { color: var(--muted); font-size: 12px; }
+    .field input, .native-select > select, .login input { width: 100%; min-width: 0; height: 36px; padding: 0 10px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
+    .native-select { position: relative; display: flex; align-items: center; min-width: 0; max-width: 100%; color: var(--muted); }
+    .native-select::after {
+      content: ""; position: absolute; right: 8px; top: 50%; width: 20px; height: 20px; background: currentColor;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+      transform: translateY(-50%); pointer-events: none;
+    }
+    .native-select > select { appearance: none; padding-right: 36px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 9px;
+      border: 1px solid transparent; background: var(--apple-soft); color: var(--apple-ink); font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) { background: var(--apple-soft-hover); }
+    .btn .icon { width: 15px; height: 15px; }
+    .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; height: 32px; padding: 0 12px; }
+    .btn.ghost:hover:not(:disabled) { background: transparent; border-color: var(--muted); }
+    .btn.ghost .icon { width: 14px; height: 14px; color: var(--muted); }
+    .btn.danger { background: var(--peach-soft); color: var(--peach); }
+    .btn.danger:hover:not(:disabled) { background: var(--peach-soft-hover); }
+    .btn:disabled { opacity: .55; cursor: default; }
+    .fp-toolbar { --mode-width: 190px; margin-bottom: 8px; }
+    .btn.icon-button { width: 32px; padding: 0; }
+    input[type="checkbox"] { accent-color: var(--apple); width: 15px; height: 15px; margin: 0; cursor: pointer; }
+
+    /* Page navigation and introduction */
     header { margin-bottom: 20px; }
     h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
     h1 .icon { width: 26px; height: 26px; color: var(--apple); }
-    .lede { margin: 6px 0 0; color: var(--muted); }
-    .lede b { color: var(--ink); font-weight: 600; }
     details.problem { margin-top: 10px; }
     details.problem summary { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; color: var(--muted); font-size: 13px; list-style: none; }
     details.problem summary::-webkit-details-marker { display: none; }
@@ -52,66 +84,44 @@
     .copy-btn { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); cursor: pointer; opacity: 0; transition: opacity .15s, color .15s; }
     .problem-body:hover .copy-btn, .problem-body:focus-within .copy-btn, .copy-btn.copied { opacity: 1; }
     .copy-btn:hover, .copy-btn.copied { color: var(--apple); border-color: currentColor; }
-    @media (hover: none) { .copy-btn { opacity: 1; } }
+    .clipboard-buffer { position: fixed; opacity: 0; pointer-events: none; }
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin: 0 0 18px; }
+    .tab { padding: 10px 18px; border: 0; border-bottom: 2px solid transparent; background: transparent; cursor: pointer; color: var(--muted); font-weight: 600; }
+    .tab[aria-selected="true"] { color: var(--apple-ink); border-bottom-color: var(--apple); }
+    .panel-intro { margin-bottom: 18px; color: var(--muted); }
+    .panel-intro p { margin: 0 0 8px; }
+    .principle-body { padding: 16px 18px; font-size: 13px; line-height: 1.8; }
+    .principle-body p { margin: 0 0 10px; }
+    .principle-body p:last-child { margin-bottom: 0; }
+    .principle-body a { color: var(--apple-ink); text-underline-offset: 3px; }
 
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
-    .toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; padding: 14px 16px; margin-bottom: 14px; }
-    .field { display: grid; gap: 4px; min-width: 0; }
-    .field span { color: var(--muted); font-size: 12px; }
-    .field select, .field input { height: 36px; padding: 0 10px; min-width: 120px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
-    .field input[type="number"] { width: 84px; min-width: 0; }
-    .field .model-select { width: 200px; }
-    .toolbar .spacer { flex: 1; }
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 9px;
-      border: 1px solid transparent; background: var(--apple-soft); color: var(--apple-ink); font-weight: 600; cursor: pointer; white-space: nowrap;
-    }
-    .btn:hover:not(:disabled) { background: var(--apple-soft-hover); }
-    .btn .icon { width: 15px; height: 15px; }
-    .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; height: 32px; padding: 0 12px; }
-    .btn.ghost:hover:not(:disabled) { background: transparent; border-color: var(--muted); }
-    .btn.ghost .icon { width: 14px; height: 14px; color: var(--muted); }
-    .btn.danger { background: var(--peach-soft); color: var(--peach); }
-    .btn.danger:hover:not(:disabled) { background: var(--peach-soft-hover); }
-    .btn:disabled { opacity: .55; cursor: default; }
-    .toolbar .btn.ghost { height: 36px; }
+    /* Result metadata */
+    .result-meta, .latest-top { display: flex; align-items: center; gap: 4px 8px; min-width: 0; }
+    .result-meta { flex-wrap: wrap; }
+    .result-meta .metric { flex: none; max-width: 100%; }
+    .result-meta .model-meta .meta { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+    .verdict { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 1px 8px 1px 6px; border-radius: 999px; background: var(--status-bg, var(--sunken)); color: var(--status-ink, var(--muted)); font-size: 12px; font-weight: 600; }
+    .verdict .icon, .metric .icon { width: 13px; height: 13px; }
+    .verdict.ok, .fp-outcome.ok { --status-ink: var(--apple-ink); --status-bg: var(--apple-soft); }
+    .verdict.bad, .fp-outcome.bad { --status-ink: var(--peach); --status-bg: var(--peach-soft); }
+    .verdict.err { border: 1px solid var(--line); }
+    .meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .metrics { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; max-width: 100%; color: var(--muted); font-size: 12px; }
+    .metric { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--muted); font-size: 12px; line-height: 20px; white-space: nowrap; }
+    .metric > .meta { min-width: 0; line-height: inherit; }
+    .model-meta { max-width: 100%; }
+    .none { color: var(--faint); }
 
-    dialog.confirm { width: min(400px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: var(--float); }
-    dialog.confirm::backdrop { background: rgb(10 16 13 / 40%); }
-    dialog.confirm h2 { margin: 0 0 6px; font-size: 16px; }
-    dialog.confirm p { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
-    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
-    .dialog-actions .btn { height: 34px; }
-
-    .tip {
-      position: fixed; z-index: 10; max-width: min(320px, calc(100vw - 16px)); padding: 10px 12px; pointer-events: none;
-      background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--float); font-size: 12px;
-    }
-    .tip-head, .latest-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .tip-head { margin-bottom: 6px; }
-    .tip .metrics { margin-top: 6px; }
-    .tip-text { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-    .tip-text.error { color: var(--peach); }
-
-    .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 4px 10px; }
-    .legend .grow { flex: 1; }
-    .legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-    .legend .flash { color: var(--peach); }
-    .legend .flash:empty { display: none; }
-    .legend .flash, .legend #rate-scope { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
-
-    .mark { width: 15px; height: 15px; flex: none; }
-    .mark.ok { color: var(--apple); }
-    .mark.bad { color: var(--peach); }
-    .mark.err { color: var(--faint); }
-    .mark.dim { opacity: .3; }
-
-    .table-head, .row-main { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr) 76px 208px 118px; gap: 14px; align-items: center; }
-    .table-head { padding: 10px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-    .table-head > :first-child { padding-left: 20px; }
+    /* Account lists and history alignment */
+    #candy-panel { --list-columns: var(--list-checkbox) minmax(0, 1.2fr) minmax(0, 1.8fr) 64px 208px 118px; --marks-width: 208px; }
+    #fingerprint-panel { --list-columns: var(--list-checkbox) minmax(0, 1.1fr) minmax(0, 1.6fr) 56px 104px 90px; --row-padding: 18px; --row-height: 108px; }
+    .list-head, .list-row { display: grid; grid-template-columns: var(--list-columns); align-items: center; gap: var(--list-gap); padding-inline: var(--list-padding); }
+    .list-head { padding-block: 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .list-head > :nth-child(2) { padding-left: 20px; }
+    .list-row { padding-block: var(--row-padding, 14px); min-height: var(--row-height, 0); }
     .row { border-bottom: 1px solid var(--line); }
     .row:last-child { border-bottom: 0; }
-    .row-main { padding: 14px 18px; cursor: pointer; }
+    .row-main { cursor: pointer; }
     .row-main:hover, .row.open .row-main { background: var(--sunken); }
     .account { min-width: 0; }
     .toggle { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: left; }
@@ -121,34 +131,38 @@
     .account .name { transition: filter .15s; }
     .masked .account .name { filter: blur(5px); user-select: none; }
     .tag { max-width: 100%; padding: 0 6px; border-radius: 6px; background: var(--sunken); border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row-summary { display: contents; }
+    .action { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
+    .history-panel { padding: 4px var(--list-padding) 20px calc(var(--list-padding) + var(--list-checkbox) + var(--list-gap)); }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: var(--heading-padding, 14px 18px); border-bottom: 1px solid var(--line); }
+    .section-head h2 { margin: 0; font-size: var(--heading-size, 14px); font-weight: 600; }
+    .list-actions { display: flex; gap: 8px; }
 
+    /* Candy results */
+    .tip {
+      position: fixed; z-index: 10; width: max-content; max-width: min(480px, calc(100vw - 16px)); padding: 10px 12px; pointer-events: none;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--float); font-size: 12px;
+    }
+    .tip .metrics { margin-top: 6px; }
+    .tip-text { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+    .tip-text.error { color: var(--peach); }
+    .mark { width: 15px; height: 15px; flex: none; }
+    .mark.ok { color: var(--apple); }
+    .mark.bad { color: var(--peach); }
+    .mark.err { color: var(--faint); }
+    .mark.dim { opacity: .3; }
     .latest { min-width: 0; }
-    .verdict { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 1px 8px 1px 6px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-    .verdict .icon, .metric .icon, .model-meta .icon { width: 13px; height: 13px; }
-    .verdict.ok { background: var(--apple-soft); color: var(--apple-ink); }
-    .verdict.bad { background: var(--peach-soft); color: var(--peach); }
-    .verdict.err { background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
-    .meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .metrics { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; max-width: 100%; color: var(--muted); font-size: 12px; }
     .latest .metrics { margin-top: 5px; }
-    .metric { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-    .model-meta { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; }
-    .model-meta .meta { min-width: 0; }
-    .none { color: var(--faint); }
-
     .rate b { font-size: 17px; font-weight: 600; }
     .rate small { display: block; color: var(--faint); font-size: 12px; }
-    .marks { display: grid; grid-template-columns: repeat(auto-fit, 19px); gap: 2px; align-items: center; width: 100%; max-width: 208px; min-width: 0; min-height: 19px; }
+    .marks { display: grid; grid-template-columns: repeat(auto-fit, 19px); gap: 2px; align-items: center; width: 100%; max-width: var(--marks-width); min-width: 0; min-height: 19px; }
     .mark-hit { display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px; padding: 2px; border: 0; border-radius: 50%; background: transparent; cursor: help; transition: transform .15s, background .15s, box-shadow .15s; }
     .mark-hit:hover, .mark-hit:focus-visible { position: relative; z-index: 1; background: var(--surface); box-shadow: 0 0 0 2px var(--line); transform: scale(1.2); }
     .mark-hit:hover .mark, .mark-hit:focus-visible .mark { opacity: 1; }
-    .action { text-align: right; }
-
-    .details { padding: 4px 18px 16px; background: var(--sunken); }
+    .candy-history { background: var(--sunken); }
     .history { display: grid; gap: 8px; }
     .entry { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
     .entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 12px; background: var(--band); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-    .entry-head .when { color: var(--ink); }
     .entry-answer { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.65; }
     .answer-toggle { display: inline-flex; align-items: center; gap: 2px; flex: none; padding: 0 3px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
     .answer-toggle:hover { color: var(--apple-ink); background: var(--apple-soft); }
@@ -157,31 +171,112 @@
     .entry-answer.expanded .entry-body { white-space: pre-wrap; overflow-wrap: anywhere; }
     .entry-body.error { color: var(--peach); }
 
+    /* Fingerprint results */
+    .fp-progress { width: 100%; height: 8px; margin-top: 7px; accent-color: var(--apple); }
+    .fp-outcome { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .fp-state-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; flex: none; border-radius: 12px; background: var(--status-bg, var(--sunken)); color: var(--status-ink, var(--muted)); }
+    .fp-state-icon .icon { width: 21px; height: 21px; }
+    .fp-outcome.warn { --status-ink: var(--warning-ink); --status-bg: var(--warning-soft); }
+    .fp-outcome.idle { --status-ink: var(--faint); }
+    .fp-outcome.idle .fp-result-title { color: var(--muted); font-weight: 500; }
+    .fp-result-copy { min-width: 0; flex: 1; }
+    .fp-result-title { font-weight: 600; line-height: 1.5; }
+    .fp-result-detail { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; color: var(--muted); font-size: 12px; margin-top: 3px; overflow-wrap: anywhere; }
+    .fp-result-detail .icon { width: 12px; height: 12px; }
+    .fp-result-detail strong { color: var(--ink); font-weight: 500; }
+    .fp-mode, .fp-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .fp-history-title { padding: 0 0 8px; color: var(--muted); font-size: 12px; }
+    .fp-history-list { border: 1px solid var(--line); border-radius: 12px; background: var(--sunken); }
+    .fp-history-entry { display: flex; align-items: center; gap: 18px; padding: 14px; border-bottom: 1px solid var(--line); }
+    .fp-history-entry:last-child { border-bottom: 0; }
+    .fp-history-info { min-width: 135px; color: var(--muted); font-size: 12px; }
+    .fp-history-info .meta { margin-top: 3px; }
+    .fp-history-entry .fp-outcome { flex: 1; }
+    .fp-history-entry .fp-state-icon { width: 30px; height: 30px; border-radius: 9px; }
+    .fp-history-entry .fp-state-icon .icon { width: 17px; height: 17px; }
+    .fp-history-entry .fp-result-title { font-size: 13px; }
+
+    /* Dialogs */
+    dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: var(--float); }
+    dialog::backdrop { background: rgb(10 16 13 / 40%); }
+    .confirm { width: min(400px, calc(100vw - 32px)); padding: 22px; }
+    .confirm h2 { margin: 0 0 6px; font-size: 16px; }
+    .confirm p { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .dialog-actions .btn { height: 34px; }
+    .fp-dialog { --dialog-padding: 22px; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border-radius: 16px; }
+    .fp-dialog-head { --heading-padding: 18px var(--dialog-padding); --heading-size: 18px; position: sticky; top: 0; z-index: 1; background: var(--surface); }
+    .fp-dialog-body { padding: var(--dialog-padding); }
+    .fp-dialog-meta { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
+    .fp-dialog-section { margin-top: 24px; }
+    .fp-dialog-section h3 { font-size: 14px; margin: 0 0 10px; }
+    .fp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 20px 0; }
+    .fp-stat { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunken); }
+    .fp-stat dt { margin-bottom: 5px; color: var(--muted); font-size: 12px; }
+    .fp-stat dd { margin: 0; font-size: 17px; font-weight: 600; }
+    .fp-detail-note { color: var(--muted); font-size: 12px; margin: 10px 0 0; line-height: 1.7; }
+    .fp-detail-warning { color: var(--peach); }
+    .fp-detail-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+    .fp-detail-table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 12px; }
+    .fp-detail-table th, .fp-detail-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+    .fp-detail-table th { color: var(--muted); font-weight: 500; background: var(--sunken); }
+    .fp-detail-table tr:last-child td { border-bottom: 0; }
+    .fp-detail-table tr.closest { background: var(--apple-soft); }
+    .fp-probe-select { max-width: 280px; margin: 14px 0 10px; }
+
+    /* Feedback and login */
+    .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 4px 10px; }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .legend #rate-scope { margin-left: auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
     .empty, .notice { padding: 40px 20px; text-align: center; color: var(--muted); }
     .notice.error { color: var(--peach); }
     .login { max-width: 380px; margin: 12vh auto 0; padding: 24px; }
     .login h2 { margin: 0 0 6px; font-size: 17px; }
     .login p { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
     .login form { display: flex; gap: 8px; }
-    .login input { flex: 1; min-width: 0; height: 36px; padding: 0 10px; background: var(--sunken); border: 1px solid var(--line); border-radius: 9px; }
+    .login input { flex: 1; }
     .login .error { margin: 10px 0 0; color: var(--peach); }
-    [hidden] { display: none !important; }
+    .global-flash { color: var(--peach); margin: 0 0 12px; overflow-wrap: anywhere; }
+    .global-flash:empty { display: none; }
 
+    /* Responsive layout */
+    @media (hover: none) { .copy-btn { opacity: 1; } }
     @media (max-width: 1000px) {
+      :root { --list-padding: 18px; --list-gap: 10px; }
       main { padding: 20px 14px 40px; }
-      .table-head { display: none; }
-      .row-main { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "account action" "latest latest" "rate marks"; gap: 10px 12px; }
-      .account { grid-area: account; } .latest { grid-area: latest; } .rate { grid-area: rate; } .marks { grid-area: marks; width: 208px; } .action { grid-area: action; }
-      .rate b { font-size: 15px; } .rate small { display: inline; margin-left: 6px; }
-      .toolbar .spacer { display: none; }
-      .toolbar .field { flex: 1 1 120px; }
-      .toolbar .field select, .toolbar .field input { width: 100%; min-width: 0; }
-      .toolbar .btn { flex: 1 1 140px; }
-      .legend .grow { flex-basis: 100%; }
+      #candy-panel { --list-columns: var(--list-checkbox) minmax(0, 1.1fr) minmax(0, 1.4fr) 56px 112px 118px; --marks-width: 112px; }
+      .legend #rate-scope { width: 100%; margin-left: 0; }
     }
-    @media (max-width: 480px) {
-      .row-main { grid-template-areas: "account account" "latest latest" "rate action" "marks marks"; }
-      .marks { width: 100%; }
+    @media (max-width: 760px) {
+      :root { --list-padding: 16px; }
+      .list-head { display: none; }
+      .list-row { grid-template-columns: var(--list-checkbox) minmax(0, 1fr) auto; }
+      .row-main { grid-template-areas: "select account action" ". latest latest" ". summary summary"; }
+      .row-main > input { grid-area: select; }
+      .row-main > .account { grid-area: account; }
+      .row-main > .latest { grid-area: latest; padding-left: 20px; }
+      .row-main > .action { grid-area: action; }
+      .row-summary { grid-area: summary; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding-left: 20px; }
+      .row-summary.empty-history { display: none; }
+      .rate { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+      .rate::before { content: "正确率"; color: var(--muted); font-size: 12px; }
+      .rate b { font-size: 14px; } .rate small { display: inline; }
+      .marks { display: flex; flex-wrap: wrap; width: auto; max-width: 208px; }
+
+      .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .toolbar > .btn { min-width: 0; width: 100%; }
+      .fp-main { row-gap: 18px; padding-block: 16px; }
+      .fp-main .latest { grid-column: 2 / 4; grid-row: 2; }
+      .fp-main .action { grid-column: 3; grid-row: 1; }
+      .fp-main .fp-mode { grid-column: 2; grid-row: 3; }
+      .fp-main .fp-time { grid-column: 3; grid-row: 3; text-align: right; }
+      .history-panel { padding-top: 0; padding-bottom: 16px; }
+      .fp-history-entry { flex-wrap: wrap; gap: 12px; }
+      .fp-history-info { flex: 1; order: 0; }
+      .fp-history-entry > .btn { order: 1; }
+      .fp-history-entry .fp-outcome { order: 2; flex-basis: 100%; }
+      .fp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .fp-dialog { --dialog-padding: 16px; }
     }
     @media (prefers-reduced-motion: reduce) {
       .spin { animation: none; }
@@ -192,15 +287,7 @@
 <body>
   <main>
     <header>
-      <h1><i data-icon="candy"></i>Codex 糖果测试</h1>
-      <p class="lede">让每个 Codex 账号解同一道糖果题，答出 <b class="mono">21</b> 即为正确，用来发现降智账号。</p>
-      <details class="problem">
-        <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
-        <div class="problem-body">
-          <pre class="mono"><code id="question"></code></pre>
-          <button id="copy" class="copy-btn" type="button" aria-label="复制题目" title="复制题目"></button>
-        </div>
-      </details>
+      <h1><i data-icon="candy"></i>Codex 降智测试</h1>
     </header>
 
     <section id="login" class="card login" hidden>
@@ -214,47 +301,103 @@
     </section>
 
     <div id="app" hidden>
-      <form id="toolbar" class="card toolbar">
-        <label class="field"><span>模型</span><select id="model" class="model-select"></select></label>
-        <label class="field"><span>推理强度</span><select id="effort"></select></label>
-        <label class="field"><span>每个账号测试次数</span><input id="runs" class="mono" type="number" min="1" max="10" value="1"></label>
-        <div class="spacer"></div>
-        <button id="run-all" class="btn" type="submit" disabled></button>
-        <button id="clear" class="btn ghost" type="button" disabled></button>
-        <button id="mask" class="btn ghost" type="button"></button>
-      </form>
-
-      <div class="legend">
-        <span><i data-icon="circle-check" data-class="mark ok"></i>答对</span>
-        <span><i data-icon="circle-x" data-class="mark bad"></i>答错</span>
-        <span><i data-icon="circle-alert" data-class="mark err"></i>请求出错</span>
-        <span><i data-icon="circle-check" data-class="mark ok dim"></i>其他模型或推理强度</span>
-        <span class="grow"></span>
-        <span id="flash" class="flash" role="alert"></span>
-        <span id="rate-scope"></span>
+      <div class="tabs" role="tablist" aria-label="测试类型">
+        <button id="tab-candy" class="tab" role="tab" aria-selected="true" aria-controls="candy-panel" type="button">糖果测试</button>
+        <button id="tab-fingerprint" class="tab" role="tab" aria-selected="false" aria-controls="fingerprint-panel" tabindex="-1" type="button">指纹测试</button>
       </div>
+      <div id="flash" class="global-flash" role="alert"></div>
+      <div id="storage-error" class="global-flash" role="alert"></div>
+      <section id="candy-panel" role="tabpanel" aria-labelledby="tab-candy">
+        <div class="panel-intro">
+          <p>让每个 Codex 账号解同一道糖果题，答出 <b class="mono">21</b> 即为正确。</p>
+          <details class="problem">
+            <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
+            <div class="problem-body"><pre class="mono"><code id="question">不使用任何外部工具回答以下问题：
 
-      <section class="card">
-        <div class="table-head">
-          <div>账号</div>
-          <div>最近一次</div>
-          <div>正确率</div>
-          <div>最近 20 次</div>
-          <div></div>
+在一个黑色的袋子里放有三种口味的糖果，每种糖果有两种不同的形状（圆形和五角星形，不同的形状靠手感可以分辨）。现已知不同口味的糖和不同形状的数量统计如下表。参赛者需要在活动前决定摸出的糖果数目，那么，最少取出多少个糖果才能保证手中同时拥有不同形状的苹果味和桃子味的糖？（同时手中有圆形苹果味匹配五角星桃子味糖果，或者有圆形桃子味匹配五角星苹果味糖果都满足要求）
+
+        苹果味  桃子味  西瓜味
+圆形       7      9      8
+五角星形   7      6      4
+</code></pre>
+              <button id="copy" class="copy-btn" type="button" aria-label="复制题目" title="复制题目"></button>
+            </div>
+          </details>
         </div>
-        <div id="rows"><div class="notice">正在加载…</div></div>
+        <form id="toolbar" class="card toolbar">
+          <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="model"></select></span></label>
+          <label class="field"><span class="field-label">推理强度</span><span class="native-select"><select id="effort"></select></span></label>
+          <label class="field"><span class="field-label">单账号次数</span><input id="runs" class="mono" type="number" min="1" max="10" step="1" value="1" required></label>
+          <button id="run-batch" class="btn" type="submit" disabled>测试全部</button>
+        </form>
+
+        <div class="legend">
+          <span><i data-icon="circle-check" data-class="mark ok"></i>答对</span>
+          <span><i data-icon="circle-x" data-class="mark bad"></i>答错</span>
+          <span><i data-icon="circle-alert" data-class="mark err"></i>请求出错</span>
+          <span><i data-icon="circle-check" data-class="mark ok dim"></i>其他模型或推理强度</span>
+          <span id="rate-scope"></span>
+        </div>
+
+        <section class="card">
+          <div class="section-head"><h2>认证文件</h2><div class="list-actions">
+            <button id="mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button>
+            <button id="clear" class="btn ghost icon-button" type="button" title="清空糖果历史" aria-label="清空糖果历史" disabled><i data-icon="trash-2"></i></button>
+          </div></div>
+          <div class="list-head">
+            <input id="select-all" type="checkbox" aria-label="选择全部可测试账号">
+            <div>账号</div>
+            <div>最近一次</div>
+            <div>正确率</div>
+            <div>最近 20 次</div>
+            <div></div>
+          </div>
+          <div id="rows"><div class="notice">正在加载…</div></div>
+        </section>
+      </section>
+      <section id="fingerprint-panel" role="tabpanel" aria-labelledby="tab-fingerprint" hidden>
+        <div class="panel-intro">
+          <p>采集模型的回答特征，与正常基准对比，判断模型是否被替换。</p>
+          <details class="problem" id="fp-principle">
+            <summary><i data-icon="chevron-right" data-class="chev"></i>查看原理</summary>
+            <div class="problem-body principle-body">
+              <p>即使让模型“随便说一个数字或颜色”，不同模型也会呈现不同的回答偏好。重复提问后，这些偏好就形成了可比较的行为“指纹”。</p>
+              <p>本测试采集多组简短回答，与正常模型的指纹对比，判断是否一致、是否更像其他模型。结果基于统计特征，不能单独证明模型身份或能力。</p>
+              <p>来源论文：Tomas Bruckner，<a href="https://arxiv.org/abs/2607.10252" target="_blank" rel="noopener noreferrer" title="One Token Is Enough: Fingerprinting and Verifying Large Language Models from Single-Token Output Distributions">《One Token Is Enough》</a>（2026）。</p>
+            </div>
+          </details>
+        </div>
+        <form id="fp-toolbar" class="card toolbar fp-toolbar">
+          <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="fp-model"></select></span></label>
+          <label class="field"><span class="field-label">采集模式</span><span class="native-select"><select id="fp-mode"></select></span></label>
+          <label class="field"><span class="field-label">单账号并发</span><input id="fp-concurrency" class="mono" type="number" min="1" step="1" required></label>
+          <button id="fp-run-batch" class="btn" type="submit" disabled>采集全部</button>
+        </form>
+        <div class="legend"><span id="fp-cost"></span></div>
+        <section class="card">
+          <div class="section-head"><h2>认证文件</h2><div class="list-actions">
+            <button id="fp-mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button>
+            <button id="fp-clear" class="btn ghost icon-button" type="button" title="清空指纹历史" aria-label="清空指纹历史" disabled><i data-icon="trash-2"></i></button>
+          </div></div>
+          <div class="list-head"><input id="fp-select-all" type="checkbox" aria-label="选择全部可采集账号"><div>账号</div><div>指纹结果</div><div>模式</div><div>测试时间</div><div></div></div>
+          <div id="fp-rows"><div class="notice">正在加载…</div></div>
+        </section>
       </section>
     </div>
 
     <dialog id="confirm-clear" class="confirm">
       <form method="dialog">
-        <h2>清空全部测试记录？</h2>
-        <p>所有账号的历史测试结果都会被删除，且无法恢复。正在进行的测试不受影响，完成后会照常记录。</p>
+        <h2 id="clear-title">清空糖果测试记录？</h2>
+        <p>所有账号在当前测试类型下的历史记录都会被删除，且无法恢复。正在进行的测试不受影响，完成后会照常记录。</p>
         <div class="dialog-actions">
           <button class="btn ghost" value="cancel" autofocus>取消</button>
           <button class="btn danger" value="confirm">清空记录</button>
         </div>
       </form>
+    </dialog>
+    <dialog id="fp-detail" class="fp-dialog" aria-labelledby="fp-detail-title">
+      <div class="section-head fp-dialog-head"><h2 id="fp-detail-title">指纹详情</h2><button id="fp-detail-close" class="btn ghost icon-button" type="button" aria-label="关闭详情"><i data-icon="x"></i></button></div>
+      <div id="fp-detail-body" class="fp-dialog-body"></div>
     </dialog>
     <div id="tip" class="tip" role="tooltip" hidden></div>
   </main>
@@ -269,8 +412,8 @@
     const DEFAULT_EFFORT = "low";
     const DEFAULT_EFFORTS = ["low", "medium", "high", "xhigh"];
     const HIDDEN_MODEL = (id) => id.startsWith("gpt-image-") || id === "codex-auto-review";
-    // The exact prompt sent to the models, injected by the plugin.
-    const PROMPT = /*CANDY_PROMPT*/"";
+    const FP_CONFIG = /*FINGERPRINT_CONFIG*/{};
+    const fpModes = Object.fromEntries(FP_CONFIG.modes.map((m) => [m.id, { name: m.name, requests: m.cells * m.samples_per_cell }]));
 
     // Lucide icons (https://lucide.dev, ISC license).
     const ICONS = {
@@ -287,6 +430,13 @@
       "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
       "circle-x": '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
       "circle-alert": '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+      "circle-help": '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+      "arrow-right": '<path d="M5 12h14m-6-6 6 6-6 6"/>',
+      "shuffle": '<path d="m18 14 4 4-4 4m0-20 4 4-4 4M2 18h2.5c6 0 9-12 15-12H22M2 6h2.5c2 0 3.7 1.3 5.2 3.2M14.3 14.8c1.5 1.9 3.2 3.2 5.2 3.2H22"/>',
+      "fingerprint": '<path d="M12 11a2 2 0 0 1 2 2c0 4-1 6-2 8M8 16c.4-1 .5-2 .5-3a3.5 3.5 0 0 1 7 0c0 4-1 7-2 9M5 16c.4-1 .5-2 .5-3a6.5 6.5 0 0 1 13 0c0 3-.4 5-1 7M2 12a10 10 0 0 1 20 0M8 20l1-2"/>',
+      "pause": '<path d="M9 5H6v14h3zm9 0h-3v14h3z"/>',
+      "x": '<path d="m18 6-12 12M6 6l12 12"/>',
+      "chart": '<path d="M3 3v18h18M7 14v3m5-8v8m5-12v12"/>',
       "loader-circle": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
       play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
       eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
@@ -306,49 +456,17 @@
     let loadVersion = 0;
     let loadError = "";
     let pending = false;
+    let storageError = "";
+    let clearScope = "candy";
     let tipTarget = null;
-    const expanded = new Set();
-    const expandedAnswers = new Set();
-
-    document.querySelectorAll("[data-icon]").forEach((el) => { el.outerHTML = icon(el.dataset.icon, el.dataset.class); });
-    $("question").textContent = PROMPT;
-
-    const COPY_LABEL = icon("copy");
     let copyTimer = 0;
-    $("copy").innerHTML = COPY_LABEL;
-    $("copy").addEventListener("click", async () => {
-      try {
-        try {
-          await navigator.clipboard.writeText(PROMPT);
-        } catch (_) {
-          const area = Object.assign(document.createElement("textarea"), { value: PROMPT });
-          area.style.cssText = "position:fixed;opacity:0";
-          document.body.append(area);
-          try {
-            area.select();
-            if (!document.execCommand("copy")) throw new Error("copy failed");
-          } finally {
-            area.remove();
-            $("copy").focus();
-          }
-        }
-      } catch (_) {
-        $("copy").setAttribute("aria-label", "复制失败，请重试");
-        $("copy").title = "复制失败，请重试";
-        return;
-      }
-      clearTimeout(copyTimer);
-      $("copy").innerHTML = icon("check");
-      $("copy").classList.add("copied");
-      $("copy").setAttribute("aria-label", "已复制");
-      $("copy").title = "已复制";
-      copyTimer = setTimeout(() => {
-        $("copy").innerHTML = COPY_LABEL;
-        $("copy").classList.remove("copied");
-        $("copy").setAttribute("aria-label", "复制题目");
-        $("copy").title = "复制题目";
-      }, 1600);
-    });
+    const COPY_LABEL = icon("copy");
+    const candyExpanded = new Set();
+    const candyAnswersExpanded = new Set();
+    const candySelected = new Set();
+    const fpSelected = new Set();
+    const fpExpanded = new Set();
+    const listMarkup = new Map();
 
     // The CPA management panel keeps its state in same-origin localStorage, optionally obfuscated.
     function panelValue(name) {
@@ -371,10 +489,6 @@
       const dark = theme === "dark" || (theme !== "white" && theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
     }
-    applyTheme();
-    addEventListener("storage", applyTheme);
-    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
-
     function panelKey() {
       const k = panelValue("cli-proxy-auth")?.state?.managementKey;
       return typeof k === "string" ? k.trim() : "";
@@ -383,20 +497,26 @@
     class AuthError extends Error {}
 
     async function api(path, { method = "GET", body } = {}) {
-      const init = { method, cache: "no-store", headers: { Authorization: "Bearer " + key } };
+      const init = { method, cache: "no-store", signal: AbortSignal.timeout(30000), headers: { Authorization: "Bearer " + key } };
       if (body !== undefined) {
         init.headers["Content-Type"] = "application/json";
         init.body = JSON.stringify(body);
       }
-      const resp = await fetch(path, init);
+      let resp;
+      try {
+        resp = await fetch(path, init);
+      } catch (err) {
+        throw new Error(err.name === "TimeoutError" ? "连接超时，请稍后重试。" : "无法连接 CPA，请检查网络后重试。");
+      }
       const text = await resp.text();
       let data = null;
       try { data = JSON.parse(text); } catch (_) {}
       if (resp.status === 401) throw new AuthError("管理密钥无效，请重新输入。");
       if (!resp.ok) {
         const err = data?.error;
-        throw new Error((typeof err === "string" ? err : err?.message) || text || "HTTP " + resp.status);
+        throw new Error(String((typeof err === "string" ? err : err?.message) || text || "HTTP " + resp.status).slice(0, 500));
       }
+      if (!data || typeof data !== "object") throw new Error("服务器返回了无效数据，请稍后重试。");
       return data;
     }
 
@@ -420,6 +540,16 @@
       $("model").value = preferred || DEFAULT_MODEL;
       if (saved.runs) { $("runs").value = saved.runs; $("runs").value = runs(); }
       fillEfforts(saved.effort || DEFAULT_EFFORT);
+      const fpSaved = stored(PREF_STORE + ".fingerprint") || {};
+      const fpIDs = [...new Set([...ids.filter((id) => !/[()]/.test(id)), ...FP_CONFIG.models])];
+      if (typeof fpSaved.model === "string" && !HIDDEN_MODEL(fpSaved.model) && !/[()]/.test(fpSaved.model) && !fpIDs.includes(fpSaved.model)) fpIDs.push(fpSaved.model);
+      $("fp-model").innerHTML = fpIDs.map((id) => `<option>${esc(id)}</option>`).join("");
+      $("fp-model").value = fpIDs.includes(fpSaved.model) ? fpSaved.model : DEFAULT_MODEL;
+      $("fp-mode").innerHTML = Object.entries(fpModes).map(([id, m]) => `<option value="${esc(id)}">${esc(m.name)} · ${m.requests} 次</option>`).join("");
+      $("fp-mode").value = Object.hasOwn(fpModes, fpSaved.mode) ? fpSaved.mode : "quick";
+      $("fp-concurrency").max = FP_CONFIG.max_concurrency;
+      $("fp-concurrency").value = fpSaved.concurrency || FP_CONFIG.default_concurrency;
+      $("fp-concurrency").value = fpConcurrency();
     }
 
     function fillEfforts(preferred) {
@@ -435,16 +565,17 @@
     const MARK = { ok: "circle-check", bad: "circle-x", err: "circle-alert" };
     const fmtNum = (n) => (n ? Number(n).toLocaleString("en-US") : "0");
     const fmtSec = (ms) => (ms / 1000).toFixed(1) + "s";
-    function fmtTime(iso, withYear = false) {
+    function fmtTime(iso) {
       const d = new Date(iso);
       const p = (n) => String(n).padStart(2, "0");
-      return `${withYear ? d.getFullYear() + "-" : ""}${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
     }
     const oneLine = (s) => String(s || "").replace(/\s+/g, " ").trim();
     const modelName = (r) => r.effort ? `${r.model}(${r.effort})` : r.model;
-    const modelMeta = (r) => `<span class="model-meta" title="${esc(modelName(r))}">${icon("cpu")}<span class="meta mono">${esc(modelName(r))}</span></span>`;
     const verdict = (r) => `<span class="verdict ${kind(r)}">${icon(MARK[kind(r)])}${VERDICT[kind(r)]}</span>`;
-    const metric = (name, label, value) => `<span class="metric mono" title="${esc(label)}" aria-label="${esc(`${label} ${value}`)}">${icon(name)}<span>${esc(value)}</span></span>`;
+    const metric = (name, label, value, cls = "") => `<span class="metric ${cls}" title="${esc(`${label} ${value}`)}" aria-label="${esc(`${label} ${value}`)}">${icon(name)}<span class="meta mono">${esc(value)}</span></span>`;
+    const modelMeta = (r) => metric("cpu", "模型", modelName(r), "model-meta");
+    const resultMeta = (r) => `<div class="result-meta">${verdict(r)}${metric("calendar", "测试时间", fmtTime(r.time))}${modelMeta(r)}</div>`;
     const metrics = (r) => metric("clock", "用时", fmtSec(r.duration_ms)) +
       metric("arrow-down", "输入 tokens", fmtNum(r.input_tokens)) +
       metric("arrow-up", "输出 tokens", fmtNum(r.output_tokens)) +
@@ -461,12 +592,32 @@
     const answerKey = (id, r) => JSON.stringify([id, r.time, r.model, r.effort]);
     const answerToggle = (open) => `${icon("chevron-right", "chev")}${open ? "收起" : "展开"}`;
 
-    function renderRow(a) {
+    function accountView(a, open, toggleAttribute) {
+      return `<div class="account"><button class="toggle" type="button" ${toggleAttribute}="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
+        <div class="tags"><span class="tag">${esc(planName(a.plan_type))}</span>${a.disabled ? `<span class="tag">已停用</span>` : ""}</div></div>`;
+    }
+
+    function candyHistory(a, r, i) {
+      const key = answerKey(a.id, r);
+      const answerOpen = candyAnswersExpanded.has(key);
+      const bodyID = `answer-${encodeURIComponent(a.id)}-${i}`;
+      return `
+      <div class="entry">
+        <div class="entry-head">${resultMeta(r)}
+          <span class="metrics">${metrics(r)}</span></div>
+        <div class="entry-answer ${answerOpen ? "expanded" : ""}">
+          <button class="answer-toggle" type="button" data-answer="${esc(key)}" aria-expanded="${answerOpen}" aria-controls="${esc(bodyID)}" aria-label="${answerOpen ? "收起文本" : "展开文本"}">${answerToggle(answerOpen)}</button>
+          <pre id="${esc(bodyID)}" class="entry-body ${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
+        </div>
+      </div>`;
+    }
+
+    function renderCandyRow(a) {
       const results = a.results;
       const last = results[results.length - 1];
       const graded = results.filter((r) => scopeMatch(r) && !r.error);
       const correct = graded.filter((r) => r.ok).length;
-      const open = expanded.has(a.id);
+      const open = candyExpanded.has(a.id);
 
       const latest = last
         ? `<div class="latest-top">${verdict(last)}
@@ -479,53 +630,40 @@
       const marks = results.map((r, i) => `<button class="mark-hit" type="button" data-auth="${esc(a.id)}" data-i="${i}" aria-label="${esc(`${fmtTime(r.time)} ${modelName(r)} ${VERDICT[kind(r)]}`)}">${icon(MARK[kind(r)], `mark ${kind(r)} ${scopeMatch(r) ? "" : "dim"}`)}</button>`).join("");
       const action = a.running
         ? `<button class="btn ghost" type="button" disabled>${icon("loader-circle", "spin")}测试中 <span class="mono">${a.running.done}/${a.running.total}</span></button>`
-        : `<button class="btn ghost" type="button" data-run="${esc(a.id)}" ${pending ? "disabled" : ""}>${icon("play")}测试</button>`;
-
-      const history = open ? [...results].reverse().map((r, i) => {
-        const key = answerKey(a.id, r);
-        const answerOpen = expandedAnswers.has(key);
-        const bodyID = `answer-${encodeURIComponent(a.id)}-${i}`;
-        return `
-        <div class="entry">
-          <div class="entry-head">${verdict(r)}<span class="when">${metric("calendar", "测试时间", fmtTime(r.time, true))}</span>${modelMeta(r)}
-            <span class="metrics">${metrics(r)}</span></div>
-          <div class="entry-answer ${answerOpen ? "expanded" : ""}">
-            <button class="answer-toggle" type="button" data-answer="${esc(key)}" aria-expanded="${answerOpen}" aria-controls="${esc(bodyID)}" aria-label="${answerOpen ? "收起文本" : "展开文本"}">${answerToggle(answerOpen)}</button>
-            <pre id="${esc(bodyID)}" class="entry-body ${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
-          </div>
-        </div>`;
-      }).join("") : "";
+        : `<button class="btn ghost" type="button" data-run="${esc(a.id)}" ${pending || !availableAuth(a) ? "disabled" : ""}>${icon("play")}${a.fingerprint_running ? "指纹采集中" : "测试"}</button>`;
 
       return `<div class="row ${open ? "open" : ""}">
-        <div class="row-main" data-row="${esc(a.id)}">
-          <div class="account">
-            <button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
-            <div class="tags"><span class="tag">${esc(planName(a.plan_type))}</span>${a.disabled ? `<span class="tag">已停用</span>` : ""}</div>
-          </div>
+        <div class="list-row row-main" data-row="${esc(a.id)}">
+          <input type="checkbox" data-candy-select="${esc(a.id)}" aria-label="选择此认证文件" ${candySelected.has(a.id) ? "checked" : ""} ${pending || !availableAuth(a) ? "disabled" : ""}>
+          ${accountView(a, open, "data-toggle")}
           <div class="latest">${latest}</div>
-          <div class="rate">${rate}</div>
-          <div class="marks">${marks}</div>
+          <div class="row-summary ${results.length ? "" : "empty-history"}"><div class="rate">${rate}</div><div class="marks">${marks}</div></div>
           <div class="action">${action}</div>
         </div>
-        ${open ? `<div class="details"><div class="history">${history || `<div class="empty">还没有测试记录，点击「测试」开始。</div>`}</div></div>` : ""}
+        ${open ? `<div class="history-panel candy-history"><div class="history">${[...results].reverse().map((r, i) => candyHistory(a, r, i)).join("") || `<div class="empty">还没有测试记录，点击「测试」开始。</div>`}</div></div>` : ""}
       </div>`;
+    }
+
+    function renderList(id, renderRow) {
+      const list = $(id);
+      const html = auths.length ? auths.map(renderRow).join("") : `<div class="empty">没有 Codex 认证文件。在 CPA 中添加 Codex 账号后刷新此页。</div>`;
+      if (listMarkup.get(id) === html) return;
+      const focused = list.contains(document.activeElement) ? document.activeElement : null;
+      const selector = focused && [...focused.attributes].filter((a) => a.name.startsWith("data-"))
+        .map((a) => `[${a.name}="${CSS.escape(a.value)}"]`).join("");
+      if (id === "rows") hideTip();
+      list.innerHTML = html;
+      listMarkup.set(id, html);
+      if (selector) list.querySelector(selector)?.focus({ preventScroll: true });
     }
 
     function render() {
       $("rate-scope").textContent = `正确率按 ${modelName({ model: $("model").value, effort: $("effort").value })} 统计`;
-      const enabled = auths.filter((a) => !a.disabled).length;
-      $("run-all").innerHTML = `${icon("play")}测试全部 (${enabled})`;
-      $("run-all").disabled = pending || !enabled || auths.every((a) => a.disabled || a.running);
+      renderSelection("", candySelected, "测试");
       $("clear").disabled = pending || auths.every((a) => !a.results.length);
-      hideTip();
-      const focused = document.activeElement?.closest?.("[data-toggle], [data-run], [data-answer], [data-auth]");
-      const focusAttr = focused && ["data-toggle", "data-run", "data-answer", "data-auth"].find((attr) => focused.hasAttribute(attr));
-      const focusSelector = focusAttr && `[${focusAttr}="${CSS.escape(focused.getAttribute(focusAttr))}"]` +
-        (focusAttr === "data-auth" ? `[data-i="${focused.dataset.i}"]` : "");
-      $("rows").innerHTML = auths.length
-        ? auths.map(renderRow).join("")
-        : `<div class="empty">没有 Codex 认证文件。在 CPA 中添加 Codex 账号后刷新此页。</div>`;
-      if (focusSelector) $("rows").querySelector(focusSelector)?.focus({ preventScroll: true });
+      $("storage-error").textContent = storageError;
+      renderList("rows", renderCandyRow);
+      renderFingerprints();
     }
 
     async function load() {
@@ -534,22 +672,32 @@
       try {
         const data = await api(BASE + "/state");
         if (version !== loadVersion) return;
-        auths = data.auths || [];
+        if (!Array.isArray(data.auths)) throw new Error("服务器返回的测试记录格式无效。");
+        auths = data.auths;
+        storageError = data.storage_error || "";
         if ($("flash").textContent === loadError) $("flash").textContent = "";
         loadError = "";
         const ids = new Set(auths.map((a) => a.id));
         const answers = new Set(auths.flatMap((a) => a.results.map((r) => answerKey(a.id, r))));
-        for (const id of expanded) if (!ids.has(id)) expanded.delete(id);
-        for (const id of expandedAnswers) if (!answers.has(id)) expandedAnswers.delete(id);
+        for (const id of candyExpanded) if (!ids.has(id)) candyExpanded.delete(id);
+        for (const id of fpExpanded) if (!ids.has(id)) fpExpanded.delete(id);
+        for (const selection of [candySelected, fpSelected]) {
+          for (const id of selection) if (!auths.some((a) => a.id === id && !a.disabled)) selection.delete(id);
+        }
+        for (const id of candyAnswersExpanded) if (!answers.has(id)) candyAnswersExpanded.delete(id);
         render();
       } catch (err) {
         if (version !== loadVersion) return;
         if (err instanceof AuthError) return showLogin(err.message);
         loadError = "读取测试结果失败：" + err.message;
-        if (auths.length) $("flash").textContent = loadError;
-        else $("rows").innerHTML = `<div class="notice error">${esc(loadError)}</div>`;
+        $("flash").textContent = loadError;
+        if (!auths.length) {
+          listMarkup.clear();
+          $("rows").innerHTML = `<div class="notice error">${esc(loadError)}</div>`;
+          $("fp-rows").innerHTML = `<div class="notice error">${esc(loadError)}</div>`;
+        }
       }
-      pollTimer = setTimeout(load, auths.some((a) => a.running) ? 2500 : 20000);
+      pollTimer = setTimeout(load, auths.some((a) => a.running || a.fingerprint_running) ? 2500 : 20000);
     }
 
     async function update(path, options, errorPrefix) {
@@ -560,7 +708,8 @@
       $("flash").textContent = "";
       render();
       try {
-        await api(BASE + path, options);
+        const response = await api(BASE + path, options);
+        if (path.endsWith("/run") && response?.started === 0) $("flash").textContent = "所选账号正在测试，本次未启动新任务。";
       } catch (err) {
         if (err instanceof AuthError) return showLogin(err.message);
         $("flash").textContent = errorPrefix + "：" + err.message;
@@ -571,7 +720,8 @@
       }
     }
 
-    function run(body) {
+    function runCandy(body) {
+      if (!$("toolbar").reportValidity()) return;
       savePrefs();
       return update("/run", { method: "POST", body: { ...body, model: $("model").value, effort: $("effort").value, runs: runs() } }, "开始测试失败");
     }
@@ -580,6 +730,7 @@
       ++loadVersion;
       clearTimeout(pollTimer);
       hideTip();
+      document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
       $("app").hidden = true;
       $("login").hidden = false;
       $("login-error").hidden = !message;
@@ -609,8 +760,7 @@
       if (!r) return;
       hideTip();
       const tip = $("tip");
-      tip.innerHTML = `<div class="tip-head">${verdict(r)}${modelMeta(r)}</div>
-        <div class="metrics">${metric("calendar", "测试时间", fmtTime(r.time, true))}</div>
+      tip.innerHTML = `${resultMeta(r)}
         <div class="metrics">${metrics(r)}</div>
         <div class="tip-text ${r.error ? "error" : ""}">${esc(oneLine(r.error || r.answer))}</div>`;
       tip.hidden = false;
@@ -628,6 +778,175 @@
       tipTarget?.removeAttribute("aria-describedby");
       tipTarget = null;
     }
+    function setMasked(masked) {
+      document.body.classList.toggle("masked", masked);
+      for (const id of ["mask", "fp-mask"]) {
+        $(id).setAttribute("aria-pressed", masked);
+        const label = masked ? "取消脱敏" : "脱敏";
+        $(id).innerHTML = icon(masked ? "eye" : "eye-off");
+        $(id).setAttribute("aria-label", label);
+        $(id).title = label;
+      }
+    }
+    function switchTab(name) {
+      for (const tab of ["candy", "fingerprint"]) {
+        const active = name === tab;
+        $("tab-" + tab).setAttribute("aria-selected", active);
+        $("tab-" + tab).tabIndex = active ? 0 : -1;
+        $(tab + "-panel").hidden = !active;
+      }
+      hideTip();
+      store(PREF_STORE + ".tab", name);
+    }
+    const fpModeName = (mode) => fpModes[mode]?.name || mode || "—";
+    const availableAuth = (a) => !a.disabled && !a.running && !a.fingerprint_running;
+    const selectedAuths = (selection) => auths.filter((a) => availableAuth(a) && selection.has(a.id));
+    function renderSelection(prefix, selection, action) {
+      const available = auths.filter(availableAuth);
+      const selected = selectedAuths(selection);
+      const button = $(prefix + "run-batch");
+      button.innerHTML = `${icon("play")}${action}${selected.length ? "所选" : "全部"} (${selected.length || available.length})`;
+      button.disabled = pending || !available.length;
+      const checkbox = $(prefix + "select-all");
+      checkbox.checked = available.length > 0 && selected.length === available.length;
+      checkbox.indeterminate = selected.length > 0 && selected.length < available.length;
+      checkbox.disabled = pending || !available.length;
+    }
+    const fpConcurrency = () => Math.min(Math.max(parseInt($("fp-concurrency").value, 10) || FP_CONFIG.default_concurrency, 1), FP_CONFIG.max_concurrency);
+    const fpSavePrefs = () => store(PREF_STORE + ".fingerprint", { model: $("fp-model").value, mode: $("fp-mode").value, concurrency: fpConcurrency() });
+    function fpOutcome(r) {
+      const status = r.attribution?.status;
+      const model = `<span class="mono">${esc(r.model)}</span>`;
+      const retry = r.mode === "strict" ? "建议稍后重新采集" : "建议用严格模式复测";
+      const states = {
+        consistent: ["ok", "circle-check", "与所选模型一致", model],
+        substitution: ["warn", "shuffle", "疑似模型替换", `${model}${icon("arrow-right")}<strong class="mono">${esc(r.attribution?.nearest)}</strong>`],
+        different: ["bad", "circle-alert", "与所选模型有差异", "暂无法确定实际模型"],
+        ambiguous: ["neutral", "circle-help", "暂无法判断", retry],
+        insufficient: ["neutral", "circle-help", "有效回答不足", "建议重新采集"],
+        no_baseline: ["neutral", "circle-help", "暂不支持判断此模型", model],
+        unstable: ["warn", "circle-alert", "结果不稳定", retry],
+        cancelled: ["neutral", "pause", "采集已停止", model],
+        failed: ["bad", "circle-x", "采集失败", "请稍后重试"],
+      };
+      const [tone, symbol, title, detail] = states[status] || ["idle", "fingerprint", "等待采集", ""];
+      return `<div class="fp-outcome ${tone}"><span class="fp-state-icon">${icon(symbol)}</span><div class="fp-result-copy"><div class="fp-result-title">${title}</div>${detail ? `<div class="fp-result-detail">${detail}</div>` : ""}</div></div>`;
+    }
+    function fpHistory(a, r) {
+      return `<article class="fp-history-entry"><div class="fp-history-info"><time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time><div class="meta"><span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}</div></div>
+        ${fpOutcome(r)}<button class="btn ghost" type="button" data-fp-detail="${esc(r.id)}" data-fp-account="${esc(a.id)}">${icon("chart")}查看详情</button></article>`;
+    }
+    const fpMetric = (n) => n == null ? "—" : Number(n).toFixed(4);
+    const fpComparisonNames = { match: "相似", uncertain: "不确定", mismatch: "不同", insufficient: "样本不足" };
+    const fpProbeNames = { "random-number-1-100": "随机数 1–100", "random-number-1-10": "随机数 1–10", "random-letter": "随机字母", "random-color": "随机颜色", "coin-flip": "抛硬币", "random-animal": "随机动物", "random-city": "随机城市", "favorite-number": "喜欢的数字" };
+    let fpDetailRecord = null;
+    let fpDetailFocus = null;
+    function showFingerprintDetail(r, account) {
+      fpDetailRecord = r;
+      fpDetailFocus = { account, id: r.id };
+      const attr = r.attribution || {};
+      const comparisons = attr.comparisons || [];
+      const stat = (label, value) => `<div class="fp-stat"><dt>${label}</dt><dd class="mono">${esc(value)}</dd></div>`;
+      $("fp-detail-body").innerHTML = `<p class="fp-dialog-meta"><span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}模式 · <time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time></p>
+        ${fpOutcome(r)}
+        <p class="fp-detail-note">${esc(attr.message || "尚无归因结果")}</p>
+        ${r.error ? `<p class="fp-detail-note fp-detail-warning">${esc(r.error)}</p>` : ""}
+        <dl class="fp-stats">${stat("采集进度", `${r.done} / ${r.total}`)}${stat("有效回答", r.valid)}${stat("请求失败", r.errors)}${stat("用时", fmtSec(r.duration_ms))}</dl>
+        <section class="fp-dialog-section"><h3>基准比对</h3>
+          <div class="fp-detail-scroll"><table class="fp-detail-table"><thead><tr><th>基准模型</th><th>距离 JSD ↓</th><th>p 值</th><th>有效探针</th><th>距离判断</th></tr></thead><tbody>
+            ${comparisons.map((c) => `<tr class="${c.model === attr.nearest ? "closest" : ""}"><td class="mono">${esc(c.model)}${c.model === r.model ? " · 所选" : ""}${c.model === attr.nearest ? " · 最近" : ""}</td><td class="mono">${fpMetric(c.mean_jsd)}</td><td class="mono">${fpMetric(c.p_value)}</td><td>${c.cells?.length || 0}</td><td>${esc(fpComparisonNames[c.verdict] || c.verdict)}</td></tr>`).join("") || `<tr><td colspan="5">暂无可比数据</td></tr>`}
+          </tbody></table></div>
+          <p class="fp-detail-note">距离越小，回答分布越接近。p 值低于 ${fpMetric(attr.alpha)} 时视为差异显著；归因同时考虑距离与统计检验。</p>
+        </section>
+        <section class="fp-dialog-section"><h3>结果稳定性</h3>
+          <p class="fp-detail-note">本次自一致性 JSD：<span class="mono">${fpMetric(attr.self_jsd)}</span>（越小越稳定）${attr.reference_p_value != null ? `<br>所选模型与最近模型的基准差异 p 值：<span class="mono">${fpMetric(attr.reference_p_value)}</span>` : ""}</p>
+          ${(attr.warnings || []).map((w) => `<p class="fp-detail-note fp-detail-warning">${esc(w)}</p>`).join("")}
+        </section>
+        <section class="fp-dialog-section"><h3>逐项比对</h3><label class="field fp-probe-select"><span class="field-label">对比模型</span><span class="native-select"><select id="fp-detail-baseline">${comparisons.map((c) => `<option>${esc(c.model)}</option>`).join("")}</select></span></label><div id="fp-detail-probes" class="fp-detail-scroll"></div></section>`;
+      renderFingerprintProbes();
+      $("fp-detail").showModal();
+    }
+    function renderFingerprintProbes() {
+      const comparison = fpDetailRecord?.attribution?.comparisons?.find((c) => c.model === $("fp-detail-baseline").value);
+      const rows = (comparison?.cells || []).map((c) => {
+        const [task, lang] = String(c.cell || "").split(":");
+        return `<tr><td>${esc(fpProbeNames[task] || task)} · ${lang === "zh" ? "中文" : "英文"}</td><td class="mono">${fpMetric(c.jsd)}</td><td>${esc(c.valid_a ?? "—")}</td><td>${esc(c.valid_b ?? "—")}</td></tr>`;
+      }).join("");
+      $("fp-detail-probes").innerHTML = `<table class="fp-detail-table"><thead><tr><th>探针</th><th>距离 JSD</th><th>本次有效回答</th><th>基准有效回答</th></tr></thead><tbody>${rows || `<tr><td colspan="4">有效样本不足，暂无可比探针</td></tr>`}</tbody></table>`;
+    }
+    function renderFingerprintRow(a) {
+      const history = a.fingerprints || [];
+      const last = history[history.length - 1];
+      const p = a.fingerprint_running;
+      const open = fpExpanded.has(a.id);
+      const phase = p?.phase === "cancelling" ? "正在停止" : p?.phase === "comparing" ? "正在分析指纹" : "正在采集";
+      const latest = p
+        ? `<div class="fp-outcome"><span class="fp-state-icon">${icon("loader-circle", "spin")}</span><div class="fp-result-copy"><div class="fp-result-title">${phase} <span class="meta mono">${p.done}/${p.total}</span></div><div class="fp-result-detail mono">${esc(p.model)}</div><progress class="fp-progress" value="${p.done}" max="${p.total}" aria-label="采集进度"></progress></div></div>`
+        : fpOutcome(last || {});
+      return `<div class="row ${open ? "open" : ""}"><div class="list-row fp-main">
+        <input type="checkbox" data-fp-select="${esc(a.id)}" aria-label="选择此认证文件" ${fpSelected.has(a.id) ? "checked" : ""} ${pending || !availableAuth(a) ? "disabled" : ""}>
+        ${accountView(a, open, "data-fp-toggle")}
+        <div class="latest">${latest}</div>
+        <div class="fp-mode">${esc(fpModeName(p?.mode || last?.mode))}</div>
+        <div class="fp-time mono" ${last && !p ? `title="${esc(fmtTime(last.time))}"` : ""}>${last && !p ? esc(fmtTime(last.time)) : "—"}</div>
+        <div class="action">${p ? `<button class="btn ghost" type="button" data-fp-cancel="${esc(a.id)}" ${pending || p.phase === "cancelling" ? "disabled" : ""}>停止</button>` : `<button class="btn" type="button" data-fp-run="${esc(a.id)}" ${pending || !availableAuth(a) ? "disabled" : ""}>${icon("play")}采集</button>`}</div></div>
+        ${open ? `<div class="history-panel"><div class="fp-history-title">历史记录</div><div class="fp-history-list">${[...history].reverse().map((r) => fpHistory(a, r)).join("") || `<div class="empty">暂无记录</div>`}</div></div>` : ""}</div>`;
+    }
+    function renderFingerprints() {
+      renderSelection("fp-", fpSelected, "采集");
+      const selected = selectedAuths(fpSelected);
+      $("fp-clear").disabled = pending || !auths.some((a) => a.fingerprints?.length);
+      const count = fpModes[$("fp-mode").value]?.requests || fpModes.quick.requests;
+      $("fp-cost").textContent = `每个账号 ${count} 次请求（失败会重试）${selected.length ? ` · 已选 ${selected.length} 个，共 ${count * selected.length} 次` : ""}`;
+      renderList("fp-rows", renderFingerprintRow);
+    }
+    function runFingerprint(body) {
+      if (!$("fp-toolbar").reportValidity()) return;
+      fpSavePrefs();
+      return update("/fingerprint/run", { method: "POST", body: { ...body, model: $("fp-model").value, mode: $("fp-mode").value, concurrency: fpConcurrency() } }, "开始采集失败");
+    }
+    // Events and initialization.
+    document.querySelectorAll("[data-icon]").forEach((el) => { el.outerHTML = icon(el.dataset.icon, el.dataset.class); });
+
+    $("copy").innerHTML = COPY_LABEL;
+    $("copy").addEventListener("click", async () => {
+      const prompt = $("question").textContent;
+      try {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(prompt);
+        } else {
+          const area = Object.assign(document.createElement("textarea"), { value: prompt, className: "clipboard-buffer" });
+          document.body.append(area);
+          try {
+            area.select();
+            if (!document.execCommand("copy")) throw new Error("copy failed");
+          } finally {
+            area.remove();
+            $("copy").focus();
+          }
+        }
+      } catch (_) {
+        $("copy").setAttribute("aria-label", "复制失败，请手动选择题目复制");
+        $("copy").title = "复制失败，请手动选择题目复制";
+        return;
+      }
+      clearTimeout(copyTimer);
+      $("copy").innerHTML = icon("check");
+      $("copy").classList.add("copied");
+      $("copy").setAttribute("aria-label", "已复制");
+      $("copy").title = "已复制";
+      copyTimer = setTimeout(() => {
+        $("copy").innerHTML = COPY_LABEL;
+        $("copy").classList.remove("copied");
+        $("copy").setAttribute("aria-label", "复制题目");
+        $("copy").title = "复制题目";
+      }, 1600);
+    });
+
+    applyTheme();
+    addEventListener("storage", applyTheme);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+
     $("rows").addEventListener("mouseover", (e) => {
       const target = e.target.closest("[data-auth]");
       if (target?.contains(e.relatedTarget)) return;
@@ -643,26 +962,25 @@
     addEventListener("scroll", hideTip, true);
     addEventListener("resize", hideTip);
 
-    function setMasked(masked) {
-      document.body.classList.toggle("masked", masked);
-      $("mask").setAttribute("aria-pressed", masked);
-      $("mask").innerHTML = masked ? icon("eye") + "取消脱敏" : icon("eye-off") + "脱敏";
-    }
     setMasked(stored(MASK_STORE) === true);
     $("mask").addEventListener("click", () => {
       const masked = !document.body.classList.contains("masked");
       setMasked(masked);
       store(MASK_STORE, masked);
     });
+    $("fp-mask").addEventListener("click", () => $("mask").click());
 
-    $("clear").innerHTML = icon("trash-2") + "清空历史";
-    $("clear").addEventListener("click", () => {
-      $("confirm-clear").returnValue = ""; // Esc keeps the previous returnValue.
-      $("confirm-clear").showModal();
-    });
+    for (const [id, scope, label] of [["clear", "candy", "糖果"], ["fp-clear", "fingerprint", "指纹"]]) {
+      $(id).addEventListener("click", () => {
+        clearScope = scope;
+        $("clear-title").textContent = `清空${label}测试记录？`;
+        $("confirm-clear").returnValue = ""; // Esc keeps the previous returnValue.
+        $("confirm-clear").showModal();
+      });
+    }
     $("confirm-clear").addEventListener("close", () => {
       if ($("confirm-clear").returnValue !== "confirm") return;
-      update("/results", { method: "DELETE" }, "清空历史失败");
+      update(clearScope === "fingerprint" ? "/fingerprint/results" : "/results", { method: "DELETE" }, "清空历史失败");
     });
 
     $("login-form").addEventListener("submit", (e) => {
@@ -671,18 +989,19 @@
       try { sessionStorage.setItem(KEY_STORE, key); } catch (_) {}
       start();
     });
-    $("toolbar").addEventListener("submit", (e) => { e.preventDefault(); run({ all: true }); });
+
     $("model").addEventListener("change", () => { fillEfforts($("effort").value); savePrefs(); render(); });
     $("effort").addEventListener("change", () => { savePrefs(); render(); });
     $("runs").addEventListener("change", () => { $("runs").value = runs(); savePrefs(); });
     $("rows").addEventListener("click", (e) => {
+      if (e.target.closest("[data-candy-select]")) return;
       const hit = e.target.closest("[data-auth]");
       if (hit) return showTip(hit);
       const answer = e.target.closest("[data-answer]");
       if (answer) {
         const key = answer.dataset.answer;
-        const open = !expandedAnswers.has(key);
-        open ? expandedAnswers.add(key) : expandedAnswers.delete(key);
+        const open = !candyAnswersExpanded.has(key);
+        open ? candyAnswersExpanded.add(key) : candyAnswersExpanded.delete(key);
         answer.closest(".entry-answer").classList.toggle("expanded", open);
         answer.setAttribute("aria-expanded", open);
         answer.setAttribute("aria-label", open ? "收起文本" : "展开文本");
@@ -690,12 +1009,63 @@
         return;
       }
       const btn = e.target.closest("[data-run]");
-      if (btn) return run({ auth_ids: [btn.dataset.run] });
+      if (btn) return runCandy({ auth_ids: [btn.dataset.run] });
       const row = e.target.closest("[data-row]");
       if (!row) return;
       const id = row.dataset.row;
-      expanded.has(id) ? expanded.delete(id) : expanded.add(id);
+      candyExpanded.has(id) ? candyExpanded.delete(id) : candyExpanded.add(id);
       render();
+    });
+
+    for (const name of ["candy", "fingerprint"]) {
+      $("tab-" + name).addEventListener("click", () => switchTab(name));
+      $("tab-" + name).addEventListener("keydown", (e) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+        e.preventDefault();
+        const next = e.key === "Home" ? "candy" : e.key === "End" ? "fingerprint" : name === "candy" ? "fingerprint" : "candy";
+        switchTab(next); $("tab-" + next).focus();
+      });
+    }
+    switchTab(stored(PREF_STORE + ".tab") === "fingerprint" ? "fingerprint" : "candy");
+
+    $("fp-detail-body").addEventListener("change", (e) => { if (e.target.id === "fp-detail-baseline") renderFingerprintProbes(); });
+    $("fp-detail-close").addEventListener("click", () => $("fp-detail").close());
+    $("fp-detail").addEventListener("close", () => {
+      if (fpDetailFocus) $("fp-rows").querySelector(`[data-fp-detail="${CSS.escape(fpDetailFocus.id)}"][data-fp-account="${CSS.escape(fpDetailFocus.account || "")}"]`)?.focus();
+      fpDetailRecord = null;
+    });
+
+    for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint]]) {
+      $(prefix + "toolbar").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const ids = selectedAuths(selection).map((a) => a.id);
+        submit(ids.length ? { auth_ids: ids } : { all: true });
+      });
+      $(prefix + "select-all").addEventListener("change", (e) => {
+        for (const a of auths.filter(availableAuth)) e.target.checked ? selection.add(a.id) : selection.delete(a.id);
+        render();
+      });
+      $(prefix + "rows").addEventListener("change", (e) => {
+        const id = e.target.getAttribute(`data-${type}-select`);
+        if (!id) return;
+        e.target.checked ? selection.add(id) : selection.delete(id);
+        render();
+      });
+    }
+    for (const id of ["fp-model", "fp-mode"]) $(id).addEventListener("change", () => { fpSavePrefs(); renderFingerprints(); });
+    $("fp-concurrency").addEventListener("change", () => { $("fp-concurrency").value = fpConcurrency(); fpSavePrefs(); });
+    $("fp-rows").addEventListener("click", (e) => {
+      const run = e.target.closest("[data-fp-run]");
+      if (run) return runFingerprint({ auth_ids: [run.dataset.fpRun] });
+      const cancel = e.target.closest("[data-fp-cancel]");
+      if (cancel) return update("/fingerprint/cancel", { method: "POST", body: { auth_ids: [cancel.dataset.fpCancel] } }, "停止采集失败");
+      const toggle = e.target.closest("[data-fp-toggle]");
+      if (toggle) { const id = toggle.dataset.fpToggle; fpExpanded.has(id) ? fpExpanded.delete(id) : fpExpanded.add(id); return renderFingerprints(); }
+      const detail = e.target.closest("[data-fp-detail]");
+      if (detail) {
+        const record = auths.find((a) => a.id === detail.dataset.fpAccount)?.fingerprints?.find((r) => r.id === detail.dataset.fpDetail);
+        if (record) showFingerprintDetail(record, detail.dataset.fpAccount);
+      }
     });
 
     key = panelKey();

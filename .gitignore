@@ -1,2 +1,7 @@
 dist/
 .DS_store
+
+# Private environment and deployment settings.
+.env
+.env.*
+!.env.example
