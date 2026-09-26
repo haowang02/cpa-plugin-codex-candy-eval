@@ -1,4 +1,4 @@
-# Install the latest cpa-codex-candy-eval release into .\plugins. Run it in the CLIProxyAPI directory.
+# Install the latest release into .\plugins\windows\amd64. Run it in the CLIProxyAPI working directory.
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
@@ -10,8 +10,11 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
 }
 
 $tag = (Invoke-RestMethod -UseBasicParsing "https://api.github.com/repos/$repo/releases/latest").tag_name
-$asset = "${name}_$($tag.TrimStart('v'))_windows_amd64.zip"
+$version = $tag.TrimStart('v')
+$asset = "${name}_${version}_windows_amd64.zip"
 $base = "https://github.com/$repo/releases/download/$tag"
+$dir = Join-Path (Join-Path "plugins" "windows") "amd64"
+$file = "$name-v$version.dll"
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("$name." + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
@@ -27,9 +30,9 @@ try {
     }
 
     Expand-Archive -LiteralPath (Join-Path $tmp $asset) -DestinationPath $tmp -Force
-    New-Item -ItemType Directory -Force -Path "plugins" | Out-Null
-    Move-Item -Force (Join-Path $tmp "$name.dll") (Join-Path "plugins" "$name.dll")
-    Write-Host "Installed: $(Resolve-Path (Join-Path "plugins" "$name.dll"))"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Move-Item -Force (Join-Path $tmp "$name.dll") (Join-Path $dir $file)
+    Write-Host "Installed: $(Resolve-Path (Join-Path $dir $file))"
 }
 finally {
     Remove-Item -Recurse -Force $tmp

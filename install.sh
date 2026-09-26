@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install the latest cpa-codex-candy-eval release into ./plugins. Run it in the CLIProxyAPI directory.
+# Install the latest release into ./plugins/<os>/<arch>. Run it in the CLIProxyAPI working directory.
 set -eu
 
 repo="haowang02/cpa-plugin-codex-candy-eval"
@@ -23,8 +23,11 @@ esac
 
 tag="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest")" || fail "failed to resolve the latest release"
 tag="${tag##*/}"
-asset="${name}_${tag#v}_${os}_${arch}.tar.gz"
+version="${tag#v}"
+asset="${name}_${version}_${os}_${arch}.tar.gz"
 base="https://github.com/$repo/releases/download/$tag"
+dir="plugins/$os/$arch"
+file="$name-v$version.$ext"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -37,8 +40,8 @@ actual="$({ sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset"; 
 [ -n "$expected" ] && [ "$expected" = "$actual" ] || fail "checksum mismatch for $asset"
 
 tar -xzf "$tmp/$asset" -C "$tmp"
-mkdir -p plugins
+mkdir -p "$dir"
 # Stage next to the target and rename, so a running CLIProxyAPI never sees a partial file.
-cp "$tmp/$name.$ext" "plugins/.$name.$ext.tmp"
-mv -f "plugins/.$name.$ext.tmp" "plugins/$name.$ext"
-echo "Installed: $(pwd)/plugins/$name.$ext"
+cp "$tmp/$name.$ext" "$dir/.$file.tmp"
+mv -f "$dir/.$file.tmp" "$dir/$file"
+echo "Installed: $(pwd)/$dir/$file"
