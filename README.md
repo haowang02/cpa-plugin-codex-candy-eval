@@ -10,7 +10,7 @@
 
 CPA 管理面板（CPAMC 或 CPAMP）插件商店搜索 `cpa-codex-candy-eval`。
 
-### 手动安装
+### 人工安装
 
 进入 CPA 工作目录，执行对应的安装命令。
 
