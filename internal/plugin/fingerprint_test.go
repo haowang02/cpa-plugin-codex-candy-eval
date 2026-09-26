@@ -1,4 +1,4 @@
-package main
+package plugin
 
 import (
 	"bytes"
@@ -276,7 +276,7 @@ func TestFingerprintConcurrencyAndCancellation(t *testing.T) {
 func TestFingerprintUpstreamErrors(t *testing.T) {
 	setupTest(t)
 	hostCall = func(_ string, _ any) (json.RawMessage, error) {
-		return nil, &envelopeError{Code: "host_call_failed", Message: "unauthorized", HTTPStatus: 401}
+		return nil, &EnvelopeError{Code: "host_call_failed", Message: "unauthorized", HTTPStatus: 401}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	p := &fingerprintProgress{Total: 60, Concurrency: fingerprintDefaultConcurrency, cancel: cancel}

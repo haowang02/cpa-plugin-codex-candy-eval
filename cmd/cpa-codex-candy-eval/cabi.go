@@ -1,6 +1,6 @@
 //go:build cshared
 
-// C ABI bridge between CLIProxyAPI and handleMethod. Build with
+// C ABI bridge between CLIProxyAPI and plugin.HandleMethod. Build with
 // -tags cshared -buildmode=c-shared.
 package main
 
@@ -63,16 +63,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"unsafe"
+
+	"cpa-codex-candy-eval/internal/plugin"
 )
 
 //export cliproxy_plugin_init
 func cliproxy_plugin_init(host *C.cliproxy_host_api, api *C.cliproxy_plugin_api) C.int {
-	if api == nil || host == nil || host.abi_version != C.uint32_t(abiVersion) || host.call == nil || host.free_buffer == nil {
+	if api == nil || host == nil || host.abi_version != C.uint32_t(plugin.ABIVersion) || host.call == nil || host.free_buffer == nil {
 		return 1
 	}
 	C.store_host_api(host)
-	hostCall = callHost
-	api.abi_version = C.uint32_t(abiVersion)
+	plugin.SetHostCall(callHost)
+	api.abi_version = C.uint32_t(plugin.ABIVersion)
 	api.call = C.cliproxy_plugin_call_fn(C.cliproxyPluginCall)
 	api.free_buffer = C.cliproxy_plugin_free_fn(C.cliproxyPluginFree)
 	api.shutdown = C.cliproxy_plugin_shutdown_fn(C.cliproxyPluginShutdown)
@@ -96,7 +98,7 @@ func callHost(method string, payload any) (json.RawMessage, error) {
 	if response.ptr == nil || response.len == 0 {
 		return nil, fmt.Errorf("host call %s returned no response, code=%d", method, int(code))
 	}
-	var env envelope
+	var env plugin.Envelope
 	if err := json.Unmarshal(C.GoBytes(response.ptr, C.int(response.len)), &env); err != nil {
 		return nil, fmt.Errorf("parse host call %s response: %w", method, err)
 	}
@@ -118,7 +120,7 @@ func cliproxyPluginCall(method *C.char, request *C.uint8_t, requestLen C.size_t,
 	if request != nil && requestLen > 0 {
 		body = C.GoBytes(unsafe.Pointer(request), C.int(requestLen))
 	}
-	raw := handleMethod(C.GoString(method), body)
+	raw := plugin.HandleMethod(C.GoString(method), body)
 	response.ptr = C.CBytes(raw)
 	response.len = C.size_t(len(raw))
 	return 0
@@ -132,4 +134,4 @@ func cliproxyPluginFree(ptr unsafe.Pointer, _ C.size_t) {
 }
 
 //export cliproxyPluginShutdown
-func cliproxyPluginShutdown() { quiesce() }
+func cliproxyPluginShutdown() { plugin.Quiesce() }

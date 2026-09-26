@@ -1,4 +1,4 @@
-package main
+package plugin
 
 import (
 	"bytes"
@@ -108,7 +108,7 @@ func TestRunAllKeepsRecentHistory(t *testing.T) {
 	var env struct {
 		Result managementResponse `json:"result"`
 	}
-	_ = json.Unmarshal(handleMethod("management.handle", request), &env)
+	_ = json.Unmarshal(HandleMethod("management.handle", request), &env)
 	if string(env.Result.Body) != `{"started":1}` {
 		t.Fatalf("run = %d %s", env.Result.StatusCode, env.Result.Body)
 	}
@@ -142,7 +142,7 @@ func TestRegistration(t *testing.T) {
 			Metadata map[string]any `json:"metadata"`
 		} `json:"result"`
 	}
-	_ = json.Unmarshal(handleMethod("plugin.register", nil), &reg)
+	_ = json.Unmarshal(HandleMethod("plugin.register", nil), &reg)
 	// CLIProxyAPI refuses to register a plugin when any of these is empty.
 	for _, field := range []string{"Name", "Version", "Author", "GitHubRepository"} {
 		if value, _ := reg.Result.Metadata[field].(string); value == "" {
@@ -334,7 +334,7 @@ func TestQuiesceDrainsBothTests(t *testing.T) {
 		}
 	}
 	stopped := make(chan struct{})
-	go func() { quiesce(); close(stopped) }()
+	go func() { Quiesce(); close(stopped) }()
 	for deadline := time.Now().Add(time.Second); ; time.Sleep(time.Millisecond) {
 		mu.Lock()
 		stopping := quiescing
@@ -360,7 +360,7 @@ func TestQuiesceDrainsBothTests(t *testing.T) {
 	if len(candyResults["candy"]) != 1 || fingerprintResults["fingerprint"][0].Status != "cancelled" {
 		t.Fatal("quiesce did not stop further collection")
 	}
-	handleMethod("plugin.reconfigure", nil)
+	HandleMethod("plugin.reconfigure", nil)
 	if quiescing {
 		t.Fatal("reconfiguration did not resume the plugin")
 	}

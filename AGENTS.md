@@ -8,6 +8,17 @@
 - Inspect relevant source before changing integration contracts. Keep changes
   focused and preserve unrelated work.
 
+## Project Layout
+
+- `cmd/cpa-codex-candy-eval/`: shared-library entry point and C ABI bridge.
+- `internal/plugin/`: plugin handlers, test runners, persistence, and Go tests.
+- `internal/plugin/web/`: embedded management page.
+- `internal/plugin/data/`: embedded fingerprint probes and baselines.
+- `docs/images/`: README screenshots.
+- Root `install.sh` and `install.ps1`: public installation entry points.
+- `.github/workflows/`: release checks, platform builds, and packaging.
+- `dist/`: ignored build artifacts.
+
 ## Build and Checks
 
 Run `gofmt` on changed Go files; run `go vet ./...` and `go test -race ./...`
@@ -21,7 +32,7 @@ mkdir -p dist
 GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
   CC='zig cc -target x86_64-linux-gnu.2.17' \
   go build -trimpath -ldflags='-s -w' -tags cshared -buildmode=c-shared \
-  -o dist/cpa-codex-candy-eval.so .
+  -o dist/cpa-codex-candy-eval.so ./cmd/cpa-codex-candy-eval
 file dist/cpa-codex-candy-eval.so
 ```
 

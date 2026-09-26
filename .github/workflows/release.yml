@@ -18,7 +18,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Check tag matches plugin version
-        run: grep -q "pluginVersion *= \"${GITHUB_REF_NAME#v}\"" plugin.go
+        run: grep -q "pluginVersion *= \"${GITHUB_REF_NAME#v}\"" internal/plugin/plugin.go
       - run: go vet ./...
       - run: go test -race ./...
 
@@ -50,14 +50,14 @@ jobs:
             -v "$PWD:/src" -w /src -v "$(go env GOROOT):/opt/go:ro" \
             -e GOROOT=/opt/go -e HOME=/tmp -e GOFLAGS=-buildvcs=false \
             ${{ matrix.image }} \
-            /opt/go/bin/go build -trimpath -ldflags="-s -w" -tags cshared -buildmode=c-shared -o dist/cpa-codex-candy-eval.so .
+            /opt/go/bin/go build -trimpath -ldflags="-s -w" -tags cshared -buildmode=c-shared -o dist/cpa-codex-candy-eval.so ./cmd/cpa-codex-candy-eval
 
       - name: Build plugin
         if: matrix.os != 'linux'
         shell: bash
         env:
           CGO_ENABLED: "1"
-        run: go build -trimpath -ldflags="-s -w" -tags cshared -buildmode=c-shared -o dist/cpa-codex-candy-eval.${{ matrix.ext }} .
+        run: go build -trimpath -ldflags="-s -w" -tags cshared -buildmode=c-shared -o dist/cpa-codex-candy-eval.${{ matrix.ext }} ./cmd/cpa-codex-candy-eval
 
       # The CPA plugin store needs <id>_<version>_<os>_<arch>.zip with the library at the zip root.
       - name: Package

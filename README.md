@@ -2,7 +2,7 @@
 
 在 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（CPA）的管理面板里，通过「糖果测试」和「指纹测试」检查 Codex 账号的回答表现。支持单个认证文件与批量测试。
 
-![fingerprint](fingerprint.png)
+![指纹测试](docs/images/fingerprint.png)
 
 ## 安装
 

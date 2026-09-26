@@ -1,6 +1,5 @@
-// Command cpa-codex-candy-eval tests Codex accounts using candy reasoning
-// and statistical model fingerprints.
-package main
+// Package plugin implements candy and fingerprint tests for Codex accounts.
+package plugin
 
 import (
 	"bytes"
@@ -17,16 +16,19 @@ import (
 const (
 	pluginID       = "cpa-codex-candy-eval"
 	pluginVersion  = "0.1.9"
-	abiVersion     = 1
+	ABIVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
 	uiPath         = "/v0/resource/plugins/" + pluginID + "/ui"
 )
 
-// hostCall is installed by the C ABI bridge.
 var hostCall func(method string, payload any) (json.RawMessage, error)
 
-//go:embed ui.html
+func SetHostCall(call func(string, any) (json.RawMessage, error)) {
+	hostCall = call
+}
+
+//go:embed web/ui.html
 var uiTemplate []byte
 
 var uiHTML = func() []byte {
@@ -41,27 +43,25 @@ var uiHTML = func() []byte {
 // Lucide "candy" icon. Hosts render it in an img element, so the stroke color is fixed.
 const logoSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#72787c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><style>@media (prefers-color-scheme: dark) { :root { stroke: #9c9d9b; } }</style><path d="M10 7v10.9"/><path d="M14 6.1V17"/><path d="M16 7V3a1 1 0 0 1 1.707-.707 2.5 2.5 0 0 0 2.152.717 1 1 0 0 1 1.131 1.131 2.5 2.5 0 0 0 .717 2.152A1 1 0 0 1 21 8h-4"/><path d="M16.536 7.465a5 5 0 0 0-7.072 0l-2 2a5 5 0 0 0 0 7.07 5 5 0 0 0 7.072 0l2-2a5 5 0 0 0 0-7.07"/><path d="M8 17v4a1 1 0 0 1-1.707.707 2.5 2.5 0 0 0-2.152-.717 1 1 0 0 1-1.131-1.131 2.5 2.5 0 0 0-.717-2.152A1 1 0 0 1 3 16h4"/></svg>`
 
-func main() {}
-
 var (
 	mu        sync.Mutex
 	tasks     sync.WaitGroup
 	quiescing bool
 )
 
-type envelope struct {
+type Envelope struct {
 	OK     bool            `json:"ok"`
 	Result json.RawMessage `json:"result,omitempty"`
-	Error  *envelopeError  `json:"error,omitempty"`
+	Error  *EnvelopeError  `json:"error,omitempty"`
 }
 
-type envelopeError struct {
+type EnvelopeError struct {
 	Code       string `json:"code"`
 	Message    string `json:"message"`
 	HTTPStatus int    `json:"http_status,omitempty"`
 }
 
-func (e *envelopeError) Error() string { return e.Code + ": " + e.Message }
+func (e *EnvelopeError) Error() string { return e.Code + ": " + e.Message }
 
 type managementRequest struct {
 	Method string `json:"Method"`
@@ -97,7 +97,7 @@ type authView struct {
 	Fingerprints       []fingerprintResult  `json:"fingerprints"`
 }
 
-func handleMethod(method string, request []byte) (response []byte) {
+func HandleMethod(method string, request []byte) (response []byte) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			response = errorEnvelope("plugin_panic", fmt.Sprint(recovered), http.StatusInternalServerError)
@@ -142,7 +142,7 @@ func handleMethod(method string, request []byte) (response []byte) {
 		}
 		return okEnvelope(handleManagement(req))
 	case "plugin.quiesce":
-		quiesce()
+		Quiesce()
 		return okEnvelope(map[string]any{})
 	default:
 		return errorEnvelope("unknown_method", "Unsupported plugin method: "+method, http.StatusNotFound)
@@ -290,7 +290,7 @@ func selectedCodexAuths(ids []string, all bool) ([]authFile, error) {
 	return selected, nil
 }
 
-func quiesce() {
+func Quiesce() {
 	mu.Lock()
 	quiescing = true
 	for _, p := range fingerprintRunning {
@@ -314,12 +314,12 @@ func okEnvelope(v any) []byte {
 	if err != nil {
 		return errorEnvelope("encode_failed", err.Error(), http.StatusInternalServerError)
 	}
-	data, _ := json.Marshal(envelope{OK: true, Result: raw})
+	data, _ := json.Marshal(Envelope{OK: true, Result: raw})
 	return data
 }
 
 func errorEnvelope(code, message string, status int) []byte {
-	data, _ := json.Marshal(envelope{Error: &envelopeError{Code: code, Message: message, HTTPStatus: status}})
+	data, _ := json.Marshal(Envelope{Error: &EnvelopeError{Code: code, Message: message, HTTPStatus: status}})
 	return data
 }
 

@@ -1,4 +1,4 @@
-package main
+package plugin
 
 import (
 	"encoding/json"
@@ -30,7 +30,7 @@ func executeModel(authID, model string, payload map[string]any) (result modelRes
 		"forced_provider": "codex", "auth_id": authID,
 	})
 	if err != nil {
-		var hostError *envelopeError
+		var hostError *EnvelopeError
 		if errors.As(err, &hostError) {
 			return result, hostError.HTTPStatus, err
 		}
