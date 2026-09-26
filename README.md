@@ -1,14 +1,18 @@
 # Codex 降智测试（CLIProxyAPI 插件）
 
-在 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（CPA）的管理面板里，通过「糖果测试」和「指纹测试」检查 Codex 账号的回答表现。支持单个认证文件与批量测试。
+在 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 管理面板里，通过「糖果测试」和「指纹测试」测试 Codex 是否降智。
 
 ![指纹测试](docs/images/fingerprint.png)
 
 ## 安装
 
-在运行 CPA 的机器上，进入 CPA 工作目录，执行对应的安装命令。
+### 插件商店
 
-Docker 用户可通过 CPA 插件商店安装。使用脚本时，请在挂载的 `plugins` 目录的上一级目录运行，并确保执行环境与 CPA 容器的系统和架构一致。
+CPA 管理面板（CPAMC 或 CPAMP）插件商店搜索 `cpa-codex-candy-eval`。
+
+### 手动安装
+
+进入 CPA 工作目录，执行对应的安装命令。
 
 macOS 和 Linux：
 
@@ -24,8 +28,6 @@ irm https://raw.githubusercontent.com/haowang02/cpa-plugin-codex-candy-eval/main
 
 也可以从 [Releases](https://github.com/haowang02/cpa-plugin-codex-candy-eval/releases/latest) 下载对应平台的压缩包，解压后将插件文件重命名为 `cpa-codex-candy-eval-v<版本号>.<扩展名>`，放入对应的 `plugins/<系统>/<架构>/` 目录。
 
-## 配置
-
 在 CPA 的 `config.yaml` 中启用插件：
 
 ```yaml
@@ -37,7 +39,7 @@ plugins:
       enabled: true
 ```
 
-升级后重启 CPA，在管理面板左侧打开「Codex 降智测试」。通过插件商店安装的用户，请在商店中切换到新版本。
+升级后重启 CPA，在管理面板左侧打开「Codex 降智测试」。
 
 ## 使用
 
