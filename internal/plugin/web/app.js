@@ -5,7 +5,7 @@ const PREF_STORE = "cpa-codex-candy-eval.prefs";
 const MASK_STORE = "cpa-codex-candy-eval.masked";
 const DEFAULT_MODEL = "gpt-5.6-sol";
 const DEFAULT_EFFORT = "low";
-const DEFAULT_EFFORTS = ["none", "low", "medium", "high", "xhigh"];
+const DEFAULT_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"];
 const HIDDEN_MODEL = (id) => id.toLowerCase().includes("image") || id.toLowerCase().split("/").pop().split("(")[0] === "codex-auto-review";
 const FP_CONFIG = /*FINGERPRINT_CONFIG*/{};
 const fpModes = Object.fromEntries(FP_CONFIG.modes.map((m) => [m.id, { name: m.name, requests: m.cells * m.samples_per_cell }]));

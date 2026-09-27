@@ -71,6 +71,10 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('model').innerHTML, '<option value="claude-sonnet">claude-sonnet</option><option value="gpt-5.6-sol">gpt-5.6-sol</option><option value="prefix/model">prefix/model</option>');
   assert.equal(element('fp-model').innerHTML, element('model').innerHTML);
   assert.equal(element('effort').value, 'low');
+  run(`store(PREF_STORE, {effort:'max'}); initializeControls()`);
+  assert.equal(element('effort').value, 'max');
+  run(`store(PREF_STORE, {}); initializeControls()`);
+  assert.equal(element('effort').value, 'low');
   run(`fillSelect('effort', DEFAULT_EFFORTS, 'none', DEFAULT_EFFORT)`);
   assert.equal(element('effort').value, 'none');
   run(`credentials = [

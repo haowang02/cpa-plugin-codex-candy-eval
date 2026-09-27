@@ -75,18 +75,20 @@ func TestEvaluate(t *testing.T) {
 		return json.Marshal(map[string]any{"status_code": 200, "body": body})
 	}
 
-	r := evaluateCandy(credential{ID: "a.json", Provider: "codex"}, "gpt-5.6-sol", "low")
-	if !r.OK || r.Answer != "答案是 21" || r.InputTokens != 499 || r.OutputTokens != 900 || r.ReasoningTokens != 850 || r.Error != "" {
-		t.Fatalf("result = %+v", r)
-	}
-	var payload struct {
-		Model     string            `json:"model"`
-		Input     string            `json:"input"`
-		Reasoning map[string]string `json:"reasoning"`
-	}
-	if err := json.Unmarshal(sent.Body, &payload); err != nil || sent.AuthID != "a.json" || sent.ForcedProvider != "codex" ||
-		payload.Model != "gpt-5.6-sol" || payload.Input != candyPrompt || payload.Reasoning["effort"] != "low" {
-		t.Fatalf("request = %+v, payload = %+v, err = %v", sent, payload, err)
+	for _, effort := range []string{"low", "max"} {
+		r := evaluateCandy(credential{ID: "a.json", Provider: "codex"}, "gpt-5.6-sol", effort)
+		if !r.OK || r.Answer != "答案是 21" || r.InputTokens != 499 || r.OutputTokens != 900 || r.ReasoningTokens != 850 || r.Error != "" {
+			t.Fatalf("result = %+v", r)
+		}
+		var payload struct {
+			Model     string            `json:"model"`
+			Input     string            `json:"input"`
+			Reasoning map[string]string `json:"reasoning"`
+		}
+		if err := json.Unmarshal(sent.Body, &payload); err != nil || sent.AuthID != "a.json" || sent.ForcedProvider != "codex" ||
+			payload.Model != "gpt-5.6-sol" || payload.Input != candyPrompt || payload.Reasoning["effort"] != effort {
+			t.Fatalf("request = %+v, payload = %+v, err = %v", sent, payload, err)
+		}
 	}
 }
 
