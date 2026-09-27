@@ -64,11 +64,12 @@ type fingerprintProgress struct {
 }
 
 type fingerprintRunRequest struct {
-	AuthIDs     []string `json:"auth_ids"`
-	All         bool     `json:"all"`
-	Model       string   `json:"model"`
-	Mode        string   `json:"mode"`
-	Concurrency int      `json:"concurrency"`
+	ModelCatalog map[string][]string `json:"model_catalog,omitempty"`
+	AuthIDs      []string            `json:"auth_ids"`
+	All          bool                `json:"all"`
+	Model        string              `json:"model"`
+	Mode         string              `json:"mode"`
+	Concurrency  int                 `json:"concurrency"`
 }
 
 var (
@@ -100,33 +101,48 @@ func fingerprintRunResponse(body []byte) managementResponse {
 		req.Concurrency = fingerprintDefaultConcurrency
 	}
 	if req.Concurrency < 1 || req.Concurrency > fingerprintMaxConcurrency {
-		return jsonError(http.StatusBadRequest, fmt.Sprintf("单账号并发须为 1–%d", fingerprintMaxConcurrency))
+		return jsonError(http.StatusBadRequest, fmt.Sprintf("单凭证并发须为 1–%d", fingerprintMaxConcurrency))
 	}
-	auths, err := selectedCodexAuths(req.AuthIDs, req.All)
+	auths, err := selectedCredentials(req.AuthIDs, req.All)
 	if err != nil {
 		return jsonError(http.StatusBadGateway, err.Error())
 	}
 	if len(auths) == 0 {
-		return jsonError(http.StatusBadRequest, "没有可采集的已启用 Codex 认证文件")
+		return jsonError(http.StatusBadRequest, "没有可采集的已启用凭证")
 	}
 	mu.Lock()
 	defer mu.Unlock()
 	if quiescing {
 		return jsonError(http.StatusServiceUnavailable, "插件正在停止，请稍后重试")
 	}
-	started := 0
+	summary := runSummary{}
 	for _, auth := range auths {
 		if fingerprintRunning[auth.ID] != nil || candyRunning[auth.ID] != nil {
+			summary.Busy++
 			continue
+		}
+		if known, supported := credentialSupportsModel(req.ModelCatalog, auth.ID, req.Model); known && !supported {
+			now := time.Now().UTC()
+			r := fingerprintResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Mode: mode.ID, Effort: "low", Status: "skipped", Error: unsupportedModelMessage}
+			r.Attribution.Status, r.Attribution.Message = "skipped", unsupportedModelMessage
+			history := append(fingerprintResults[auth.ID], r)
+			fingerprintResults[auth.ID] = history[max(0, len(history)-fingerprintHistoryLimit):]
+			summary.Skipped++
+			continue
+		} else if !known {
+			summary.Unchecked++
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		p := &fingerprintProgress{Model: req.Model, Mode: mode.ID, Total: mode.Cells * mode.Samples, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
 		fingerprintRunning[auth.ID] = p
-		started++
+		summary.Started++
 		tasks.Add(1)
-		go runFingerprint(ctx, auth.ID, req.Model, mode, p)
+		go runFingerprint(ctx, auth, req.Model, mode, p)
 	}
-	return jsonResponse(http.StatusOK, map[string]int{"started": started})
+	if summary.Skipped > 0 {
+		_ = saveStateLocked()
+	}
+	return jsonResponse(http.StatusOK, summary)
 }
 
 func fingerprintCancelResponse(body []byte) managementResponse {
@@ -154,7 +170,8 @@ func fingerprintCancelResponse(body []byte) managementResponse {
 	return jsonResponse(http.StatusOK, map[string]int{"cancelled": count})
 }
 
-func runFingerprint(ctx context.Context, id, model string, mode fingerprintMode, p *fingerprintProgress) {
+func runFingerprint(ctx context.Context, auth credential, model string, mode fingerprintMode, p *fingerprintProgress) {
+	id := auth.ID
 	defer tasks.Done()
 	started := time.Now()
 	r := fingerprintResult{ID: fmt.Sprintf("%d", started.UnixNano()), Time: started.UTC(), Model: model, Mode: mode.ID, Concurrency: p.Concurrency, Effort: "low", Status: "completed", Total: mode.Cells * mode.Samples}
@@ -201,7 +218,7 @@ func runFingerprint(ctx context.Context, id, model string, mode fingerprintMode,
 				if i >= len(jobs) {
 					return
 				}
-				sample := collectFingerprintSample(ctx, id, model, jobs[i])
+				sample := collectFingerprintSample(ctx, auth, model, jobs[i])
 				if sample.Category != "cancelled" {
 					events <- sample
 				}
@@ -239,7 +256,7 @@ func runFingerprint(ctx context.Context, id, model string, mode fingerprintMode,
 	r.Attribution = attributeFingerprint(model, valid)
 }
 
-func collectFingerprintSample(ctx context.Context, authID, model string, probe fingerprintProbe) (sample fingerprintSample) {
+func collectFingerprintSample(ctx context.Context, auth credential, model string, probe fingerprintProbe) (sample fingerprintSample) {
 	sample.Cell = probe.ID
 	prompt := probe.Prompts[rand.Intn(len(probe.Prompts))]
 	for attempt := 0; attempt < 3; attempt++ {
@@ -262,7 +279,7 @@ func collectFingerprintSample(ctx context.Context, authID, model string, probe f
 			}
 			var out modelResponse
 			var err error
-			out, status, err = executeModel(authID, model, map[string]any{
+			out, status, err = executeModel(auth, model, map[string]any{
 				"model": model, "instructions": probe.Instructions, "input": prompt,
 				"temperature": 1.0, "reasoning": map[string]string{"effort": "low"},
 				"store": false, "stream": false,

@@ -14,12 +14,15 @@ import (
 
 func setupTest(t *testing.T) {
 	t.Helper()
+	previousCredentials := configuredCredentials
+	configuredCredentials = map[string]credential{}
 	previousHost, previousPath, previousLoaded := hostCall, statePath, loaded
 	previousLoadError, previousQuiescing := stateLoadError, quiescing
 	previousResults, previousRunning := candyResults, candyRunning
 	previousFPResults, previousFPRunning, previousFPError := fingerprintResults, fingerprintRunning, storageError
 	t.Cleanup(func() {
 		tasks.Wait()
+		configuredCredentials = previousCredentials
 		hostCall, statePath, loaded = previousHost, previousPath, previousLoaded
 		stateLoadError, quiescing = previousLoadError, previousQuiescing
 		candyResults, candyRunning = previousResults, previousRunning
@@ -72,7 +75,7 @@ func TestEvaluate(t *testing.T) {
 		return json.Marshal(map[string]any{"status_code": 200, "body": body})
 	}
 
-	r := evaluateCandy("a.json", "gpt-5.6-sol", "low")
+	r := evaluateCandy(credential{ID: "a.json", Provider: "codex"}, "gpt-5.6-sol", "low")
 	if !r.OK || r.Answer != "答案是 21" || r.InputTokens != 499 || r.OutputTokens != 900 || r.ReasoningTokens != 850 || r.Error != "" {
 		t.Fatalf("result = %+v", r)
 	}
@@ -109,7 +112,7 @@ func TestRunAllKeepsRecentHistory(t *testing.T) {
 		Result managementResponse `json:"result"`
 	}
 	_ = json.Unmarshal(HandleMethod("management.handle", request), &env)
-	if string(env.Result.Body) != `{"started":1}` {
+	if string(env.Result.Body) != `{"started":2,"unchecked":2}` {
 		t.Fatalf("run = %d %s", env.Result.StatusCode, env.Result.Body)
 	}
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
@@ -130,8 +133,8 @@ func TestRunAllKeepsRecentHistory(t *testing.T) {
 	if len(history) != candyHistoryLimit || history[candyHistoryLimit-candyMaxRuns-1].Error != "" || history[candyHistoryLimit-candyMaxRuns].Error == "" {
 		t.Fatalf("want 10 old and %d new results, got %+v", candyMaxRuns, history)
 	}
-	if len(candyResults["off.json"]) != 0 || len(candyResults["c.json"]) != 0 {
-		t.Fatalf("run all must skip disabled and non-Codex auth files: %+v", candyResults)
+	if len(candyResults["off.json"]) != 0 || len(candyResults["c.json"]) != candyMaxRuns {
+		t.Fatalf("run all must include non-Codex credentials and skip disabled credentials: %+v", candyResults)
 	}
 }
 
@@ -154,13 +157,13 @@ func TestRegistration(t *testing.T) {
 	}
 }
 
-func TestStateAccountPlans(t *testing.T) {
+func TestStateCredentialPlans(t *testing.T) {
 	setupTest(t)
 	token := func(plan string) string {
 		claims, _ := json.Marshal(map[string]any{"https://api.openai.com/auth": map[string]string{"chatgpt_plan_type": plan}})
 		return "header." + base64.RawURLEncoding.EncodeToString(claims) + ".signature"
 	}
-	files := []authFile{
+	files := []hostAuthFile{
 		{ID: "free", Name: "a.json", Provider: "codex", PlanType: " free "},
 		{ID: "plus", Name: "b.json", Provider: "codex", AuthIndex: "plus"},
 		{ID: "prolite", Name: "c.json", Provider: "codex", AuthIndex: "prolite", Disabled: true},
@@ -194,22 +197,22 @@ func TestStateAccountPlans(t *testing.T) {
 	}
 	response := stateResponse()
 	var state struct {
-		Auths []authView `json:"auths"`
+		Auths []credentialView `json:"auths"`
 	}
 	if err := json.Unmarshal(response.Body, &state); err != nil || response.StatusCode != http.StatusOK {
 		t.Fatalf("state response = %d, decode error = %v", response.StatusCode, err)
 	}
 	want := []string{"free", "plus", "prolite", "", "", ""}
 	if len(state.Auths) != len(want) {
-		t.Fatalf("got %d accounts, want %d", len(state.Auths), len(want))
+		t.Fatalf("got %d credentials, want %d", len(state.Auths), len(want))
 	}
 	for i, plan := range want {
 		if state.Auths[i].PlanType != plan || state.Auths[i].Results == nil {
-			t.Errorf("account %s: plan = %q, want %q; results = %v", state.Auths[i].ID, state.Auths[i].PlanType, plan, state.Auths[i].Results)
+			t.Errorf("credential %s: plan = %q, want %q; results = %v", state.Auths[i].ID, state.Auths[i].PlanType, plan, state.Auths[i].Results)
 		}
 	}
 	if !state.Auths[2].Disabled {
-		t.Error("disabled account lost its status")
+		t.Error("disabled credential lost its status")
 	}
 	for _, secret := range [][]byte{[]byte("private-access-token"), []byte("id_token"), []byte("signature")} {
 		if bytes.Contains(response.Body, secret) {
@@ -299,7 +302,7 @@ func TestEvaluateErrors(t *testing.T) {
 				}
 				return json.Marshal(map[string]any{"status_code": tc.status, "body": []byte(tc.body)})
 			}
-			if r := evaluateCandy("a", "gpt-5.6-sol", "low"); r.OK || r.Error == "" {
+			if r := evaluateCandy(credential{ID: "a", Provider: "codex"}, "gpt-5.6-sol", "low"); r.OK || r.Error == "" {
 				t.Fatalf("request failure must not be graded as an answer: %+v", r)
 			}
 		})

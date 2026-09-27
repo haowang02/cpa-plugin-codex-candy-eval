@@ -14,12 +14,15 @@ type modelResponse struct {
 	ReasoningTokens int64
 }
 
-func executeModel(authID, model string, payload map[string]any) (result modelResponse, status int, err error) {
+func executeModel(auth credential, model string, payload map[string]any) (result modelResponse, status int, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("模型请求异常：%v", recovered)
 		}
 	}()
+	if strings.TrimSpace(auth.ID) == "" || strings.TrimSpace(auth.Provider) == "" {
+		return result, 0, fmt.Errorf("缺少凭证标识或提供商，无法固定路由")
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return result, 0, err
@@ -27,7 +30,7 @@ func executeModel(authID, model string, payload map[string]any) (result modelRes
 	raw, err := hostCall("host.model.execute", map[string]any{
 		"entry_protocol": "openai-response", "exit_protocol": "openai-response",
 		"model": model, "stream": false, "body": body,
-		"forced_provider": "codex", "auth_id": authID,
+		"forced_provider": auth.Provider, "auth_id": auth.ID,
 	})
 	if err != nil {
 		var hostError *EnvelopeError

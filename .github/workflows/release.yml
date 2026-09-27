@@ -21,6 +21,7 @@ jobs:
         run: grep -q "pluginVersion *= \"${GITHUB_REF_NAME#v}\"" internal/plugin/plugin.go
       - run: go vet ./...
       - run: go test -race ./...
+      - run: node scripts/test-ui.cjs
 
   build:
     name: Build ${{ matrix.os }}-${{ matrix.arch }}

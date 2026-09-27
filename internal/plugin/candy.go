@@ -27,6 +27,7 @@ const candyPrompt = `不使用任何外部工具回答以下问题：
 `
 
 type candyResult struct {
+	Skipped         bool      `json:"skipped,omitempty"`
 	Time            time.Time `json:"time"`
 	Model           string    `json:"model"`
 	Effort          string    `json:"effort"`
@@ -45,11 +46,12 @@ type candyProgress struct {
 }
 
 type candyRunRequest struct {
-	AuthIDs []string `json:"auth_ids"`
-	All     bool     `json:"all"`
-	Model   string   `json:"model"`
-	Effort  string   `json:"effort"`
-	Runs    int      `json:"runs"`
+	ModelCatalog map[string][]string `json:"model_catalog,omitempty"`
+	AuthIDs      []string            `json:"auth_ids"`
+	All          bool                `json:"all"`
+	Model        string              `json:"model"`
+	Effort       string              `json:"effort"`
+	Runs         int                 `json:"runs"`
 }
 
 func candyRunResponse(body []byte) managementResponse {
@@ -63,34 +65,46 @@ func candyRunResponse(body []byte) managementResponse {
 		return jsonError(http.StatusBadRequest, "请选择模型")
 	}
 	req.Runs = min(max(req.Runs, 1), candyMaxRuns)
-	auths, err := selectedCodexAuths(req.AuthIDs, req.All)
+	auths, err := selectedCredentials(req.AuthIDs, req.All)
 	if err != nil {
 		return jsonError(http.StatusBadGateway, err.Error())
 	}
 	if len(auths) == 0 {
-		return jsonError(http.StatusBadRequest, "没有可测试的 Codex 认证文件")
+		return jsonError(http.StatusBadRequest, "没有可测试的已启用凭证")
 	}
 	mu.Lock()
 	defer mu.Unlock()
 	if quiescing {
 		return jsonError(http.StatusServiceUnavailable, "插件正在停止，请稍后重试")
 	}
-	started := 0
+	summary := runSummary{}
 	for _, auth := range auths {
 		id := auth.ID
 		if candyRunning[id] != nil || fingerprintRunning[id] != nil {
+			summary.Busy++
 			continue
 		}
+		if known, supported := credentialSupportsModel(req.ModelCatalog, id, req.Model); known && !supported {
+			appendCandyResult(id, candyResult{Time: time.Now().UTC(), Model: req.Model, Effort: req.Effort, Skipped: true, Error: unsupportedModelMessage})
+			summary.Skipped++
+			continue
+		} else if !known {
+			summary.Unchecked++
+		}
 		candyRunning[id] = &candyProgress{Total: req.Runs}
-		started++
+		summary.Started++
 		tasks.Add(1)
-		go runCandy(id, req.Model, req.Effort, req.Runs)
+		go runCandy(auth, req.Model, req.Effort, req.Runs)
 	}
-	return jsonResponse(http.StatusOK, map[string]int{"started": started})
+	if summary.Skipped > 0 {
+		_ = saveStateLocked()
+	}
+	return jsonResponse(http.StatusOK, summary)
 }
 
-// Each account runs serially; different accounts run in parallel.
-func runCandy(id, model, effort string, runs int) {
+// Each credential runs serially; different credentials run in parallel.
+func runCandy(auth credential, model, effort string, runs int) {
+	id := auth.ID
 	defer tasks.Done()
 	defer func() {
 		mu.Lock()
@@ -104,24 +118,23 @@ func runCandy(id, model, effort string, runs int) {
 		if stopping {
 			return
 		}
-		r := evaluateCandy(id, model, effort)
+		r := evaluateCandy(auth, model, effort)
 		mu.Lock()
-		history := append(candyResults[id], r)
-		candyResults[id] = history[max(len(history)-candyHistoryLimit, 0):]
+		appendCandyResult(id, r)
 		candyRunning[id].Done++
 		_ = saveStateLocked()
 		mu.Unlock()
 	}
 }
 
-func evaluateCandy(authID, model, effort string) candyResult {
+func evaluateCandy(auth credential, model, effort string) candyResult {
 	r := candyResult{Time: time.Now().UTC(), Model: model, Effort: effort}
 	payload := map[string]any{"model": model, "input": candyPrompt, "stream": false}
-	if effort != "" {
+	if effort != "" && effort != "none" {
 		payload["reasoning"] = map[string]string{"effort": effort}
 	}
 	start := time.Now()
-	out, _, err := executeModel(authID, model, payload)
+	out, _, err := executeModel(auth, model, payload)
 	r.DurationMS = time.Since(start).Milliseconds()
 	if err != nil {
 		r.Error = truncate(err.Error(), 500)
@@ -145,4 +158,9 @@ func hasStandalone21(text string) bool {
 		}
 	}
 	return false
+}
+
+func appendCandyResult(id string, r candyResult) {
+	history := append(candyResults[id], r)
+	candyResults[id] = history[max(len(history)-candyHistoryLimit, 0):]
 }

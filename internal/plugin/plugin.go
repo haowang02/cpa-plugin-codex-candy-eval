@@ -1,21 +1,19 @@
-// Package plugin implements candy and fingerprint tests for Codex accounts.
+// Package plugin implements candy and fingerprint tests for CPA credentials.
 package plugin
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 )
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.1.9"
+	pluginVersion  = "0.2.0"
 	ABIVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
@@ -29,15 +27,24 @@ func SetHostCall(call func(string, any) (json.RawMessage, error)) {
 }
 
 //go:embed web/ui.html
-var uiTemplate []byte
+var uiTemplate string
+
+//go:embed web/style.css
+var uiStyles string
+
+//go:embed web/credentials.js
+var credentialScript string
+
+//go:embed web/app.js
+var appScript string
+
+//go:embed web/catalog.js
+var catalogScript string
 
 var uiHTML = func() []byte {
-	models := make([]string, 0, len(fingerprintBaselines))
-	for _, baseline := range fingerprintBaselines {
-		models = append(models, baseline.Model)
-	}
-	config, _ := json.Marshal(map[string]any{"models": models, "modes": fingerprintModes, "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
-	return bytes.Replace(uiTemplate, []byte(`/*FINGERPRINT_CONFIG*/{}`), config, 1)
+	config, _ := json.Marshal(map[string]any{"modes": fingerprintModes, "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
+	script := strings.Replace(appScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
+	return []byte(strings.NewReplacer("/*APP_STYLES*/", uiStyles, "/*CREDENTIALS_SCRIPT*/", credentialScript, "/*CATALOG_SCRIPT*/", catalogScript, "/*APP_SCRIPT*/", script).Replace(uiTemplate))
 }()
 
 // Lucide "candy" icon. Hosts render it in an img element, so the stroke color is fixed.
@@ -75,28 +82,6 @@ type managementResponse struct {
 	Body       []byte      `json:"Body,omitempty"`
 }
 
-type authFile struct {
-	ID        string `json:"id"`
-	AuthIndex string `json:"auth_index"`
-	Name      string `json:"name"`
-	Provider  string `json:"provider"`
-	Email     string `json:"email"`
-	PlanType  string `json:"plan_type,omitempty"`
-	Disabled  bool   `json:"disabled"`
-}
-
-type authView struct {
-	ID                 string               `json:"id"`
-	Name               string               `json:"name"`
-	Email              string               `json:"email,omitempty"`
-	PlanType           string               `json:"plan_type,omitempty"`
-	Disabled           bool                 `json:"disabled"`
-	Running            *candyProgress       `json:"running,omitempty"`
-	Results            []candyResult        `json:"results"`
-	FingerprintRunning *fingerprintProgress `json:"fingerprint_running,omitempty"`
-	Fingerprints       []fingerprintResult  `json:"fingerprints"`
-}
-
 func HandleMethod(method string, request []byte) (response []byte) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -124,15 +109,16 @@ func HandleMethod(method string, request []byte) (response []byte) {
 	case "management.register":
 		return okEnvelope(map[string]any{
 			"routes": []map[string]string{
-				{"Method": http.MethodGet, "Path": managementBase + "/state", "Description": "View Codex test results"},
-				{"Method": http.MethodPost, "Path": managementBase + "/run", "Description": "Run the candy test on Codex auth files"},
-				{"Method": http.MethodDelete, "Path": managementBase + "/results", "Description": "Clear Codex candy test results"},
-				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/run", "Description": "Collect and compare Codex fingerprints"},
+				{"Method": http.MethodPost, "Path": managementBase + "/credentials/sync", "Description": "Sync configured credential identities"},
+				{"Method": http.MethodGet, "Path": managementBase + "/state", "Description": "View credential test results"},
+				{"Method": http.MethodPost, "Path": managementBase + "/run", "Description": "Run the candy test on credentials"},
+				{"Method": http.MethodDelete, "Path": managementBase + "/results", "Description": "Clear candy test results"},
+				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/run", "Description": "Collect and compare model fingerprints"},
 				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/cancel", "Description": "Stop fingerprint collection"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/fingerprint/results", "Description": "Clear fingerprint history"},
 			},
 			"resources": []map[string]string{
-				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果题与模型指纹测试 Codex 认证文件"},
+				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果题与模型指纹测试 CPA 凭证"},
 			},
 		})
 	case "management.handle":
@@ -163,6 +149,8 @@ func handleManagement(req managementRequest) managementResponse {
 			},
 			Body: uiHTML,
 		}
+	case req.Method == http.MethodPost && path == managementBase+"/credentials/sync":
+		return syncCredentialsResponse(req.Body)
 	case req.Method == http.MethodGet && path == managementBase+"/state":
 		return stateResponse()
 	case req.Method == http.MethodPost && path == managementBase+"/run":
@@ -181,19 +169,21 @@ func handleManagement(req managementRequest) managementResponse {
 }
 
 func stateResponse() managementResponse {
-	auths, err := codexAuths()
+	auths, err := credentials()
 	if err != nil {
 		return jsonError(http.StatusBadGateway, err.Error())
 	}
 	// Host calls must stay outside the results lock.
 	for i := range auths {
-		auths[i].PlanType = authPlanType(auths[i])
+		if auths[i].Source == credentialSourceFile && auths[i].Provider == "codex" {
+			auths[i].PlanType = authPlanType(auths[i])
+		}
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	views := make([]authView, 0, len(auths))
+	views := make([]credentialView, 0, len(auths))
 	for _, auth := range auths {
-		view := authView{ID: auth.ID, Name: auth.Name, Email: auth.Email, PlanType: auth.PlanType, Disabled: auth.Disabled, Results: candyResults[auth.ID]}
+		view := credentialView{credential: auth, Results: candyResults[auth.ID]}
 		if view.Results == nil {
 			view.Results = []candyResult{}
 		}
@@ -206,88 +196,6 @@ func stateResponse() managementResponse {
 		views = append(views, view)
 	}
 	return jsonResponse(http.StatusOK, map[string]any{"auths": views, "storage_error": storageError})
-}
-
-func authPlanType(auth authFile) string {
-	if plan := strings.TrimSpace(auth.PlanType); plan != "" {
-		return plan
-	}
-	if auth.AuthIndex == "" {
-		return ""
-	}
-	raw, err := hostCall("host.auth.get", map[string]string{"auth_index": auth.AuthIndex})
-	if err != nil {
-		return ""
-	}
-	var file struct {
-		JSON struct {
-			PlanType string `json:"plan_type"`
-			IDToken  string `json:"id_token"`
-		} `json:"json"`
-	}
-	if json.Unmarshal(raw, &file) != nil {
-		return ""
-	}
-	if plan := strings.TrimSpace(file.JSON.PlanType); plan != "" {
-		return plan
-	}
-	parts := strings.Split(file.JSON.IDToken, ".")
-	if len(parts) != 3 {
-		return ""
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
-	if err != nil {
-		return ""
-	}
-	// These claims are used for a display label, never for authorization.
-	var claims struct {
-		Auth struct {
-			PlanType string `json:"chatgpt_plan_type"`
-		} `json:"https://api.openai.com/auth"`
-	}
-	if json.Unmarshal(payload, &claims) != nil {
-		return ""
-	}
-	return strings.TrimSpace(claims.Auth.PlanType)
-}
-
-func codexAuths() ([]authFile, error) {
-	raw, err := hostCall("host.auth.list", map[string]any{})
-	if err != nil {
-		return nil, fmt.Errorf("读取认证文件失败：%w", err)
-	}
-	var list struct {
-		Files []authFile `json:"files"`
-	}
-	if err := json.Unmarshal(raw, &list); err != nil {
-		return nil, fmt.Errorf("解析认证文件列表失败：%w", err)
-	}
-	auths := list.Files[:0]
-	for _, file := range list.Files {
-		if strings.EqualFold(file.Provider, "codex") {
-			auths = append(auths, file)
-		}
-	}
-	sort.Slice(auths, func(i, j int) bool { return auths[i].Name < auths[j].Name })
-	return auths, nil
-}
-
-func selectedCodexAuths(ids []string, all bool) ([]authFile, error) {
-	auths, err := codexAuths()
-	if err != nil {
-		return nil, err
-	}
-	wanted := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		wanted[id] = true
-	}
-	selected := auths[:0]
-	for _, auth := range auths {
-		if !auth.Disabled && (all || wanted[auth.ID]) {
-			selected = append(selected, auth)
-		}
-	}
-	return selected, nil
 }
 
 func Quiesce() {

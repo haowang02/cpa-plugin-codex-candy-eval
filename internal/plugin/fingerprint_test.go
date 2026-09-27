@@ -142,7 +142,7 @@ func TestFingerprintExecutionContract(t *testing.T) {
 		}
 		return mockModelResponse("47"), nil
 	}
-	r := collectFingerprintSample(context.Background(), "auth", "gpt-5.5", fingerprintProbes[0])
+	r := collectFingerprintSample(context.Background(), credential{ID: "auth", Provider: "codex"}, "gpt-5.5", fingerprintProbes[0])
 	if r.Category != "valid" || r.Normalized != "47" {
 		t.Fatalf("sample = %+v", r)
 	}
@@ -181,17 +181,17 @@ func TestFingerprintBatchAndPersistence(t *testing.T) {
 	body := []byte(`{"all":true,"model":"gpt-5.5","mode":"quick","effort":"high"}`)
 	first := fingerprintRunResponse(body)
 	second := fingerprintRunResponse(body)
-	if !bytes.Contains(first.Body, []byte(`"started":2`)) || !bytes.Contains(second.Body, []byte(`"started":0`)) {
+	if !bytes.Contains(first.Body, []byte(`"started":3`)) || string(second.Body) != `{"started":0,"busy":3}` {
 		close(gate)
 		waitFingerprintIdle(t)
 		t.Fatalf("start %s duplicate %s", first.Body, second.Body)
 	}
-	if res := candyRunResponse([]byte(`{"all":true,"model":"gpt-5.5"}`)); !bytes.Contains(res.Body, []byte(`"started":0`)) {
+	if res := candyRunResponse([]byte(`{"all":true,"model":"gpt-5.5"}`)); string(res.Body) != `{"started":0,"busy":3}` {
 		t.Errorf("candy must not overlap: %s", res.Body)
 	}
 	close(gate)
 	waitFingerprintIdle(t)
-	if calls.Load() != 120 {
+	if calls.Load() != 180 {
 		t.Fatalf("requests = %d", calls.Load())
 	}
 	for _, id := range []string{"a", "b"} {
@@ -282,7 +282,7 @@ func TestFingerprintUpstreamErrors(t *testing.T) {
 	p := &fingerprintProgress{Total: 60, Concurrency: fingerprintDefaultConcurrency, cancel: cancel}
 	fingerprintRunning["a"] = p
 	tasks.Add(1)
-	runFingerprint(ctx, "a", "gpt-5.5", fingerprintModes[0], p)
+	runFingerprint(ctx, credential{ID: "a", Provider: "codex"}, "gpt-5.5", fingerprintModes[0], p)
 	r := fingerprintResults["a"][0]
 	if r.Status != "failed" || r.Errors < 8 || r.Errors > 11 || r.Valid != 0 || r.Attribution.Status != "failed" {
 		t.Fatalf("error run: %+v", r)
