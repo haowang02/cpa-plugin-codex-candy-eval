@@ -1,10 +1,13 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 )
 
 type modelResponse struct {
@@ -12,6 +15,46 @@ type modelResponse struct {
 	InputTokens     int64
 	OutputTokens    int64
 	ReasoningTokens int64
+}
+
+func retryableModelStatus(status int) bool {
+	return status == 0 || status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
+}
+
+// Collection probes retry the same request at most twice, after 2s and 4s.
+// Invalid model answers are evaluated by the caller and do not trigger retries.
+func executeProbe(ctx context.Context, auth credential, model string, payload map[string]any, slots chan struct{}) (out modelResponse, attempts int, err error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		if ctx.Err() != nil {
+			return out, attempts, ctx.Err()
+		}
+		select {
+		case slots <- struct{}{}:
+		case <-ctx.Done():
+			return out, attempts, ctx.Err()
+		}
+		var status int
+		func() {
+			defer func() { <-slots }()
+			if ctx.Err() != nil {
+				err = ctx.Err()
+				return
+			}
+			attempts++
+			out, status, err = executeModel(auth, model, payload)
+		}()
+		if err == nil || !retryableModelStatus(status) || attempt == 2 {
+			return
+		}
+		timer := time.NewTimer(time.Duration(2<<attempt) * time.Second)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return out, attempts, ctx.Err()
+		}
+	}
+	return
 }
 
 func executeModel(auth credential, model string, payload map[string]any) (result modelResponse, status int, err error) {

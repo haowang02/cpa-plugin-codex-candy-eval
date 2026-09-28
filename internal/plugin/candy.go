@@ -80,7 +80,7 @@ func candyRunResponse(body []byte) managementResponse {
 	summary := runSummary{}
 	for _, auth := range auths {
 		id := auth.ID
-		if candyRunning[id] != nil || fingerprintRunning[id] != nil {
+		if credentialBusyLocked(id) {
 			summary.Busy++
 			continue
 		}

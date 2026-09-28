@@ -11,7 +11,7 @@ const browserStorage = new Map();
 let now = Date.now(), storageBlocked = false, storageWrites = 0;
 let timerID = 0;
 function element(id) {
-  if (!elements.has(id)) elements.set(id, { value: id.endsWith('credential-type') ? 'auth_files:codex' : '', innerHTML: '', hidden: true, dataset: {}, setAttribute(name, value) { this[name] = value; }, querySelector(selector) { return element(id + ' ' + selector); }, addEventListener() {} });
+  if (!elements.has(id)) elements.set(id, { value: id.endsWith('credential-type') ? 'auth_files:codex' : '', innerHTML: '', hidden: true, dataset: {}, setAttribute(name, value) { this[name] = value; }, querySelector(selector) { return element(id + ' ' + selector); }, addEventListener() {}, contains() { return false; }, focus() {}, showModal() { this.open = true; } });
   return elements.get(id);
 }
 const context = vm.createContext({
@@ -20,15 +20,16 @@ const context = vm.createContext({
   setTimeout(callback, delay) { const id = ++timerID; noticeTimers.set(id, { callback, delay }); return id; },
   clearTimeout(id) { noticeTimers.delete(id); },
   window: { crypto: {} }, // Verify the HTTP fallback, not just SubtleCrypto.
-  document: { getElementById: element },
+  document: { getElementById: element, querySelectorAll: () => [] },
   sessionStorage: { getItem: () => null },
   localStorage: {
     getItem: key => browserStorage.get(key) || null,
     setItem(key, value) { if (storageBlocked) throw new Error('Storage unavailable'); storageWrites++; browserStorage.set(key, value); },
   },
 });
-let source = webFile('credentials.js') + '\n' + webFile('catalog.js') + '\n' + webFile('app.js').split('// Events and initialization.')[0];
+let source = webFile('credentials.js') + '\n' + webFile('catalog.js') + '\n' + webFile('modeltrace.js') + '\n' + webFile('app.js').split('// Events and initialization.')[0];
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({ modes: [{ id: 'quick', name: '快速', cells: 4, samples_per_cell: 15 }], default_concurrency: 2, max_concurrency: 6 }));
+source = source.replace('/*MODELTRACE_CONFIG*/{}', JSON.stringify({requests:3,default_concurrency:3,max_concurrency:3}));
 vm.runInContext(source, context);
 const run = code => vm.runInContext(code, context);
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -70,6 +71,45 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('model').value, 'gpt-5.6-sol');
   assert.equal(element('model').innerHTML, '<option value="claude-sonnet">claude-sonnet</option><option value="gpt-5.6-sol">gpt-5.6-sol</option><option value="prefix/model">prefix/model</option>');
   assert.equal(element('fp-model').innerHTML, element('model').innerHTML);
+  assert.equal(element('mt-model').innerHTML, element('model').innerHTML);
+  assert.equal(run(`availableCredential({modeltrace_running:{}})`), false);
+  assert.equal(run(`mtPercent(0.12345)`), '12.3%');
+  assert.equal(run(`mtConcurrency()`), 3);
+  element('mt-concurrency').value = '2';
+  assert.equal(run(`mtConcurrency()`), 2);
+  element('mt-concurrency').value = '10';
+  assert.equal(run(`mtConcurrency()`), 3);
+  run(`mtSavePrefs()`);
+  assert.equal(run(`stored(PREF_STORE + '.modeltrace').concurrency`), 3);
+  assert.equal(run(`stored(PREF_STORE + '.modeltrace').temperature`), undefined);
+  assert(run(`mtOutcome({status:'partial',attribution:{prediction:'<script>',family_prediction_name:'GPT',used_outputs:2}})`).includes('&lt;script&gt;'));
+  assert(run(`mtOutcome({status:'cancelled'})`).includes('测试已停止'));
+  assert(run(`mtOutcome({status:'failed',error:'<error>'})`).includes('&lt;error&gt;'));
+  assert(run(`mtOutcome({status:'completed',attribution:{prediction:'gpt-test',family_prediction_name:'GPT',used_outputs:3,probability:0.834}})`).includes('<span>gpt-test</span><span class="mt-probability mono">83.4%</span>'));
+  assert.equal(run(`mtComparison({status:'completed',model:'provider/GPT-TEST',attribution:{prediction:'gpt-test'}}).tone`), 'ok');
+  assert.equal(run(`mtComparison({status:'completed',model:'gpt-test',attribution:{prediction:'other-model'}}).tone`), 'warn');
+  assert.equal(run(`mtComparison({status:'cancelled',model:'gpt-test',attribution:{prediction:'gpt-test'}}).tone`), 'neutral');
+  assert(run(`mtOutcome({status:'partial',model:'gpt-test',attribution:{prediction:'other-model'}})`).includes('与测试模型不一致 · 部分结果'));
+  run(`loadController = {}; renderRefresh()`);
+  assert.equal(element('refresh').disabled, true);
+  assert.equal(element('refresh')['aria-busy'], true);
+  run(`loadController = null; pending = true; renderRefresh()`);
+  assert.equal(element('refresh').disabled, true);
+  assert.equal(element('refresh')['aria-busy'], false);
+  run(`pending = false; renderRefresh()`);
+  assert.equal(element('refresh').disabled, false);
+  run(`showModelTraceDetail({id:'failed',time:'2026-09-28T00:00:00Z',status:'failed',model:'<model>',error:'<request failed>',duration_ms:0},'test')`);
+  assert.equal(element('mt-detail').open, true);
+  assert.equal(element('mt-detail-body').innerHTML.match(/&lt;request failed&gt;/g).length, 1);
+  assert(!element('mt-detail-body').innerHTML.includes('<model>'));
+  const progress = run(`renderModelTraceRow({id:'progress',name:'Test',source:'auth_files',provider:'codex',modeltrace_running:{model:'gpt-test',phase:'collecting',done:2},modeltraces:[]})`);
+  assert(progress.includes('2/3'));
+  assert(!progress.includes('份回答'));
+  run(`switchTab('modeltrace')`);
+  assert.equal(element('modeltrace-panel').hidden, false);
+  assert.equal(element('candy-panel').hidden, true);
+  assert.equal(element('fingerprint-panel').hidden, true);
+  run(`switchTab('candy')`);
   assert.equal(element('effort').value, 'low');
   run(`store(PREF_STORE, {effort:'max'}); initializeControls()`);
   assert.equal(element('effort').value, 'max');
@@ -90,6 +130,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   element('credential-type').value = 'ai_providers:codex';
   assert.deepEqual(plain(run(`visibleCredentials('').map(a => a.id)`)), ['config']);
   assert.equal(element('fp-credential-type').value, 'auth_files:codex');
+  assert.equal(element('mt-credential-type').value, 'auth_files:codex');
   assert.equal(run(`kind({skipped:true,error:'unsupported'})`), 'skip');
   element('credential-type').value = 'all';
   run(`candySelected.clear(); candySelected.add('codex'); credentials[0].running = {done:0,total:1}`);
@@ -217,5 +258,10 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`metrics({skipped:true, duration_ms:0, input_tokens:0, output_tokens:0, reasoning_tokens:0})`), '');
   assert(!run(`metrics({duration_ms:100, input_tokens:5, output_tokens:10, reasoning_tokens:0})`).includes('推理 tokens'));
   assert(run(`metrics({duration_ms:100, input_tokens:5, output_tokens:10, reasoning_tokens:2})`).includes('推理 tokens'));
-  console.log('UI checks passed: identities, filters, preflight, cache reuse/invalidation/recovery, notices, metrics.');
+  run(`candySelected.add('a'); fpSelected.add('a'); mtSelected.add('a'); mtExpanded.add('a'); showLogin('Expired')`);
+  assert.equal(run(`credentials.length + candySelected.size + fpSelected.size + mtSelected.size + mtExpanded.size`), 0);
+  assert.equal(element('app').hidden, true);
+  assert.equal(element('login-error').textContent, 'Expired');
+  assert(!element('mt-rows').innerHTML.includes('data-mt-run'));
+  console.log('UI checks passed: identities, filters, catalog recovery, ModelTrace results and controls, refresh, login reset, notices, metrics.');
 })().catch(err => { console.error(err); process.exitCode = 1; });

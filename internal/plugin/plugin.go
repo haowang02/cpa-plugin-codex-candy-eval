@@ -1,4 +1,4 @@
-// Package plugin implements candy and fingerprint tests for CPA credentials.
+// Package plugin implements model evaluation and attribution tests for CPA credentials.
 package plugin
 
 import (
@@ -13,7 +13,7 @@ import (
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.2.0"
+	pluginVersion  = "0.3.0"
 	ABIVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
@@ -41,10 +41,26 @@ var appScript string
 //go:embed web/catalog.js
 var catalogScript string
 
+//go:embed web/modeltrace.js
+var modelTraceScript string
+
+//go:embed web/modeltrace.css
+var modelTraceStyles string
+
 var uiHTML = func() []byte {
 	config, _ := json.Marshal(map[string]any{"modes": fingerprintModes, "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
 	script := strings.Replace(appScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
-	return []byte(strings.NewReplacer("/*APP_STYLES*/", uiStyles, "/*CREDENTIALS_SCRIPT*/", credentialScript, "/*CATALOG_SCRIPT*/", catalogScript, "/*APP_SCRIPT*/", script).Replace(uiTemplate))
+	traceConfig, _ := json.Marshal(map[string]any{"requests": traceTarget, "default_concurrency": traceDefaultConcurrency, "max_concurrency": traceMaxConcurrency})
+	traceScript := strings.Replace(modelTraceScript, `/*MODELTRACE_CONFIG*/{}`, string(traceConfig), 1)
+	return []byte(strings.NewReplacer(
+		"/*APP_STYLES*/", uiStyles,
+		"/*MODELTRACE_STYLES*/", modelTraceStyles,
+		"<!--MODELTRACE_LICENSE-->", "<!-- ModelTrace\n"+modelTraceLicense+"-->",
+		"/*CREDENTIALS_SCRIPT*/", credentialScript,
+		"/*CATALOG_SCRIPT*/", catalogScript,
+		"/*MODELTRACE_SCRIPT*/", traceScript,
+		"/*APP_SCRIPT*/", script,
+	).Replace(uiTemplate))
 }()
 
 // Lucide "candy" icon. Hosts render it in an img element, so the stroke color is fixed.
@@ -116,9 +132,12 @@ func HandleMethod(method string, request []byte) (response []byte) {
 				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/run", "Description": "Collect and compare model fingerprints"},
 				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/cancel", "Description": "Stop fingerprint collection"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/fingerprint/results", "Description": "Clear fingerprint history"},
+				{"Method": http.MethodPost, "Path": managementBase + "/modeltrace/run", "Description": "Run ModelTrace on credentials"},
+				{"Method": http.MethodPost, "Path": managementBase + "/modeltrace/cancel", "Description": "Stop ModelTrace collection"},
+				{"Method": http.MethodDelete, "Path": managementBase + "/modeltrace/results", "Description": "Clear ModelTrace history"},
 			},
 			"resources": []map[string]string{
-				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果题与模型指纹测试 CPA 凭证"},
+				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果题、指纹测试与 ModelTrace 测试 CPA 凭证"},
 			},
 		})
 	case "management.handle":
@@ -158,11 +177,17 @@ func handleManagement(req managementRequest) managementResponse {
 	case req.Method == http.MethodPost && path == managementBase+"/fingerprint/run":
 		return fingerprintRunResponse(req.Body)
 	case req.Method == http.MethodPost && path == managementBase+"/fingerprint/cancel":
-		return fingerprintCancelResponse(req.Body)
+		return cancelCollectionResponse("fingerprint", req.Body)
 	case req.Method == http.MethodDelete && path == managementBase+"/fingerprint/results":
-		return clearHistoryResponse(true)
+		return clearHistoryResponse("fingerprint")
 	case req.Method == http.MethodDelete && path == managementBase+"/results":
-		return clearHistoryResponse(false)
+		return clearHistoryResponse("candy")
+	case req.Method == http.MethodPost && path == managementBase+"/modeltrace/run":
+		return traceRunResponse(req.Body)
+	case req.Method == http.MethodPost && path == managementBase+"/modeltrace/cancel":
+		return cancelCollectionResponse("modeltrace", req.Body)
+	case req.Method == http.MethodDelete && path == managementBase+"/modeltrace/results":
+		return clearHistoryResponse("modeltrace")
 	default:
 		return jsonError(http.StatusNotFound, "Route not found: "+req.Method+" "+req.Path)
 	}
@@ -193,6 +218,11 @@ func stateResponse() managementResponse {
 		if view.Fingerprints == nil {
 			view.Fingerprints = []fingerprintResult{}
 		}
+		view.ModelTraceRunning = traceRunning[auth.ID]
+		view.ModelTraces = traceResults[auth.ID]
+		if view.ModelTraces == nil {
+			view.ModelTraces = []traceResult{}
+		}
 		views = append(views, view)
 	}
 	return jsonResponse(http.StatusOK, map[string]any{"auths": views, "storage_error": storageError})
@@ -202,6 +232,10 @@ func Quiesce() {
 	mu.Lock()
 	quiescing = true
 	for _, p := range fingerprintRunning {
+		p.Phase = "cancelling"
+		p.cancel()
+	}
+	for _, p := range traceRunning {
 		p.Phase = "cancelling"
 		p.cancel()
 	}

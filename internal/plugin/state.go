@@ -11,6 +11,7 @@ import (
 type persistedState struct {
 	Results      map[string][]candyResult       `json:"results"`
 	Fingerprints map[string][]fingerprintResult `json:"fingerprints"`
+	ModelTraces  map[string][]traceResult       `json:"modeltraces,omitempty"`
 }
 
 var (
@@ -46,15 +47,21 @@ func loadState() {
 	if state.Fingerprints != nil {
 		fingerprintResults = state.Fingerprints
 	}
+	if state.ModelTraces != nil {
+		traceResults = state.ModelTraces
+	}
 	for id, history := range candyResults {
 		candyResults[id] = history[max(0, len(history)-candyHistoryLimit):]
 	}
 	for id, history := range fingerprintResults {
 		fingerprintResults[id] = history[max(0, len(history)-fingerprintHistoryLimit):]
 	}
+	for id, history := range traceResults {
+		traceResults[id] = history[max(0, len(history)-traceHistoryLimit):]
+	}
 }
 
-// Call with mu held so both histories are written as one snapshot.
+// Call with mu held so all histories are written as one snapshot.
 func saveStateLocked() (err error) {
 	defer func() {
 		storageError = ""
@@ -65,7 +72,7 @@ func saveStateLocked() (err error) {
 	if stateLoadError != nil {
 		return stateLoadError
 	}
-	data, err := json.Marshal(persistedState{candyResults, fingerprintResults})
+	data, err := json.Marshal(persistedState{Results: candyResults, Fingerprints: fingerprintResults, ModelTraces: traceResults})
 	if err != nil {
 		return err
 	}
@@ -77,17 +84,23 @@ func saveStateLocked() (err error) {
 	return os.Rename(tmp, statePath)
 }
 
-func clearHistoryResponse(fingerprint bool) managementResponse {
+func clearHistoryResponse(scope string) managementResponse {
 	mu.Lock()
 	defer mu.Unlock()
-	previous := persistedState{candyResults, fingerprintResults}
-	if fingerprint {
+	previous := persistedState{Results: candyResults, Fingerprints: fingerprintResults, ModelTraces: traceResults}
+	switch scope {
+	case "fingerprint":
 		fingerprintResults = map[string][]fingerprintResult{}
-	} else {
+	case "modeltrace":
+		traceResults = map[string][]traceResult{}
+	case "candy":
 		candyResults = map[string][]candyResult{}
+	default:
+		return jsonError(http.StatusBadRequest, "未知测试类型")
 	}
 	if err := saveStateLocked(); err != nil {
 		candyResults, fingerprintResults = previous.Results, previous.Fingerprints
+		traceResults = previous.ModelTraces
 		return jsonError(http.StatusInternalServerError, "清空记录失败："+err.Error())
 	}
 	return jsonResponse(http.StatusOK, map[string]bool{"cleared": true})

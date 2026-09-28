@@ -117,7 +117,7 @@ func fingerprintRunResponse(body []byte) managementResponse {
 	}
 	summary := runSummary{}
 	for _, auth := range auths {
-		if fingerprintRunning[auth.ID] != nil || candyRunning[auth.ID] != nil {
+		if credentialBusyLocked(auth.ID) {
 			summary.Busy++
 			continue
 		}
@@ -143,31 +143,6 @@ func fingerprintRunResponse(body []byte) managementResponse {
 		_ = saveStateLocked()
 	}
 	return jsonResponse(http.StatusOK, summary)
-}
-
-func fingerprintCancelResponse(body []byte) managementResponse {
-	var req struct {
-		AuthIDs []string `json:"auth_ids"`
-		All     bool     `json:"all"`
-	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		return jsonError(http.StatusBadRequest, "请求格式错误")
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	count := 0
-	wanted := map[string]bool{}
-	for _, id := range req.AuthIDs {
-		wanted[id] = true
-	}
-	for id, p := range fingerprintRunning {
-		if req.All || wanted[id] {
-			p.Phase = "cancelling"
-			p.cancel()
-			count++
-		}
-	}
-	return jsonResponse(http.StatusOK, map[string]int{"cancelled": count})
 }
 
 func runFingerprint(ctx context.Context, auth credential, model string, mode fingerprintMode, p *fingerprintProgress) {
@@ -259,48 +234,19 @@ func runFingerprint(ctx context.Context, auth credential, model string, mode fin
 func collectFingerprintSample(ctx context.Context, auth credential, model string, probe fingerprintProbe) (sample fingerprintSample) {
 	sample.Cell = probe.ID
 	prompt := probe.Prompts[rand.Intn(len(probe.Prompts))]
-	for attempt := 0; attempt < 3; attempt++ {
+	out, _, err := executeProbe(ctx, auth, model, map[string]any{
+		"model": model, "instructions": probe.Instructions, "input": prompt,
+		"temperature": 1.0, "reasoning": map[string]string{"effort": "low"},
+		"store": false, "stream": false,
+	}, fingerprintSlots)
+	if err != nil {
 		if ctx.Err() != nil {
 			sample.Category = "cancelled"
 			return
 		}
-		select {
-		case fingerprintSlots <- struct{}{}:
-		case <-ctx.Done():
-			sample.Category = "cancelled"
-			return
-		}
-		var status int
-		func() {
-			defer func() { <-fingerprintSlots }()
-			if ctx.Err() != nil {
-				sample.Category = "cancelled"
-				return
-			}
-			var out modelResponse
-			var err error
-			out, status, err = executeModel(auth, model, map[string]any{
-				"model": model, "instructions": probe.Instructions, "input": prompt,
-				"temperature": 1.0, "reasoning": map[string]string{"effort": "low"},
-				"store": false, "stream": false,
-			})
-			if err != nil {
-				sample.Category, sample.Error = "error", truncate(err.Error(), 500)
-				return
-			}
-			sample.Error = ""
-			sample.Normalized, sample.Category = normalizeFingerprintAnswer(out.Answer, probe)
-		}()
-		if sample.Category != "error" || (status > 0 && status != 429 && status < 500) || attempt == 2 {
-			return
-		}
-		timer := time.NewTimer(time.Duration(2<<attempt) * time.Second)
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		}
+		sample.Category, sample.Error = "error", truncate(err.Error(), 500)
+		return
 	}
+	sample.Normalized, sample.Category = normalizeFingerprintAnswer(out.Answer, probe)
 	return
 }

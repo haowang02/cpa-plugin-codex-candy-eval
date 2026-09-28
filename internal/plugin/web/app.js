@@ -142,6 +142,7 @@ function fillModels() {
   const ids = [...new Set(catalogCache.models?.ids || [])].sort();
   fillSelect("model", ids, $("model").value || prefs().model, DEFAULT_MODEL);
   fillSelect("fp-model", ids.filter((id) => !/[()]/.test(id)), $("fp-model").value || stored(PREF_STORE + ".fingerprint")?.model, DEFAULT_MODEL);
+  fillSelect("mt-model", ids.filter((id) => !/[()]/.test(id)), $("mt-model").value || stored(PREF_STORE + ".modeltrace")?.model, DEFAULT_MODEL);
 }
 function initializeControls() {
   const saved = prefs(), fpSaved = stored(PREF_STORE + ".fingerprint") || {};
@@ -254,26 +255,33 @@ function renderList(prefix, renderRow) {
   if (selector) list.querySelector(selector)?.focus({ preventScroll: true });
 }
 
-function render() {
+function renderRefresh() {
   $("refresh").disabled = pending || !!loadController;
+  $("refresh").setAttribute("aria-busy", !!loadController);
+}
+
+function render() {
+  renderRefresh();
   $("rate-scope").textContent = `正确率按 ${modelName({ model: $("model").value, effort: $("effort").value })} 统计`;
   renderSelection("", candySelected, "测试");
   $("clear").disabled = pending || credentials.every((a) => !a.results.length);
   setNotice("storage-error", storageError);
   renderList("", renderCandyRow);
   renderFingerprints();
+  renderModelTrace();
 }
 
 function stopPolling() {
   clearTimeout(pollTimer);
   loadController?.abort();
   loadController = null;
+  renderRefresh();
 }
 async function load({ refresh = false } = {}) {
   stopPolling();
   const controller = new AbortController();
   loadController = controller;
-  $("refresh").disabled = true;
+  renderRefresh();
   try {
     try {
       await refreshCatalog({ signal: controller.signal, force: refresh });
@@ -298,7 +306,8 @@ async function load({ refresh = false } = {}) {
     const answers = new Set(credentials.flatMap((a) => a.results.map((r) => answerKey(a.id, r))));
     for (const id of candyExpanded) if (!ids.has(id)) candyExpanded.delete(id);
     for (const id of fpExpanded) if (!ids.has(id)) fpExpanded.delete(id);
-    for (const selection of [candySelected, fpSelected]) {
+    for (const id of mtExpanded) if (!ids.has(id)) mtExpanded.delete(id);
+    for (const selection of [candySelected, fpSelected, mtSelected]) {
       for (const id of selection) if (!credentials.some((a) => a.id === id && !a.disabled)) selection.delete(id);
     }
     for (const id of candyAnswersExpanded) if (!answers.has(id)) candyAnswersExpanded.delete(id);
@@ -310,7 +319,7 @@ async function load({ refresh = false } = {}) {
   }
   loadController = null;
   render();
-  pollTimer = setTimeout(load, credentials.some((a) => a.running || a.fingerprint_running) ? 2500 : 20000);
+  pollTimer = setTimeout(load, credentials.some((a) => a.running || a.fingerprint_running || a.modeltrace_running) ? 2500 : 20000);
 }
 
 async function update(path, options, errorPrefix) {
@@ -353,9 +362,13 @@ function showLogin(message) {
   stopPolling();
   resetCatalogCache();
   credentials = [];
+  loadError = storageError = "";
+  for (const selection of [candySelected, fpSelected, mtSelected, candyExpanded, fpExpanded, mtExpanded, candyAnswersExpanded]) selection.clear();
+  for (const id of notices.keys()) setNotice(id, "");
   $("refresh").hidden = true;
   hideTip();
   document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
+  render();
   $("app").hidden = true;
   $("login").hidden = false;
   $("login-error").hidden = !message;
@@ -400,7 +413,7 @@ function hideTip() {
 }
 function setMasked(masked) {
   document.body.classList.toggle("masked", masked);
-  for (const id of ["mask", "fp-mask"]) {
+  for (const id of ["mask", "fp-mask", "mt-mask"]) {
     $(id).setAttribute("aria-pressed", masked);
     const label = masked ? "取消脱敏" : "脱敏";
     $(id).innerHTML = icon(masked ? "eye" : "eye-off");
@@ -409,7 +422,7 @@ function setMasked(masked) {
   }
 }
 function switchTab(name) {
-  for (const tab of ["candy", "fingerprint"]) {
+  for (const tab of ["candy", "fingerprint", "modeltrace"]) {
     const active = name === tab;
     $("tab-" + tab).setAttribute("aria-selected", active);
     $("tab-" + tab).tabIndex = active ? 0 : -1;
@@ -419,7 +432,7 @@ function switchTab(name) {
   store(PREF_STORE + ".tab", name);
 }
 const fpModeName = (mode) => fpModes[mode]?.name || mode || "—";
-const availableCredential = (a) => !a.disabled && !a.running && !a.fingerprint_running;
+const availableCredential = (a) => !a.disabled && !a.running && !a.fingerprint_running && !a.modeltrace_running;
 const selectedCredentials = (prefix, selection) => visibleCredentials(prefix).filter((a) => selection.has(a.id));
 const batchCredentials = (prefix, selection) => {
   const selected = selectedCredentials(prefix, selection);
@@ -439,6 +452,57 @@ function renderSelection(prefix, selection, action) {
 }
 const fpConcurrency = () => Math.min(Math.max(parseInt($("fp-concurrency").value, 10) || FP_CONFIG.default_concurrency, 1), FP_CONFIG.max_concurrency);
 const fpSavePrefs = () => store(PREF_STORE + ".fingerprint", { model: $("fp-model").value, mode: $("fp-mode").value, concurrency: fpConcurrency() });
+
+function resultOutcome({ tone = "", symbol, titleHTML, detailHTML = "", progressHTML = "" }) {
+  return `<div class="outcome ${tone}"><span class="outcome-icon">${icon(symbol, progressHTML ? "spin" : "")}</span><div class="outcome-copy"><div class="outcome-title">${titleHTML}</div>${detailHTML ? `<div class="outcome-detail">${detailHTML}</div>` : ""}${progressHTML}</div></div>`;
+}
+function collectionOutcome(p, total, showModel = false) {
+  const phase = p.phase === "cancelling" ? "正在停止" : p.phase === "comparing" ? "正在分析指纹" : "正在采集";
+  return resultOutcome({
+    symbol: "loader-circle",
+    titleHTML: `${phase} <span class="meta mono">${p.done}/${total}</span>`,
+    detailHTML: showModel ? `<span class="mono">${esc(p.model)}</span>` : "",
+    progressHTML: `<progress class="collection-progress" value="${p.done}" max="${total}" aria-label="采集进度"></progress>`,
+  });
+}
+function historyEntry(type, credentialID, r, outcomeHTML, metaHTML) {
+  return `<article class="history-entry"><div class="history-info"><time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time><div class="meta">${metaHTML}</div></div>
+    ${outcomeHTML}<button class="btn ghost" type="button" data-${type}-detail="${esc(r.id)}" data-${type}-credential="${esc(credentialID)}">${icon("chart")}查看详情</button></article>`;
+}
+function historyPanel(entries) {
+  return `<div class="history-panel"><div class="history-title">历史记录</div><div class="result-history">${entries || `<div class="empty">暂无记录</div>`}</div></div>`;
+}
+function openResultDetail(type, recordID, credentialID) {
+  const dialog = $(type + "-detail");
+  dialog.dataset.record = recordID;
+  dialog.dataset.credential = credentialID;
+  dialog.showModal();
+}
+function bindCollectionActions({ type, scope, historyKey, expanded, renderRows, run, showDetail }) {
+  const rows = $(type + "-rows"), dialog = $(type + "-detail");
+  $(type + "-detail-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
+    rows.querySelector(`[data-${type}-detail="${CSS.escape(dialog.dataset.record)}"][data-${type}-credential="${CSS.escape(dialog.dataset.credential)}"]`)?.focus();
+  });
+  rows.addEventListener("click", (e) => {
+    const action = (name) => e.target.closest(`[data-${type}-${name}]`)?.getAttribute(`data-${type}-${name}`);
+    const runID = action("run");
+    if (runID) return run({ auth_ids: [runID] });
+    const cancelID = action("cancel");
+    if (cancelID) return update(`/${scope}/cancel`, { method: "POST", body: { auth_ids: [cancelID] } }, "停止测试失败");
+    const toggleID = action("toggle");
+    if (toggleID) {
+      expanded.has(toggleID) ? expanded.delete(toggleID) : expanded.add(toggleID);
+      return renderRows();
+    }
+    const recordID = action("detail"), credentialID = action("credential");
+    if (recordID && credentialID) {
+      const record = credentials.find((a) => a.id === credentialID)?.[historyKey]?.find((r) => r.id === recordID);
+      if (record) showDetail(record, credentialID);
+    }
+  });
+}
+
 function fpOutcome(r) {
   const status = r.attribution?.status;
   const model = `<span class="mono">${esc(r.model)}</span>`;
@@ -456,41 +520,38 @@ function fpOutcome(r) {
     skipped: ["neutral", "ban", "已跳过", "此凭证不含所选模型"],
   };
   const [tone, symbol, title, detail] = states[status] || ["idle", "fingerprint", "等待采集", ""];
-  return `<div class="fp-outcome ${tone}"><span class="fp-state-icon">${icon(symbol)}</span><div class="fp-result-copy"><div class="fp-result-title">${title}</div>${detail ? `<div class="fp-result-detail">${detail}</div>` : ""}</div></div>`;
+  return resultOutcome({ tone, symbol, titleHTML: title, detailHTML: detail });
 }
 function fpHistory(a, r) {
-  return `<article class="fp-history-entry"><div class="fp-history-info"><time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time><div class="meta"><span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}</div></div>
-    ${fpOutcome(r)}<button class="btn ghost" type="button" data-fp-detail="${esc(r.id)}" data-fp-credential="${esc(a.id)}">${icon("chart")}查看详情</button></article>`;
+  return historyEntry("fp", a.id, r, fpOutcome(r), `<span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}`);
 }
 const fpMetric = (n) => n == null ? "—" : Number(n).toFixed(4);
 const fpComparisonNames = { match: "相似", uncertain: "不确定", mismatch: "不同", insufficient: "样本不足" };
 const fpProbeNames = { "random-number-1-100": "随机数 1–100", "random-number-1-10": "随机数 1–10", "random-letter": "随机字母", "random-color": "随机颜色", "coin-flip": "抛硬币", "random-animal": "随机动物", "random-city": "随机城市", "favorite-number": "喜欢的数字" };
 let fpDetailRecord = null;
-let fpDetailFocus = null;
 function showFingerprintDetail(r, credentialID) {
   fpDetailRecord = r;
-  fpDetailFocus = { credentialID, id: r.id };
   const attr = r.attribution || {};
   const comparisons = attr.comparisons || [];
   const stat = (label, value) => `<div class="fp-stat"><dt>${label}</dt><dd class="mono">${esc(value)}</dd></div>`;
-  $("fp-detail-body").innerHTML = `<p class="fp-dialog-meta"><span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}模式 · <time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time></p>
+  $("fp-detail-body").innerHTML = `<p class="result-dialog-meta"><span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}模式 · <time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time></p>
     ${fpOutcome(r)}
-    <p class="fp-detail-note">${esc(attr.message || "尚无归因结果")}</p>
-    ${r.error ? `<p class="fp-detail-note fp-detail-warning">${esc(r.error)}</p>` : ""}
+    <p class="detail-note">${esc(attr.message || "尚无归因结果")}</p>
+    ${r.error ? `<p class="detail-note detail-warning">${esc(r.error)}</p>` : ""}
     ${r.status === "skipped" ? "" : `<dl class="fp-stats">${stat("采集进度", `${r.done} / ${r.total}`)}${stat("有效回答", r.valid)}${stat("请求失败", r.errors)}${stat("用时", fmtSec(r.duration_ms))}</dl>
-    <section class="fp-dialog-section"><h3>基准比对</h3>
+    <section class="result-dialog-section"><h3>基准比对</h3>
       <div class="fp-detail-scroll"><table class="fp-detail-table"><thead><tr><th>基准模型</th><th>距离 JSD ↓</th><th>p 值</th><th>有效探针</th><th>距离判断</th></tr></thead><tbody>
         ${comparisons.map((c) => `<tr class="${c.model === attr.nearest ? "closest" : ""}"><td class="mono">${esc(c.model)}${c.model === r.model ? " · 所选" : ""}${c.model === attr.nearest ? " · 最近" : ""}</td><td class="mono">${fpMetric(c.mean_jsd)}</td><td class="mono">${fpMetric(c.p_value)}</td><td>${c.cells?.length || 0}</td><td>${esc(fpComparisonNames[c.verdict] || c.verdict)}</td></tr>`).join("") || `<tr><td colspan="5">暂无可比数据</td></tr>`}
       </tbody></table></div>
-      <p class="fp-detail-note">距离越小，回答分布越接近。p 值低于 ${fpMetric(attr.alpha)} 时视为差异显著；归因同时考虑距离与统计检验。</p>
+      <p class="detail-note">距离越小，回答分布越接近。p 值低于 ${fpMetric(attr.alpha)} 时视为差异显著；归因同时考虑距离与统计检验。</p>
     </section>
-    <section class="fp-dialog-section"><h3>结果稳定性</h3>
-      <p class="fp-detail-note">本次自一致性 JSD：<span class="mono">${fpMetric(attr.self_jsd)}</span>（越小越稳定）${attr.reference_p_value != null ? `<br>所选模型与最近模型的基准差异 p 值：<span class="mono">${fpMetric(attr.reference_p_value)}</span>` : ""}</p>
-      ${(attr.warnings || []).map((w) => `<p class="fp-detail-note fp-detail-warning">${esc(w)}</p>`).join("")}
+    <section class="result-dialog-section"><h3>结果稳定性</h3>
+      <p class="detail-note">本次自一致性 JSD：<span class="mono">${fpMetric(attr.self_jsd)}</span>（越小越稳定）${attr.reference_p_value != null ? `<br>所选模型与最近模型的基准差异 p 值：<span class="mono">${fpMetric(attr.reference_p_value)}</span>` : ""}</p>
+      ${(attr.warnings || []).map((w) => `<p class="detail-note detail-warning">${esc(w)}</p>`).join("")}
     </section>
-    <section class="fp-dialog-section"><h3>逐项比对</h3><label class="field fp-probe-select"><span class="field-label">对比模型</span><span class="native-select"><select id="fp-detail-baseline">${comparisons.map((c) => `<option>${esc(c.model)}</option>`).join("")}</select></span></label><div id="fp-detail-probes" class="fp-detail-scroll"></div></section>`}`;
+    <section class="result-dialog-section"><h3>逐项比对</h3><label class="field fp-probe-select"><span class="field-label">对比模型</span><span class="native-select"><select id="fp-detail-baseline">${comparisons.map((c) => `<option>${esc(c.model)}</option>`).join("")}</select></span></label><div id="fp-detail-probes" class="fp-detail-scroll"></div></section>`}`;
   if (r.status !== "skipped") renderFingerprintProbes();
-  $("fp-detail").showModal();
+  openResultDetail("fp", r.id, credentialID);
 }
 function renderFingerprintProbes() {
   const comparison = fpDetailRecord?.attribution?.comparisons?.find((c) => c.model === $("fp-detail-baseline").value);
@@ -505,18 +566,15 @@ function renderFingerprintRow(a) {
   const last = history[history.length - 1];
   const p = a.fingerprint_running;
   const open = fpExpanded.has(a.id);
-  const phase = p?.phase === "cancelling" ? "正在停止" : p?.phase === "comparing" ? "正在分析指纹" : "正在采集";
-  const latest = p
-    ? `<div class="fp-outcome"><span class="fp-state-icon">${icon("loader-circle", "spin")}</span><div class="fp-result-copy"><div class="fp-result-title">${phase} <span class="meta mono">${p.done}/${p.total}</span></div><div class="fp-result-detail mono">${esc(p.model)}</div><progress class="fp-progress" value="${p.done}" max="${p.total}" aria-label="采集进度"></progress></div></div>`
-    : fpOutcome(last || {});
-  return `<div class="row ${open ? "open" : ""}"><div class="list-row fp-main">
+  const latest = p ? collectionOutcome(p, p.total, true) : fpOutcome(last || {});
+  return `<div class="row ${open ? "open" : ""}"><div class="list-row collection-row">
     <input type="checkbox" data-fp-select="${esc(a.id)}" aria-label="选择此凭证" ${fpSelected.has(a.id) ? "checked" : ""} ${pending || !$("fp-model").value || !availableCredential(a) ? "disabled" : ""}>
     ${credentialView(a, open, "data-fp-toggle")}
     <div class="latest">${latest}</div>
     <div class="fp-mode">${esc(fpModeName(p?.mode || last?.mode))}</div>
-    <div class="fp-time mono" ${last && !p ? `title="${esc(fmtTime(last.time))}"` : ""}>${last && !p ? esc(fmtTime(last.time)) : "—"}</div>
+    <div class="test-time mono" ${last && !p ? `title="${esc(fmtTime(last.time))}"` : ""}>${last && !p ? esc(fmtTime(last.time)) : "—"}</div>
     <div class="action">${p ? `<button class="btn ghost" type="button" data-fp-cancel="${esc(a.id)}" ${pending || p.phase === "cancelling" ? "disabled" : ""}>停止</button>` : `<button class="btn" type="button" data-fp-run="${esc(a.id)}" ${pending || !$("fp-model").value || !availableCredential(a) ? "disabled" : ""}>${icon("play")}采集</button>`}</div></div>
-    ${open ? `<div class="history-panel"><div class="fp-history-title">历史记录</div><div class="fp-history-list">${[...history].reverse().map((r) => fpHistory(a, r)).join("") || `<div class="empty">暂无记录</div>`}</div></div>` : ""}</div>`;
+    ${open ? historyPanel([...history].reverse().map((r) => fpHistory(a, r)).join("")) : ""}</div>`;
 }
 function renderFingerprints() {
   renderSelection("fp-", fpSelected, "采集");
@@ -539,7 +597,7 @@ function fillCredentialTypes() {
   // Keep the requested default visible even when there are no Codex files.
   types.set("auth_files:codex", "认证文件 · codex");
   const options = [["all", "全部凭证"], ...[...types].sort(([a], [b]) => a.localeCompare(b))];
-  for (const prefix of ["", "fp-"]) fillSelect(prefix + "credential-type", options, $(prefix + "credential-type").value, "auth_files:codex");
+  for (const prefix of ["", "fp-", "mt-"]) fillSelect(prefix + "credential-type", options, $(prefix + "credential-type").value, "auth_files:codex");
 }
 
 const notices = new Map();
@@ -567,7 +625,7 @@ function setNotice(id, message, tone = "error") {
 }
 
 function credentialCard(prefix, columns) {
-  const label = prefix ? "指纹" : "糖果";
+  const label = prefix === "mt-" ? "ModelTrace" : prefix ? "指纹" : "糖果";
   return `<div class="section-head"><div class="credential-heading"><h2>凭证</h2><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span></div>
     <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" title="清空${label}历史" aria-label="清空${label}历史" disabled>${icon("trash-2")}</button></div></div>
     <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${columns.map((label) => `<div>${label}</div>`).join("")}</div>
@@ -576,12 +634,14 @@ function credentialCard(prefix, columns) {
 function initializeLayout() {
   $("candy-credentials").innerHTML = credentialCard("", ["凭证", "最近一次", "正确率", "最近 20 次", ""]);
   $("fp-credentials").innerHTML = credentialCard("fp-", ["凭证", "指纹结果", "模式", "测试时间", ""]);
+  $("mt-credentials").innerHTML = credentialCard("mt-", ["凭证", "测试模型", "归因结果", "测试时间", ""]);
   $("notifications").innerHTML = ["flash", "load-error", "catalog-error", "storage-error"].map((id) => `<div id="${id}" class="global-flash" role="alert" hidden><span class="notice-symbol" aria-hidden="true"></span><span class="notice-message"></span><button class="notice-close" type="button" title="隐藏提示" aria-label="隐藏提示">${icon("x")}</button></div>`).join("");
 }
 
 // Events and initialization.
 initializeLayout();
 initializeControls();
+initializeModelTrace();
 document.querySelectorAll("[data-icon]").forEach((el) => { el.outerHTML = icon(el.dataset.icon, el.dataset.class); });
 
 for (const id of ["flash", "load-error", "catalog-error", "storage-error"]) {
@@ -654,9 +714,9 @@ $("mask").addEventListener("click", () => {
   setMasked(masked);
   store(MASK_STORE, masked);
 });
-$("fp-mask").addEventListener("click", () => $("mask").click());
+for (const id of ["fp-mask", "mt-mask"]) $(id).addEventListener("click", () => $("mask").click());
 
-for (const [id, scope, label] of [["clear", "candy", "糖果"], ["fp-clear", "fingerprint", "指纹"]]) {
+for (const [id, scope, label] of [["clear", "candy", "糖果"], ["fp-clear", "fingerprint", "指纹"], ["mt-clear", "modeltrace", "ModelTrace"]]) {
   $(id).addEventListener("click", () => {
     clearScope = scope;
     $("clear-title").textContent = `清空${label}测试记录？`;
@@ -666,7 +726,7 @@ for (const [id, scope, label] of [["clear", "candy", "糖果"], ["fp-clear", "fi
 }
 $("confirm-clear").addEventListener("close", () => {
   if ($("confirm-clear").returnValue !== "confirm") return;
-  update(clearScope === "fingerprint" ? "/fingerprint/results" : "/results", { method: "DELETE" }, "清空历史失败");
+  update(clearScope === "candy" ? "/results" : `/${clearScope}/results`, { method: "DELETE" }, "清空历史失败");
 });
 
 $("login-form").addEventListener("submit", (e) => {
@@ -703,25 +763,22 @@ $("rows").addEventListener("click", (e) => {
   render();
 });
 
-for (const name of ["candy", "fingerprint"]) {
+const tabNames = ["candy", "fingerprint", "modeltrace"];
+for (const name of tabNames) {
   $("tab-" + name).addEventListener("click", () => switchTab(name));
   $("tab-" + name).addEventListener("keydown", (e) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
     e.preventDefault();
-    const next = e.key === "Home" ? "candy" : e.key === "End" ? "fingerprint" : name === "candy" ? "fingerprint" : "candy";
+    const next = e.key === "Home" ? tabNames[0] : e.key === "End" ? tabNames.at(-1) : tabNames[(tabNames.indexOf(name) + (e.key === "ArrowRight" ? 1 : -1) + tabNames.length) % tabNames.length];
     switchTab(next); $("tab-" + next).focus();
   });
 }
-switchTab(stored(PREF_STORE + ".tab") === "fingerprint" ? "fingerprint" : "candy");
+switchTab(tabNames.includes(stored(PREF_STORE + ".tab")) ? stored(PREF_STORE + ".tab") : "candy");
 
 $("fp-detail-body").addEventListener("change", (e) => { if (e.target.id === "fp-detail-baseline") renderFingerprintProbes(); });
-$("fp-detail-close").addEventListener("click", () => $("fp-detail").close());
-$("fp-detail").addEventListener("close", () => {
-  if (fpDetailFocus) $("fp-rows").querySelector(`[data-fp-detail="${CSS.escape(fpDetailFocus.id)}"][data-fp-credential="${CSS.escape(fpDetailFocus.credentialID || "")}"]`)?.focus();
-  fpDetailRecord = null;
-});
+$("fp-detail").addEventListener("close", () => { fpDetailRecord = null; });
 
-for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint]]) {
+for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint], ["mt-", "mt", mtSelected, runModelTrace]]) {
   $(prefix + "credential-type").addEventListener("change", () => { selection.clear(); render(); });
   $(prefix + "toolbar").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -744,19 +801,7 @@ for (const [prefix, type, selection, submit] of [["", "candy", candySelected, ru
 }
 for (const id of ["fp-model", "fp-mode"]) $(id).addEventListener("change", () => { fpSavePrefs(); renderFingerprints(); });
 $("fp-concurrency").addEventListener("change", () => { $("fp-concurrency").value = fpConcurrency(); fpSavePrefs(); });
-$("fp-rows").addEventListener("click", (e) => {
-  const run = e.target.closest("[data-fp-run]");
-  if (run) return runFingerprint({ auth_ids: [run.dataset.fpRun] });
-  const cancel = e.target.closest("[data-fp-cancel]");
-  if (cancel) return update("/fingerprint/cancel", { method: "POST", body: { auth_ids: [cancel.dataset.fpCancel] } }, "停止采集失败");
-  const toggle = e.target.closest("[data-fp-toggle]");
-  if (toggle) { const id = toggle.dataset.fpToggle; fpExpanded.has(id) ? fpExpanded.delete(id) : fpExpanded.add(id); return renderFingerprints(); }
-  const detail = e.target.closest("[data-fp-detail]");
-  if (detail) {
-    const record = credentials.find((a) => a.id === detail.dataset.fpCredential)?.fingerprints?.find((r) => r.id === detail.dataset.fpDetail);
-    if (record) showFingerprintDetail(record, detail.dataset.fpCredential);
-  }
-});
+bindCollectionActions({ type: "fp", scope: "fingerprint", historyKey: "fingerprints", expanded: fpExpanded, renderRows: renderFingerprints, run: runFingerprint, showDetail: showFingerprintDetail });
 
 key = panelKey();
 if (!key) { try { key = sessionStorage.getItem(KEY_STORE) || ""; } catch (_) {} }

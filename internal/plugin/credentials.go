@@ -47,6 +47,8 @@ type credentialView struct {
 	Results            []candyResult        `json:"results"`
 	FingerprintRunning *fingerprintProgress `json:"fingerprint_running,omitempty"`
 	Fingerprints       []fingerprintResult  `json:"fingerprints"`
+	ModelTraceRunning  *traceProgress       `json:"modeltrace_running,omitempty"`
+	ModelTraces        []traceResult        `json:"modeltraces"`
 }
 
 // host.auth.list omits some config-backed credentials. The UI syncs their CPA

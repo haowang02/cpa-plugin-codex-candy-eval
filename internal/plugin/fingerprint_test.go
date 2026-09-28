@@ -206,7 +206,7 @@ func TestFingerprintBatchAndPersistence(t *testing.T) {
 		t.Fatal("fingerprint results not restored")
 	}
 	candyResults["a"] = []candyResult{{Answer: "21", OK: true}}
-	if res := clearHistoryResponse(true); res.StatusCode != 200 || len(candyResults["a"]) != 1 || len(fingerprintResults) != 0 {
+	if res := clearHistoryResponse("fingerprint"); res.StatusCode != 200 || len(candyResults["a"]) != 1 || len(fingerprintResults) != 0 {
 		t.Fatal("fingerprint clear must preserve candy history")
 	}
 }
@@ -220,7 +220,7 @@ func TestFingerprintValidationAndStorageFailure(t *testing.T) {
 	}
 	fingerprintResults["a"] = []fingerprintResult{{Status: "completed"}}
 	statePath = filepath.Join(t.TempDir(), "missing", "state.json")
-	if res := clearHistoryResponse(true); res.StatusCode != 500 || len(fingerprintResults["a"]) != 1 {
+	if res := clearHistoryResponse("fingerprint"); res.StatusCode != 500 || len(fingerprintResults["a"]) != 1 {
 		t.Fatal("failed save must preserve history")
 	}
 }
@@ -245,7 +245,7 @@ func TestFingerprintConcurrencyAndCancellation(t *testing.T) {
 				return mockModelResponse("47"), nil
 			}
 			defer func() {
-				fingerprintCancelResponse([]byte(`{"all":true}`))
+				cancelCollectionResponse("fingerprint", []byte(`{"all":true}`))
 				close(gate)
 				waitFingerprintIdle(t)
 			}()
@@ -260,7 +260,7 @@ func TestFingerprintConcurrencyAndCancellation(t *testing.T) {
 					t.Fatal("configured concurrency was not reached")
 				}
 			}
-			fingerprintCancelResponse([]byte(`{"auth_ids":["a"]}`))
+			cancelCollectionResponse("fingerprint", []byte(`{"auth_ids":["a"]}`))
 			for range want {
 				gate <- struct{}{}
 			}

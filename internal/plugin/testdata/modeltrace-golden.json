@@ -1,0 +1,677 @@
+[
+  {
+    "outputs": [
+      {
+        "text": "14, 102, 224, 25, 215, 84, 342, 279, 250, 255, 294, 12, 119, 260, 80, 289, 177, 99, 55, 45, 69, 127, 219, 345, 150, 344, 217, 124, 65, 40, 49, 92, 169, 280, 70, 249, 107, 354, 280, 240, 234, 262, 324, 65, 195, 4, 202, 79, 345, 290, 269, 282, 329, 55, 170, 319, 147, 9, 260, 190, 154, 152, 184, 250, 350, 129, 297, 144, 25, 295, 244, 227, 244, 295, 25, 144, 297, 129, 350, 250, 184, 152, 154, 190, 260, 9, 147, 319, 170, 55, 329, 282, 269, 290, 345, 79, 202, 4, 195, 65, 324, 262, 234, 240, 280, 354, 107, 249, 70, 280, 169, 92, 49, 40, 65, 124, 217, 344, 150, 345, 219, 127, 69, 45, 55, 99, 177, 289, 80, 260, 119, 12, 294, 255, 250, 279, 342, 84, 215, 25, 224, 102, 14, 315, 295, 309, 2, 84, 200, 350, 179, 42, 294, 225, 190, 189, 222, 289, 35, 170, 339, 187, 69, 340, 290, 274, 292, 344, 75, 195, 349, 182, 49, 305, 240, 209, 212, 249, 320, 70, 209, 27, 234, 120, 40, 349, 337, 4, 60, 150, 274, 77, 269, 140, 45, 339, 312, 319, 5, 80, 189, 332, 154, 10, 255, 179, 137, 129, 155, 215, 309, 82, 244, 85, 315, 224, 167, 144, 155, 200, 279, 37, 184, 10, 225, 119, 47, 9, 5, 35, 99, 197, 329, 140, 340, 219, 132, 79, 60, 75, 124, 207, 324, 120, 305, 169, 67, 354, 320, 320, 354, 67, 169, 305, 120, 324, 207, 124, 75, 60, 79, 132, 219, 340, 140, 329, 197, 99, 35, 5, 9, 47, 119, 225, 10, 184, 37, 279, 200, 155, 144, 167, 224, 315, 85, 244, 82, 309, 215, 155, 129",
+        "expected_count": 300
+      },
+      {
+        "text": "无法完成",
+        "expected_count": 300
+      }
+    ],
+    "expected": {
+      "prediction": "claude-opus-5-5",
+      "prediction_name": "claude-opus-5-5",
+      "probability": 0.9258151017173791,
+      "used_outputs": 1,
+      "results": [
+        {
+          "model": "claude-opus-5-5",
+          "display_name": "claude-opus-5-5",
+          "probability": 0.9258151017173791,
+          "profile_similarity": 0.2943833643300383,
+          "score": 1.7227609510723518,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.9997579387549665
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "display_name": "gpt-5.6-sol",
+          "probability": 0.04664721605963743,
+          "profile_similarity": 0.2897824294647856,
+          "score": 1.3121764689093263,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.6307023972144071
+        },
+        {
+          "model": "gpt-5.5",
+          "display_name": "gpt-5.5",
+          "probability": 0.027240911237874567,
+          "profile_similarity": 0.2893694413694573,
+          "score": 1.2382654521089904,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.36831582828151976
+        },
+        {
+          "model": "claude-sonnet-5",
+          "display_name": "claude-sonnet-5",
+          "probability": 0.00016548862071245955,
+          "profile_similarity": 0.2755439387681864,
+          "score": 0.5369920909910586,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.0001787058366449039
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "display_name": "claude-haiku-4-5-20251001",
+          "probability": 0.00005865398896656985,
+          "profile_similarity": 0.2779368596392995,
+          "score": 0.39446574398539636,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.00006333855539858672
+        },
+        {
+          "model": "gpt-6-luna",
+          "display_name": "gpt-6-luna",
+          "probability": 0.00002416292866182813,
+          "profile_similarity": 0.28500386023389546,
+          "score": 0.27260709903152974,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.0003266993899754317
+        },
+        {
+          "model": "gpt-6-astra",
+          "display_name": "gpt-6-astra",
+          "probability": 0.000017957182325483142,
+          "profile_similarity": 0.28502649382264544,
+          "score": 0.23182026701079161,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00024279343756375134
+        },
+        {
+          "model": "gpt-5.4",
+          "display_name": "gpt-5.4",
+          "probability": 0.000013722722191129158,
+          "profile_similarity": 0.2864910735112065,
+          "score": 0.19486606485523247,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00018554062843080142
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "display_name": "gpt-5.6-luna",
+          "probability": 0.000013421600276467783,
+          "profile_similarity": 0.2816764094051619,
+          "score": 0.19181729810950215,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00018146925334192333
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "display_name": "gpt-5.6-terra",
+          "probability": 0.000003060909223156631,
+          "profile_similarity": 0.28154825374666537,
+          "score": -0.011293272655115622,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.000041385594849485666
+        },
+        {
+          "model": "gpt-6-sol",
+          "display_name": "gpt-6-sol",
+          "probability": 2.8742622152163807e-7,
+          "profile_similarity": 0.28152543544313513,
+          "score": -0.33633280142955085,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.000003886199911784947
+        },
+        {
+          "model": "claude-opus-4-7",
+          "display_name": "claude-opus-4-7",
+          "probability": 8.56923719528204e-9,
+          "profile_similarity": 0.2578457846253406,
+          "score": -0.8190190284122569,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 9.253643518198773e-9
+        },
+        {
+          "model": "claude-opus-4-6",
+          "display_name": "claude-opus-4-6",
+          "probability": 3.7688211243266396e-9,
+          "profile_similarity": 0.27873369387173597,
+          "score": -0.9318884850774057,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 4.069828664280306e-9
+        },
+        {
+          "model": "claude-opus-4-8",
+          "display_name": "claude-opus-4-8",
+          "probability": 2.166165653526121e-9,
+          "profile_similarity": 0.27207289605809004,
+          "score": -1.0079857113079003,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 2.339172589379708e-9
+        },
+        {
+          "model": "claude-opus-5",
+          "display_name": "claude-opus-5",
+          "probability": 1.098722615178052e-9,
+          "profile_similarity": 0.2780741212621184,
+          "score": -1.1012599050129077,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 1.186475198963862e-9
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "display_name": "claude-sonnet-4-6",
+          "probability": 3.5837018847406948e-12,
+          "profile_similarity": 0.25837365260492373,
+          "score": -1.8879922321790419,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 3.869924353960654e-12
+        }
+      ],
+      "diagnostics": [
+        {
+          "index": 0,
+          "parsed_numbers": 291,
+          "minimum_numbers": 165,
+          "accepted": true
+        },
+        {
+          "index": 1,
+          "parsed_numbers": 0,
+          "minimum_numbers": 165,
+          "accepted": false
+        }
+      ],
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "family_prediction": "claude",
+      "family_prediction_name": "Claude",
+      "family_probability": 0.9260392599335885,
+      "family_probabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.07396074006641158
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.9260392599335885
+        }
+      ],
+      "method": "统一全局稳健数字指纹"
+    }
+  },
+  {
+    "outputs": [
+      {
+        "text": "14, 102, 224, 25, 215, 84, 342, 279, 250, 255, 294, 12, 119, 260, 80, 289, 177, 99, 55, 45, 69, 127, 219, 345, 150, 344, 217, 124, 65, 40, 49, 92, 169, 280, 70, 249, 107, 354, 280, 240, 234, 262, 324, 65, 195, 4, 202, 79, 345, 290, 269, 282, 329, 55, 170, 319, 147, 9, 260, 190, 154, 152, 184, 250, 350, 129, 297, 144, 25, 295, 244, 227, 244, 295, 25, 144, 297, 129, 350, 250, 184, 152, 154, 190, 260, 9, 147, 319, 170, 55, 329, 282, 269, 290, 345, 79, 202, 4, 195, 65, 324, 262, 234, 240, 280, 354, 107, 249, 70, 280, 169, 92, 49, 40, 65, 124, 217, 344, 150, 345, 219, 127, 69, 45, 55, 99, 177, 289, 80, 260, 119, 12, 294, 255, 250, 279, 342, 84, 215, 25, 224, 102, 14, 315, 295, 309, 2, 84, 200, 350, 179, 42, 294, 225, 190, 189, 222, 289, 35, 170, 339, 187, 69, 340, 290, 274, 292, 344, 75, 195, 349, 182, 49, 305, 240, 209, 212, 249, 320, 70, 209, 27, 234, 120, 40, 349, 337, 4, 60, 150, 274, 77, 269, 140, 45, 339, 312, 319, 5, 80, 189, 332, 154, 10, 255, 179, 137, 129, 155, 215, 309, 82, 244, 85, 315, 224, 167, 144, 155, 200, 279, 37, 184, 10, 225, 119, 47, 9, 5, 35, 99, 197, 329, 140, 340, 219, 132, 79, 60, 75, 124, 207, 324, 120, 305, 169, 67, 354, 320, 320, 354, 67, 169, 305, 120, 324, 207, 124, 75, 60, 79, 132, 219, 340, 140, 329, 197, 99, 35, 5, 9, 47, 119, 225, 10, 184, 37, 279, 200, 155, 144, 167, 224, 315, 85, 244, 82, 309, 215, 155, 129",
+        "expected_count": 300
+      },
+      {
+        "text": "53, 141, 263, 64, 254, 123, 26, 318, 289, 294, 333, 51, 158, 299, 119, 328, 216, 138, 94, 84, 108, 166, 258, 29, 189, 28, 256, 163, 104, 79, 88, 131, 208, 319, 109, 288, 146, 38, 319, 279, 273, 301, 8, 104, 234, 43, 241, 118, 29, 329, 308, 321, 13, 94, 209, 3, 186, 48, 299, 229, 193, 191, 223, 289, 34, 168, 336, 183, 64, 334, 283, 266, 283, 334, 64, 183, 336, 168, 34, 289, 223, 191, 193, 229, 299, 48, 186, 3, 209, 94, 13, 321, 308, 329, 29, 118, 241, 43, 234, 104, 8, 301, 273, 279, 319, 38, 146, 288, 109, 319, 208, 131, 88, 79, 104, 163, 256, 28, 189, 29, 258, 166, 108, 84, 94, 138, 216, 328, 119, 299, 158, 51, 333, 294, 289, 318, 26, 123, 254, 64, 263, 141, 53, 354, 334, 348, 41, 123, 239, 34, 218, 81, 333, 264, 229, 228, 261, 328, 74, 209, 23, 226, 108, 24, 329, 313, 331, 28, 114, 234, 33, 221, 88, 344, 279, 248, 251, 288, 4, 109, 248, 66, 273, 159, 79, 33, 21, 43, 99, 189, 313, 116, 308, 179, 84, 23, 351, 3, 44, 119, 228, 16, 193, 49, 294, 218, 176, 168, 194, 254, 348, 121, 283, 124, 354, 263, 206, 183, 194, 239, 318, 76, 223, 49, 264, 158, 86, 48, 44, 74, 138, 236, 13, 179, 24, 258, 171, 118, 99, 114, 163, 246, 8, 159, 344, 208, 106, 38, 4, 4, 38, 106, 208, 344, 159, 8, 246, 163, 114, 99, 118, 171, 258, 24, 179, 13, 236, 138, 74, 44, 48, 86, 158, 264, 49, 223, 76, 318, 239, 194, 183, 206, 263, 354, 124, 283, 121, 348, 254, 194, 168, 176",
+        "expected_count": 300
+      },
+      {
+        "text": "无法完成",
+        "expected_count": 300
+      }
+    ],
+    "expected": {
+      "prediction": "gpt-6-astra",
+      "prediction_name": "gpt-6-astra",
+      "probability": 0.7062997584825808,
+      "used_outputs": 2,
+      "results": [
+        {
+          "model": "gpt-6-astra",
+          "display_name": "gpt-6-astra",
+          "probability": 0.7062997584825808,
+          "profile_similarity": 0.45597715974887854,
+          "score": 0.7762238603532641,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.9992871477341512
+        },
+        {
+          "model": "claude-opus-5-5",
+          "display_name": "claude-opus-5-5",
+          "probability": 0.2748842891815612,
+          "profile_similarity": 0.45776957100631355,
+          "score": 0.6975830693565553,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.9375432096065877
+        },
+        {
+          "model": "claude-sonnet-5",
+          "display_name": "claude-sonnet-5",
+          "probability": 0.017821260301680696,
+          "profile_similarity": 0.42910370443193835,
+          "score": 0.4695865611094653,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.06078267198252429
+        },
+        {
+          "model": "claude-opus-4-8",
+          "display_name": "claude-opus-4-8",
+          "probability": 0.00030626142073771236,
+          "profile_similarity": 0.4404584498602995,
+          "score": 0.13094419701316162,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.0010445606630776075
+        },
+        {
+          "model": "claude-opus-4-7",
+          "display_name": "claude-opus-4-7",
+          "probability": 0.00018207221289489854,
+          "profile_similarity": 0.42223838745430464,
+          "score": 0.08760789111000883,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.0006209906261500064
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "display_name": "gpt-5.6-sol",
+          "probability": 0.0001693042867918361,
+          "profile_similarity": 0.4477269965187982,
+          "score": 0.08154907669102474,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00023953512062761258
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "display_name": "gpt-5.6-luna",
+          "probability": 0.0001624622624620249,
+          "profile_similarity": 0.4470250595731975,
+          "score": 0.07811142121555308,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00022985488656954964
+        },
+        {
+          "model": "gpt-6-luna",
+          "display_name": "gpt-6-luna",
+          "probability": 0.00007766000904418627,
+          "profile_similarity": 0.44862813479229324,
+          "score": 0.016602645962651985,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00010987494756829542
+        },
+        {
+          "model": "gpt-6-sol",
+          "display_name": "gpt-6-sol",
+          "probability": 0.00005932676018043879,
+          "profile_similarity": 0.44954324799058,
+          "score": -0.005837351433262916,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00008393669720684295
+        },
+        {
+          "model": "gpt-5.5",
+          "display_name": "gpt-5.5",
+          "probability": 0.000020528010467257565,
+          "profile_similarity": 0.45013147085911365,
+          "score": -0.09427653095298405,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.000029043443356902304
+        },
+        {
+          "model": "gpt-5.4",
+          "display_name": "gpt-5.4",
+          "probability": 0.000013429544367765567,
+          "profile_similarity": 0.4514904171848304,
+          "score": -0.12963763380846843,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.00001900039030944205
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "display_name": "claude-haiku-4-5-20251001",
+          "probability": 0.0000013520682849544658,
+          "profile_similarity": 0.4337374161470666,
+          "score": -0.32095610052016327,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.000004611476498921402
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "display_name": "gpt-5.6-terra",
+          "probability": 0.0000011356780451900031,
+          "profile_similarity": 0.4435100045834107,
+          "score": -0.33548990166702,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.0000016067802103746628
+        },
+        {
+          "model": "claude-opus-5",
+          "display_name": "claude-opus-5",
+          "probability": 6.206417474272507e-7,
+          "profile_similarity": 0.4418724822025515,
+          "score": -0.3858424957483486,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.0000021168123417721218
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "display_name": "claude-sonnet-4-6",
+          "probability": 5.174051685476168e-7,
+          "profile_similarity": 0.42800972999674713,
+          "score": -0.4010031424190489,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.000001764705083115056
+        },
+        {
+          "model": "claude-opus-4-6",
+          "display_name": "claude-opus-4-6",
+          "probability": 2.1733985186181392e-8,
+          "profile_similarity": 0.4460672418737891,
+          "score": -0.6651655662623888,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 7.412773676394364e-8
+        }
+      ],
+      "diagnostics": [
+        {
+          "index": 0,
+          "parsed_numbers": 291,
+          "minimum_numbers": 165,
+          "accepted": true
+        },
+        {
+          "index": 1,
+          "parsed_numbers": 292,
+          "minimum_numbers": 165,
+          "accepted": true
+        },
+        {
+          "index": 2,
+          "parsed_numbers": 0,
+          "minimum_numbers": 165,
+          "accepted": false
+        }
+      ],
+      "calibration": {
+        "queries": "2",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 0.9965277777777778
+      },
+      "family_prediction": "gpt",
+      "family_prediction_name": "GPT",
+      "family_probability": 0.7068036050339394,
+      "family_probabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.7068036050339394
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.2931963949660606
+        }
+      ],
+      "method": "统一全局稳健数字指纹"
+    }
+  },
+  {
+    "outputs": [
+      {
+        "text": "14, 102, 224, 25, 215, 84, 342, 279, 250, 255, 294, 12, 119, 260, 80, 289, 177, 99, 55, 45, 69, 127, 219, 345, 150, 344, 217, 124, 65, 40, 49, 92, 169, 280, 70, 249, 107, 354, 280, 240, 234, 262, 324, 65, 195, 4, 202, 79, 345, 290, 269, 282, 329, 55, 170, 319, 147, 9, 260, 190, 154, 152, 184, 250, 350, 129, 297, 144, 25, 295, 244, 227, 244, 295, 25, 144, 297, 129, 350, 250, 184, 152, 154, 190, 260, 9, 147, 319, 170, 55, 329, 282, 269, 290, 345, 79, 202, 4, 195, 65, 324, 262, 234, 240, 280, 354, 107, 249, 70, 280, 169, 92, 49, 40, 65, 124, 217, 344, 150, 345, 219, 127, 69, 45, 55, 99, 177, 289, 80, 260, 119, 12, 294, 255, 250, 279, 342, 84, 215, 25, 224, 102, 14, 315, 295, 309, 2, 84, 200, 350, 179, 42, 294, 225, 190, 189, 222, 289, 35, 170, 339, 187, 69, 340, 290, 274, 292, 344, 75, 195, 349, 182, 49, 305, 240, 209, 212, 249, 320, 70, 209, 27, 234, 120, 40, 349, 337, 4, 60, 150, 274, 77, 269, 140, 45, 339, 312, 319, 5, 80, 189, 332, 154, 10, 255, 179, 137, 129, 155, 215, 309, 82, 244, 85, 315, 224, 167, 144, 155, 200, 279, 37, 184, 10, 225, 119, 47, 9, 5, 35, 99, 197, 329, 140, 340, 219, 132, 79, 60, 75, 124, 207, 324, 120, 305, 169, 67, 354, 320, 320, 354, 67, 169, 305, 120, 324, 207, 124, 75, 60, 79, 132, 219, 340, 140, 329, 197, 99, 35, 5, 9, 47, 119, 225, 10, 184, 37, 279, 200, 155, 144, 167, 224, 315, 85, 244, 82, 309, 215, 155, 129",
+        "expected_count": 300
+      },
+      {
+        "text": "53, 141, 263, 64, 254, 123, 26, 318, 289, 294, 333, 51, 158, 299, 119, 328, 216, 138, 94, 84, 108, 166, 258, 29, 189, 28, 256, 163, 104, 79, 88, 131, 208, 319, 109, 288, 146, 38, 319, 279, 273, 301, 8, 104, 234, 43, 241, 118, 29, 329, 308, 321, 13, 94, 209, 3, 186, 48, 299, 229, 193, 191, 223, 289, 34, 168, 336, 183, 64, 334, 283, 266, 283, 334, 64, 183, 336, 168, 34, 289, 223, 191, 193, 229, 299, 48, 186, 3, 209, 94, 13, 321, 308, 329, 29, 118, 241, 43, 234, 104, 8, 301, 273, 279, 319, 38, 146, 288, 109, 319, 208, 131, 88, 79, 104, 163, 256, 28, 189, 29, 258, 166, 108, 84, 94, 138, 216, 328, 119, 299, 158, 51, 333, 294, 289, 318, 26, 123, 254, 64, 263, 141, 53, 354, 334, 348, 41, 123, 239, 34, 218, 81, 333, 264, 229, 228, 261, 328, 74, 209, 23, 226, 108, 24, 329, 313, 331, 28, 114, 234, 33, 221, 88, 344, 279, 248, 251, 288, 4, 109, 248, 66, 273, 159, 79, 33, 21, 43, 99, 189, 313, 116, 308, 179, 84, 23, 351, 3, 44, 119, 228, 16, 193, 49, 294, 218, 176, 168, 194, 254, 348, 121, 283, 124, 354, 263, 206, 183, 194, 239, 318, 76, 223, 49, 264, 158, 86, 48, 44, 74, 138, 236, 13, 179, 24, 258, 171, 118, 99, 114, 163, 246, 8, 159, 344, 208, 106, 38, 4, 4, 38, 106, 208, 344, 159, 8, 246, 163, 114, 99, 118, 171, 258, 24, 179, 13, 236, 138, 74, 44, 48, 86, 158, 264, 49, 223, 76, 318, 239, 194, 183, 206, 263, 354, 124, 283, 121, 348, 254, 194, 168, 176",
+        "expected_count": 300
+      },
+      {
+        "text": "118, 206, 328, 129, 319, 188, 91, 28, 354, 4, 43, 116, 223, 9, 184, 38, 281, 203, 159, 149, 173, 231, 323, 94, 254, 93, 321, 228, 169, 144, 153, 196, 273, 29, 174, 353, 211, 103, 29, 344, 338, 11, 73, 169, 299, 108, 306, 183, 94, 39, 18, 31, 78, 159, 274, 68, 251, 113, 9, 294, 258, 256, 288, 354, 99, 233, 46, 248, 129, 44, 348, 331, 348, 44, 129, 248, 46, 233, 99, 354, 288, 256, 258, 294, 9, 113, 251, 68, 274, 159, 78, 31, 18, 39, 94, 183, 306, 108, 299, 169, 73, 11, 338, 344, 29, 103, 211, 353, 174, 29, 273, 196, 153, 144, 169, 228, 321, 93, 254, 94, 323, 231, 173, 149, 159, 203, 281, 38, 184, 9, 223, 116, 43, 4, 354, 28, 91, 188, 319, 129, 328, 206, 118, 64, 44, 58, 106, 188, 304, 99, 283, 146, 43, 329, 294, 293, 326, 38, 139, 274, 88, 291, 173, 89, 39, 23, 41, 93, 179, 299, 98, 286, 153, 54, 344, 313, 316, 353, 69, 174, 313, 131, 338, 224, 144, 98, 86, 108, 164, 254, 23, 181, 18, 244, 149, 88, 61, 68, 109, 184, 293, 81, 258, 114, 4, 283, 241, 233, 259, 319, 58, 186, 348, 189, 64, 328, 271, 248, 259, 304, 28, 141, 288, 114, 329, 223, 151, 113, 109, 139, 203, 301, 78, 244, 89, 323, 236, 183, 164, 179, 228, 311, 73, 224, 54, 273, 171, 103, 69, 69, 103, 171, 273, 54, 224, 73, 311, 228, 179, 164, 183, 236, 323, 89, 244, 78, 301, 203, 139, 109, 113, 151, 223, 329, 114, 288, 141, 28, 304, 259, 248, 271, 328, 64, 189, 348, 186, 58, 319, 259, 233, 241, 283",
+        "expected_count": 300
+      },
+      {
+        "text": "无法完成",
+        "expected_count": 300
+      }
+    ],
+    "expected": {
+      "prediction": "gpt-6-astra",
+      "prediction_name": "gpt-6-astra",
+      "probability": 0.9993526250812793,
+      "used_outputs": 3,
+      "results": [
+        {
+          "model": "gpt-6-astra",
+          "display_name": "gpt-6-astra",
+          "probability": 0.9993526250812793,
+          "profile_similarity": 0.5305218475937623,
+          "score": 1.1652148296449871,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.9993779649869898
+        },
+        {
+          "model": "gpt-6-sol",
+          "display_name": "gpt-6-sol",
+          "probability": 0.0006141222629953175,
+          "profile_similarity": 0.5263224251575118,
+          "score": 0.5489924180046467,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.0006141378348764018
+        },
+        {
+          "model": "claude-sonnet-5",
+          "display_name": "claude-sonnet-5",
+          "probability": 0.000013729625543183013,
+          "profile_similarity": 0.484431566234619,
+          "score": 0.2322725774039298,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.5414813059043153
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "display_name": "claude-sonnet-4-6",
+          "probability": 0.000007688580790282253,
+          "profile_similarity": 0.5064406684333169,
+          "score": 0.1839542663490358,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.3032291560886725
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "display_name": "gpt-5.6-sol",
+          "probability": 0.0000068233412548185425,
+          "profile_similarity": 0.5190998494834322,
+          "score": 0.17400535452308288,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 0.000006823514269648032
+        },
+        {
+          "model": "claude-opus-5-5",
+          "display_name": "claude-opus-5-5",
+          "probability": 0.000002872544387416876,
+          "profile_similarity": 0.5220838861909933,
+          "score": 0.10190943045765015,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.11328998604327542
+        },
+        {
+          "model": "claude-opus-4-7",
+          "display_name": "claude-opus-4-7",
+          "probability": 9.061909512462154e-7,
+          "profile_similarity": 0.480788240532118,
+          "score": 0.005767479179189165,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.03573917279361693
+        },
+        {
+          "model": "gpt-5.4",
+          "display_name": "gpt-5.4",
+          "probability": 6.326033122497878e-7,
+          "profile_similarity": 0.5231483839603841,
+          "score": -0.024183062488470797,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 6.326193527422849e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "display_name": "gpt-6-luna",
+          "probability": 2.676044713830241e-7,
+          "profile_similarity": 0.5165775218071984,
+          "score": -0.09587752161096934,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 2.676112568478364e-7
+        },
+        {
+          "model": "claude-opus-4-8",
+          "display_name": "claude-opus-4-8",
+          "probability": 1.4387791087266944e-7,
+          "profile_similarity": 0.49913397547307414,
+          "score": -0.14758959982140443,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.0056743862988164265
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "display_name": "gpt-5.6-terra",
+          "probability": 9.497491247887631e-8,
+          "profile_similarity": 0.5151638129630806,
+          "score": -0.18220229325787188,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 9.497732069322095e-8
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "display_name": "gpt-5.6-luna",
+          "probability": 6.378974926601081e-8,
+          "profile_similarity": 0.51319380913659,
+          "score": -0.21537064908500084,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 6.379136673935418e-8
+        },
+        {
+          "model": "gpt-5.5",
+          "display_name": "gpt-5.5",
+          "probability": 1.466419531109293e-8,
+          "profile_similarity": 0.5189498109906533,
+          "score": -0.3378859555928712,
+          "family": "gpt",
+          "family_name": "GPT",
+          "conditional_probability": 1.4664567141132875e-8
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "display_name": "claude-haiku-4-5-20251001",
+          "probability": 9.701123876444887e-9,
+          "profile_similarity": 0.5009108619446947,
+          "score": -0.3723165461917953,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.00038260163824825513
+        },
+        {
+          "model": "claude-opus-5",
+          "display_name": "claude-opus-5",
+          "probability": 4.533132882206469e-9,
+          "profile_similarity": 0.5048873696916628,
+          "score": -0.43571891755952397,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.00017878176685697772
+        },
+        {
+          "model": "claude-opus-4-6",
+          "display_name": "claude-opus-4-6",
+          "probability": 6.239896964769976e-10,
+          "profile_similarity": 0.5153852169148752,
+          "score": -0.600971809954614,
+          "family": "claude",
+          "family_name": "Claude",
+          "conditional_probability": 0.000024609466198221582
+        }
+      ],
+      "diagnostics": [
+        {
+          "index": 0,
+          "parsed_numbers": 291,
+          "minimum_numbers": 165,
+          "accepted": true
+        },
+        {
+          "index": 1,
+          "parsed_numbers": 292,
+          "minimum_numbers": 165,
+          "accepted": true
+        },
+        {
+          "index": 2,
+          "parsed_numbers": 293,
+          "minimum_numbers": 165,
+          "accepted": true
+        },
+        {
+          "index": 3,
+          "parsed_numbers": 0,
+          "minimum_numbers": 165,
+          "accepted": false
+        }
+      ],
+      "calibration": {
+        "queries": "3",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 1
+      },
+      "family_prediction": "gpt",
+      "family_prediction_name": "GPT",
+      "family_probability": 0.9999746443221701,
+      "family_probabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999746443221701
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.000025355677829456155
+        }
+      ],
+      "method": "统一全局稳健数字指纹"
+    }
+  }
+]
