@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Codex 降智测试</title>
   <style>/*APP_STYLES*/</style>
-  <style>/*MODELTRACE_STYLES*/</style>
 </head>
 <body>
   <main>
@@ -81,7 +80,7 @@
             </div>
           </details>
         </div>
-        <form id="fp-toolbar" class="card toolbar fp-toolbar">
+        <form id="fp-toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="fp-model"></select></span></label>
           <label class="field"><span class="field-label">采集模式</span><span class="native-select"><select id="fp-mode"></select></span></label>
           <label class="field"><span class="field-label">单凭证并发</span><input id="fp-concurrency" class="mono" type="number" min="1" step="1" required></label>
@@ -102,7 +101,7 @@
             </div>
           </details>
         </div>
-        <form id="mt-toolbar" class="card toolbar mt-toolbar">
+        <form id="mt-toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="mt-model"></select></span></label>
           <label class="field"><span class="field-label">单凭证并发</span><input id="mt-concurrency" class="mono" type="number" min="1" step="1" required></label>
           <button id="mt-run-batch" class="btn" type="submit" disabled>测试全部</button>
@@ -135,6 +134,9 @@
 
   <script>/*CREDENTIALS_SCRIPT*/</script>
   <script>/*CATALOG_SCRIPT*/</script>
+  <script>/*COMPONENTS_SCRIPT*/</script>
+  <script>/*CANDY_SCRIPT*/</script>
+  <script>/*FINGERPRINT_SCRIPT*/</script>
   <script>/*MODELTRACE_SCRIPT*/</script>
   <script>/*APP_SCRIPT*/</script>
 </body>

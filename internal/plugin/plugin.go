@@ -13,7 +13,7 @@ import (
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.3.0"
+	pluginVersion  = "0.3.1"
 	ABIVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
@@ -41,25 +41,33 @@ var appScript string
 //go:embed web/catalog.js
 var catalogScript string
 
+//go:embed web/components.js
+var componentsScript string
+
+//go:embed web/candy.js
+var candyScript string
+
+//go:embed web/fingerprint.js
+var fingerprintScript string
+
 //go:embed web/modeltrace.js
 var modelTraceScript string
 
-//go:embed web/modeltrace.css
-var modelTraceStyles string
-
 var uiHTML = func() []byte {
 	config, _ := json.Marshal(map[string]any{"modes": fingerprintModes, "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
-	script := strings.Replace(appScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
+	fpScript := strings.Replace(fingerprintScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
 	traceConfig, _ := json.Marshal(map[string]any{"requests": traceTarget, "default_concurrency": traceDefaultConcurrency, "max_concurrency": traceMaxConcurrency})
 	traceScript := strings.Replace(modelTraceScript, `/*MODELTRACE_CONFIG*/{}`, string(traceConfig), 1)
 	return []byte(strings.NewReplacer(
 		"/*APP_STYLES*/", uiStyles,
-		"/*MODELTRACE_STYLES*/", modelTraceStyles,
 		"<!--MODELTRACE_LICENSE-->", "<!-- ModelTrace\n"+modelTraceLicense+"-->",
 		"/*CREDENTIALS_SCRIPT*/", credentialScript,
 		"/*CATALOG_SCRIPT*/", catalogScript,
+		"/*COMPONENTS_SCRIPT*/", componentsScript,
+		"/*CANDY_SCRIPT*/", candyScript,
+		"/*FINGERPRINT_SCRIPT*/", fpScript,
 		"/*MODELTRACE_SCRIPT*/", traceScript,
-		"/*APP_SCRIPT*/", script,
+		"/*APP_SCRIPT*/", appScript,
 	).Replace(uiTemplate))
 }()
 

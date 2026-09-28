@@ -130,11 +130,14 @@ async function modelCatalog(ids) {
   const catalog = Object.create(null), queue = [...new Set(ids)];
   try {
     await Promise.all(Array.from({ length: Math.min(6, queue.length) }, async () => {
-      while (queue.length) {
+      while (queue.length && cache === catalogCache) {
         const id = queue.shift(), models = await credentialModels(id);
         if (models !== null) catalog[id] = models;
       }
     }));
+  } catch (err) {
+    queue.length = 0;
+    throw err;
   } finally {
     saveCatalogCache();
   }

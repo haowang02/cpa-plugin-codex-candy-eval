@@ -15,7 +15,8 @@ function element(id) {
   return elements.get(id);
 }
 const context = vm.createContext({
-  TextEncoder, Uint8Array, Uint32Array, DataView, console,
+  TextEncoder, Uint8Array, Uint32Array, DataView, console, AbortController, AbortSignal,
+  addEventListener() {},
   Date: class extends Date { static now() { return now; } },
   setTimeout(callback, delay) { const id = ++timerID; noticeTimers.set(id, { callback, delay }); return id; },
   clearTimeout(id) { noticeTimers.delete(id); },
@@ -27,7 +28,8 @@ const context = vm.createContext({
     setItem(key, value) { if (storageBlocked) throw new Error('Storage unavailable'); storageWrites++; browserStorage.set(key, value); },
   },
 });
-let source = webFile('credentials.js') + '\n' + webFile('catalog.js') + '\n' + webFile('modeltrace.js') + '\n' + webFile('app.js').split('// Events and initialization.')[0];
+let source = ['credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'modeltrace.js', 'app.js']
+  .map(file => webFile(file).split('// Events and initialization.')[0]).join('\n');
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({ modes: [{ id: 'quick', name: '快速', cells: 4, samples_per_cell: 15 }], default_concurrency: 2, max_concurrency: 6 }));
 source = source.replace('/*MODELTRACE_CONFIG*/{}', JSON.stringify({requests:3,default_concurrency:3,max_concurrency:3}));
 vm.runInContext(source, context);
@@ -67,7 +69,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`HIDDEN_MODEL('codex-auto-review')`), true);
   assert.equal(run(`HIDDEN_MODEL('provider/codex-auto-review(high)')`), true);
   assert.equal(run(`HIDDEN_MODEL('claude-sonnet')`), false);
-  run(`initializeControls(); catalogCache.models = {time:Date.now(),ids:['prefix/model','gpt-5.6-sol','claude-sonnet']}; fillModels()`);
+  run(`initializeCandy(); initializeFingerprint(); catalogCache.models = {time:Date.now(),ids:['prefix/model','gpt-5.6-sol','claude-sonnet']}; fillModels()`);
   assert.equal(element('model').value, 'gpt-5.6-sol');
   assert.equal(element('model').innerHTML, '<option value="claude-sonnet">claude-sonnet</option><option value="gpt-5.6-sol">gpt-5.6-sol</option><option value="prefix/model">prefix/model</option>');
   assert.equal(element('fp-model').innerHTML, element('model').innerHTML);
@@ -105,15 +107,30 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   const progress = run(`renderModelTraceRow({id:'progress',name:'Test',source:'auth_files',provider:'codex',modeltrace_running:{model:'gpt-test',phase:'collecting',done:2},modeltraces:[]})`);
   assert(progress.includes('2/3'));
   assert(!progress.includes('份回答'));
+  const historyRecord = {id:'record',time:'2026-09-28T00:00:00Z',model:'<model>',effort:'low',mode:'quick',status:'completed',ok:true,answer:'21',duration_ms:1200,attribution:{status:'consistent',prediction:'<model>',probability:0.9}};
+  const historyCredential = {id:'history',name:'Test',source:'auth_files',provider:'codex',results:[historyRecord,historyRecord],fingerprints:[historyRecord,historyRecord],modeltraces:[historyRecord,historyRecord]};
+  run(`candyExpanded.add('history'); fpExpanded.add('history'); mtExpanded.add('history')`);
+  for (const renderer of ['renderCandyRow','renderFingerprintRow','renderModelTraceRow']) {
+    const markup = run(`${renderer}(${JSON.stringify(historyCredential)})`);
+    assert.equal((markup.match(/class="history-title"/g) || []).length, 1);
+    assert.equal((markup.match(/<article class="history-card">/g) || []).length, 2);
+    assert.equal((markup.match(/class="history-card-head"/g) || []).length, 2);
+    assert(markup.includes('data-row="history"'));
+    assert(!markup.includes('<model>'));
+    const empty = run(`${renderer}(${JSON.stringify({...historyCredential,results:[],fingerprints:[],modeltraces:[]})})`);
+    assert(empty.includes('<div class="empty">暂无记录</div>'));
+  }
+  assert(!run(`metrics({duration_ms:1200})`).includes('tokens'));
+  assert.equal(run(`metrics({status:'skipped',duration_ms:0})`), '');
   run(`switchTab('modeltrace')`);
   assert.equal(element('modeltrace-panel').hidden, false);
   assert.equal(element('candy-panel').hidden, true);
   assert.equal(element('fingerprint-panel').hidden, true);
   run(`switchTab('candy')`);
   assert.equal(element('effort').value, 'low');
-  run(`store(PREF_STORE, {effort:'max'}); initializeControls()`);
+  run(`store(PREF_STORE, {effort:'max'}); initializeCandy()`);
   assert.equal(element('effort').value, 'max');
-  run(`store(PREF_STORE, {}); initializeControls()`);
+  run(`store(PREF_STORE, {}); initializeCandy()`);
   assert.equal(element('effort').value, 'low');
   run(`fillSelect('effort', DEFAULT_EFFORTS, 'none', DEFAULT_EFFORT)`);
   assert.equal(element('effort').value, 'none');
@@ -258,6 +275,38 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`metrics({skipped:true, duration_ms:0, input_tokens:0, output_tokens:0, reasoning_tokens:0})`), '');
   assert(!run(`metrics({duration_ms:100, input_tokens:5, output_tokens:10, reasoning_tokens:0})`).includes('推理 tokens'));
   assert(run(`metrics({duration_ms:100, input_tokens:5, output_tokens:10, reasoning_tokens:2})`).includes('推理 tokens'));
+
+  const validState = {auths:[{id:'valid-state',name:'Test',source:'auth_files',provider:'codex',results:[],fingerprints:[],modeltraces:[]}],storage_error:''};
+  run(`refreshCatalog = async () => {}; api = async () => (${JSON.stringify(validState)})`);
+  await run(`load()`);
+  for (const invalid of [{auths:null},{auths:[null]},{auths:[{id:'broken',results:null,fingerprints:[],modeltraces:[]}]},{auths:[{...validState.auths[0],results:[null]}]}]) {
+    run(`api = async () => (${JSON.stringify(invalid)})`);
+    await run(`load()`);
+    assert.equal(run(`credentials[0].id`), 'valid-state', 'invalid responses must not replace the last valid state');
+    assert.equal(element('load-error').hidden, false);
+    assert.equal(element('refresh')['aria-busy'], false);
+    assert(run(`pollTimer > 0`), 'polling must recover after a bad response');
+  }
+  run(`api = async () => (${JSON.stringify(validState)})`);
+  await run(`load()`);
+  assert.equal(element('load-error').hidden, true);
+  run(`let finishState, stateStarted; const stateWaiting = new Promise(resolve => {stateStarted=resolve});
+    api = () => new Promise(resolve => {finishState=resolve;stateStarted();})`);
+  const outdatedState = run(`load()`);
+  await run(`stateWaiting`);
+  run(`api = async () => (${JSON.stringify(validState)})`);
+  await run(`load()`);
+  run(`finishState({auths:[]})`);
+  await outdatedState;
+  assert.equal(run(`credentials[0].id`), 'valid-state', 'an aborted refresh must not overwrite newer data');
+  run(`catalogCache.models = {time:Date.now(),ids:['available-model']}; let submitted = false;
+    api = async (path, options) => { if (path.endsWith('/run')) submitted = true; return ${JSON.stringify(validState)}; }`);
+  await run(`update('/modeltrace/run', {method:'POST',body:{auth_ids:['valid-state'],model:'removed-model'}}, '开始测试失败')`);
+  assert.equal(run(`submitted`), false);
+  assert(element('flash .notice-message').textContent.includes('重新选择'));
+  assert.equal(run(`pending`), false);
+  assert.equal(run(`mtPercent(undefined)`), '—');
+  assert(!run(`mtResultHTML({status:'completed',model:'test',attribution:{prediction:'test',probability:0.5,used_outputs:1,family_probabilities:null,results:null}})`).includes('NaN'));
   run(`candySelected.add('a'); fpSelected.add('a'); mtSelected.add('a'); mtExpanded.add('a'); showLogin('Expired')`);
   assert.equal(run(`credentials.length + candySelected.size + fpSelected.size + mtSelected.size + mtExpanded.size`), 0);
   assert.equal(element('app').hidden, true);
