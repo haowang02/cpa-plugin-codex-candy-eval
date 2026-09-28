@@ -2,7 +2,7 @@
 
 在 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 管理面板中进行**糖果测试**、**模型指纹测试**和 **ModelTrace 模型归因**。
 
-![指纹测试](docs/images/fingerprint.png)
+![example](docs/images/example.png)
 
 ## 安装
 
