@@ -143,7 +143,7 @@ func TestFingerprintExecutionContract(t *testing.T) {
 		return mockModelResponse("47"), nil
 	}
 	r := collectFingerprintSample(context.Background(), credential{ID: "auth", Provider: "codex"}, "gpt-5.5", fingerprintProbes[0])
-	if r.Category != "valid" || r.Normalized != "47" {
+	if r.Category != "valid" || r.Normalized != "47" || r.Output.InputTokens != 12 || r.Output.OutputTokens != 3 || r.Output.ReasoningTokens != 1 {
 		t.Fatalf("sample = %+v", r)
 	}
 }
@@ -196,13 +196,13 @@ func TestFingerprintBatchAndPersistence(t *testing.T) {
 	}
 	for _, id := range []string{"a", "b"} {
 		r := fingerprintResults[id][0]
-		if r.Done != 60 || r.Status != "completed" || r.Effort != "low" {
+		if r.Done != 60 || r.Status != "completed" || r.Effort != "low" || *r.InputTokens != 720 || *r.OutputTokens != 180 || *r.ReasoningTokens != 60 {
 			t.Fatalf("result %+v", r)
 		}
 	}
 	fingerprintResults = map[string][]fingerprintResult{}
 	loadState()
-	if r := fingerprintResults["a"][0]; r.Done != 60 || r.Attribution.Status == "" {
+	if r := fingerprintResults["a"][0]; r.Done != 60 || r.Attribution.Status == "" || *r.InputTokens != 720 || *r.OutputTokens != 180 || *r.ReasoningTokens != 60 {
 		t.Fatal("fingerprint results not restored")
 	}
 	candyResults["a"] = []candyResult{{Answer: "21", OK: true}}
@@ -266,7 +266,7 @@ func TestFingerprintConcurrencyAndCancellation(t *testing.T) {
 			}
 			waitFingerprintIdle(t)
 			r := fingerprintResults["a"][0]
-			if calls.Load() != int64(want) || r.Done != want || r.Concurrency != want || r.Status != "cancelled" || r.Attribution.Status != "cancelled" {
+			if calls.Load() != int64(want) || r.Done != want || r.Concurrency != want || r.Status != "cancelled" || r.Attribution.Status != "insufficient" || *r.InputTokens != int64(want*12) || *r.OutputTokens != int64(want*3) || *r.ReasoningTokens != int64(want) {
 				t.Fatalf("cancelled run: calls=%d, result=%+v", calls.Load(), r)
 			}
 		})
@@ -284,7 +284,58 @@ func TestFingerprintUpstreamErrors(t *testing.T) {
 	tasks.Add(1)
 	runFingerprint(ctx, credential{ID: "a", Provider: "codex"}, "gpt-5.5", fingerprintModes[0], p)
 	r := fingerprintResults["a"][0]
-	if r.Status != "failed" || r.Errors < 8 || r.Errors > 11 || r.Valid != 0 || r.Attribution.Status != "failed" {
+	if r.Status != "failed" || r.Errors < 8 || r.Errors > 11 || r.Valid != 0 || r.Attribution.Status != "insufficient" {
 		t.Fatalf("error run: %+v", r)
+	}
+}
+
+func TestFingerprintStopDuringRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name, want        string
+		stopAfter, status int
+	}{
+		{"unfinished", "cancelled", 1, 200},
+		{"completed", "completed", 60, 200},
+		{"terminal_error", "completed", 60, 401},
+		{"interrupted_retry", "cancelled", 60, 503},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupTest(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			calls := 0
+			hostCall = func(string, any) (json.RawMessage, error) {
+				calls++
+				if calls == tc.stopAfter {
+					cancel()
+					if tc.status != 200 {
+						return json.Marshal(map[string]any{"status_code": tc.status, "body": []byte(`{"usage":{"input_tokens":12,"output_tokens":3,"output_tokens_details":{"reasoning_tokens":1}}}`)})
+					}
+				}
+				return mockModelResponse("47"), nil
+			}
+			p := &fingerprintProgress{Concurrency: 1, cancel: cancel}
+			fingerprintRunning["a"] = p
+			tasks.Add(1)
+			runFingerprint(ctx, credential{ID: "a", Provider: "codex"}, "test-model", fingerprintModes[0], p)
+			r := fingerprintResults["a"][0]
+			wantDone := tc.stopAfter
+			if tc.status == 503 {
+				wantDone--
+			}
+			if calls != tc.stopAfter || r.Status != tc.want || r.Done != wantDone || *r.InputTokens != int64(calls*12) || *r.OutputTokens != int64(calls*3) || *r.ReasoningTokens != int64(calls) {
+				t.Fatalf("calls=%d result=%+v", calls, r)
+			}
+		})
+	}
+}
+
+func TestFingerprintMissingUsage(t *testing.T) {
+	var r fingerprintResult
+	if err := json.Unmarshal([]byte(`{"status":"completed","done":60}`), &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.InputTokens != nil || r.OutputTokens != nil || r.ReasoningTokens != nil {
+		t.Fatal("missing usage must stay unknown")
 	}
 }

@@ -92,6 +92,12 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`mtComparison({status:'completed',model:'gpt-test',attribution:{prediction:'other-model'}}).tone`), 'warn');
   assert.equal(run(`mtComparison({status:'cancelled',model:'gpt-test',attribution:{prediction:'gpt-test'}}).tone`), 'neutral');
   assert(run(`mtOutcome({status:'partial',model:'gpt-test',attribution:{prediction:'other-model'}})`).includes('与测试模型不一致 · 部分结果'));
+  for (const [status, label] of [['cancelled','采集已停止'], ['failed','采集失败'], ['skipped','已跳过'], ['completed','与所选模型一致']]) {
+    assert(run(`fpOutcome({status:${JSON.stringify(status)},attribution:{status:'consistent'}})`).includes(label));
+  }
+  run(`showFingerprintDetail({id:'skipped',status:'skipped',model:'test',error:'不支持的模型'},'test')`);
+  assert.equal(element('fp-detail-body').innerHTML.match(/不支持的模型/g).length, 1);
+  assert(!element('fp-detail-body').innerHTML.includes('基准比对'));
   run(`loadController = {}; renderRefresh()`);
   assert.equal(element('refresh').disabled, true);
   assert.equal(element('refresh')['aria-busy'], true);
@@ -107,7 +113,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   const progress = run(`renderModelTraceRow({id:'progress',name:'Test',source:'auth_files',provider:'codex',modeltrace_running:{model:'gpt-test',phase:'collecting',done:2},modeltraces:[]})`);
   assert(progress.includes('2/3'));
   assert(!progress.includes('份回答'));
-  const historyRecord = {id:'record',time:'2026-09-28T00:00:00Z',model:'<model>',effort:'low',mode:'quick',status:'completed',ok:true,answer:'21',duration_ms:1200,attribution:{status:'consistent',prediction:'<model>',probability:0.9}};
+  const historyRecord = {id:'record',time:'2026-09-28T00:00:00Z',model:'<model>',effort:'low',mode:'quick',status:'completed',ok:true,answer:'21',duration_ms:1200,input_tokens:1234,output_tokens:567,reasoning_tokens:89,attribution:{status:'consistent',prediction:'<model>',probability:0.9}};
   const historyCredential = {id:'history',name:'Test',source:'auth_files',provider:'codex',results:[historyRecord,historyRecord],fingerprints:[historyRecord,historyRecord],modeltraces:[historyRecord,historyRecord]};
   run(`candyExpanded.add('history'); fpExpanded.add('history'); mtExpanded.add('history')`);
   for (const renderer of ['renderCandyRow','renderFingerprintRow','renderModelTraceRow']) {
@@ -116,12 +122,33 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     assert.equal((markup.match(/<article class="history-card">/g) || []).length, 2);
     assert.equal((markup.match(/class="history-card-head"/g) || []).length, 2);
     assert(markup.includes('data-row="history"'));
+    for (const head of markup.matchAll(/class="history-card-head">(.*?)<div class="history-card-body">/gs)) {
+      const labels = [...head[1].matchAll(/aria-label="(耗时|输入 tokens|输出 tokens|推理 tokens) ([^"]+)"/g)].map(match => match[1] + ' ' + match[2]);
+      assert.deepEqual(labels, ['耗时 1.2s', '输入 tokens 1,234', '输出 tokens 567', '推理 tokens 89']);
+      assert(head[1].includes(run(`ICONS['square-arrow-right-enter']`)));
+      assert(head[1].includes(run(`ICONS['square-arrow-right-exit']`)));
+    }
     assert(!markup.includes('<model>'));
     const empty = run(`${renderer}(${JSON.stringify({...historyCredential,results:[],fingerprints:[],modeltraces:[]})})`);
     assert(empty.includes('<div class="empty">暂无记录</div>'));
   }
-  assert(!run(`metrics({duration_ms:1200})`).includes('tokens'));
-  assert.equal(run(`metrics({status:'skipped',duration_ms:0})`), '');
+  const unknownCard = run(`historyCard({duration_ms:1200,input_tokens:null,output_tokens:null}, '')`);
+  assert(unknownCard.includes('输入 tokens —'));
+  assert(unknownCard.includes('输出 tokens —'));
+  assert(!unknownCard.includes('推理 tokens'));
+  const zeroCard = run(`historyCard({duration_ms:0,input_tokens:0,output_tokens:0,reasoning_tokens:0,status:'skipped'}, '')`);
+  assert(zeroCard.includes('耗时 0.0s'));
+  assert(zeroCard.includes('输入 tokens 0'));
+  assert(zeroCard.includes('输出 tokens 0'));
+  assert(!zeroCard.includes('推理 tokens'));
+  for (const [renderer, runningKey, type] of [['renderFingerprintRow','fingerprint_running','fp'],['renderModelTraceRow','modeltrace_running','mt']]) {
+    const markup = run(`${renderer}(${JSON.stringify({...historyCredential,[runningKey]:{phase:'cancelling',model:'test',done:2,total:3}})})`);
+    assert(markup.includes('等待当前请求结束'));
+    assert(markup.includes('已停止后续请求，当前请求返回后保存结果'));
+    assert(new RegExp(`data-${type}-cancel="history"[^>]*disabled`).test(markup));
+  }
+  const skippedLatest = run(`renderCandyRow(${JSON.stringify({...historyCredential,id:'skipped',results:[{...historyRecord,skipped:true}]})})`);
+  assert(!skippedLatest.includes('输入 tokens'));
   run(`switchTab('modeltrace')`);
   assert.equal(element('modeltrace-panel').hidden, false);
   assert.equal(element('candy-panel').hidden, true);
@@ -272,9 +299,6 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   run(`setNotice('flash', 'Started', 'info')`);
   assert.equal(element('flash').role, 'status');
   assert.equal(noticeTimers.size, 1);
-  assert.equal(run(`metrics({skipped:true, duration_ms:0, input_tokens:0, output_tokens:0, reasoning_tokens:0})`), '');
-  assert(!run(`metrics({duration_ms:100, input_tokens:5, output_tokens:10, reasoning_tokens:0})`).includes('推理 tokens'));
-  assert(run(`metrics({duration_ms:100, input_tokens:5, output_tokens:10, reasoning_tokens:2})`).includes('推理 tokens'));
 
   const validState = {auths:[{id:'valid-state',name:'Test',source:'auth_files',provider:'codex',results:[],fingerprints:[],modeltraces:[]}],storage_error:''};
   run(`refreshCatalog = async () => {}; api = async () => (${JSON.stringify(validState)})`);

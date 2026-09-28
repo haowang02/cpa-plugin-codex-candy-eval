@@ -95,6 +95,9 @@ func credentials() ([]credential, error) {
 	if err := json.Unmarshal(raw, &list); err != nil {
 		return nil, fmt.Errorf("解析凭证列表失败：%w", err)
 	}
+	if list.Files == nil {
+		return nil, fmt.Errorf("凭证响应缺少有效的 files 列表")
+	}
 	byID := make(map[string]credential, len(list.Files))
 	for _, file := range list.Files {
 		provider := strings.ToLower(strings.TrimSpace(file.Provider))

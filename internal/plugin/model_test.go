@@ -34,7 +34,7 @@ func TestModelTraceRetriesSameProbe(t *testing.T) {
 	traceRunResponse([]byte(`{"all":true,"model":"test-model","concurrency":1}`))
 	tasks.Wait()
 	r := traceResults["a"][0]
-	if calls.Load() != 5 || len(r.Samples) != 3 || r.Samples[0].Attempts != 3 || r.Status != "completed" {
+	if calls.Load() != 5 || len(r.Samples) != 3 || r.Samples[0].Attempts != 3 || r.Status != "completed" || r.InputTokens != 60 || r.OutputTokens != 15 || r.ReasoningTokens != 5 {
 		t.Fatalf("requests=%d, result=%+v", calls.Load(), r)
 	}
 	if prompts[0] != prompts[1] || prompts[0] != prompts[2] || prompts[2] == prompts[3] {
@@ -64,5 +64,16 @@ func TestProbeRetryLimitAndCancellation(t *testing.T) {
 	_, attempts, err = executeProbe(ctx, auth, "test-model", payload, slots)
 	if err != context.Canceled || attempts != 0 || len(slots) != 1 {
 		t.Fatalf("cancelled queue: attempts=%d err=%v", attempts, err)
+	}
+}
+
+func TestIncompleteResponsePreservesUsage(t *testing.T) {
+	setupTest(t)
+	hostCall = func(string, any) (json.RawMessage, error) {
+		return json.Marshal(map[string]any{"status_code": 200, "body": []byte(`{"status":"incomplete","usage":{"input_tokens":17,"output_tokens":29,"output_tokens_details":{"reasoning_tokens":23}}}`)})
+	}
+	out, _, err := executeModel(credential{ID: "a", Provider: "codex"}, "test-model", map[string]any{})
+	if err == nil || out.InputTokens != 17 || out.OutputTokens != 29 || out.ReasoningTokens != 23 || out.Answer != "" {
+		t.Fatalf("incomplete response: %+v, %v", out, err)
 	}
 }

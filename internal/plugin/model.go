@@ -41,7 +41,12 @@ func executeProbe(ctx context.Context, auth credential, model string, payload ma
 				return
 			}
 			attempts++
-			out, status, err = executeModel(auth, model, payload)
+			var response modelResponse
+			response, status, err = executeModel(auth, model, payload)
+			out.Answer = response.Answer
+			out.InputTokens += response.InputTokens
+			out.OutputTokens += response.OutputTokens
+			out.ReasoningTokens += response.ReasoningTokens
 		}()
 		if err == nil || !retryableModelStatus(status) || attempt == 2 {
 			return
@@ -89,9 +94,6 @@ func executeModel(auth credential, model string, payload map[string]any) (result
 	if err := json.Unmarshal(raw, &response); err != nil {
 		return result, 0, fmt.Errorf("解析宿主响应失败：%w", err)
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return result, response.StatusCode, fmt.Errorf("HTTP %d: %s", response.StatusCode, response.Body)
-	}
 	var out struct {
 		Status string          `json:"status"`
 		Error  json.RawMessage `json:"error"`
@@ -110,8 +112,17 @@ func executeModel(auth credential, model string, payload map[string]any) (result
 			} `json:"output_tokens_details"`
 		} `json:"usage"`
 	}
-	if err := json.Unmarshal(response.Body, &out); err != nil {
-		return result, 0, fmt.Errorf("解析模型响应失败：%w", err)
+	parseErr := json.Unmarshal(response.Body, &out)
+	if parseErr == nil {
+		result.InputTokens = out.Usage.InputTokens
+		result.OutputTokens = out.Usage.OutputTokens
+		result.ReasoningTokens = out.Usage.OutputTokensDetails.ReasoningTokens
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return result, response.StatusCode, fmt.Errorf("HTTP %d: %s", response.StatusCode, response.Body)
+	}
+	if parseErr != nil {
+		return result, 0, fmt.Errorf("解析模型响应失败：%w", parseErr)
 	}
 	if (out.Status != "" && out.Status != "completed") || (len(out.Error) > 0 && string(out.Error) != "null") {
 		return result, response.StatusCode, fmt.Errorf("模型响应未完成（%s）：%s", out.Status, out.Error)
@@ -128,8 +139,5 @@ func executeModel(auth credential, model string, payload map[string]any) (result
 		}
 	}
 	result.Answer = answer.String()
-	result.InputTokens = out.Usage.InputTokens
-	result.OutputTokens = out.Usage.OutputTokens
-	result.ReasoningTokens = out.Usage.OutputTokensDetails.ReasoningTokens
 	return result, response.StatusCode, nil
 }

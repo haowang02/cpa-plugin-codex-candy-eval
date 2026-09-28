@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -28,6 +29,7 @@ type fingerprintMode struct {
 var fingerprintModes = []fingerprintMode{{"quick", "快速", 4, 15}, {"standard", "标准", 8, 25}, {"strict", "严格", 16, 25}}
 
 type fingerprintSample struct {
+	Output     modelResponse
 	Cell       string
 	Normalized string
 	Category   string
@@ -35,20 +37,23 @@ type fingerprintSample struct {
 }
 
 type fingerprintResult struct {
-	ID          string                 `json:"id"`
-	Time        time.Time              `json:"time"`
-	Model       string                 `json:"model"`
-	Mode        string                 `json:"mode"`
-	Concurrency int                    `json:"concurrency,omitempty"`
-	Effort      string                 `json:"effort"`
-	Status      string                 `json:"status"`
-	Total       int                    `json:"total"`
-	Done        int                    `json:"done"`
-	Valid       int                    `json:"valid"`
-	Errors      int                    `json:"errors"`
-	DurationMS  int64                  `json:"duration_ms"`
-	Error       string                 `json:"error,omitempty"`
-	Attribution fingerprintAttribution `json:"attribution"`
+	ID              string                 `json:"id"`
+	Time            time.Time              `json:"time"`
+	Model           string                 `json:"model"`
+	Mode            string                 `json:"mode"`
+	Concurrency     int                    `json:"concurrency,omitempty"`
+	Effort          string                 `json:"effort"`
+	Status          string                 `json:"status"`
+	Total           int                    `json:"total"`
+	Done            int                    `json:"done"`
+	Valid           int                    `json:"valid"`
+	Errors          int                    `json:"errors"`
+	DurationMS      int64                  `json:"duration_ms"`
+	InputTokens     *int64                 `json:"input_tokens"`
+	OutputTokens    *int64                 `json:"output_tokens"`
+	ReasoningTokens *int64                 `json:"reasoning_tokens"`
+	Error           string                 `json:"error,omitempty"`
+	Attribution     fingerprintAttribution `json:"attribution"`
 }
 
 type fingerprintProgress struct {
@@ -123,10 +128,7 @@ func fingerprintRunResponse(body []byte) managementResponse {
 		}
 		if known, supported := credentialSupportsModel(req.ModelCatalog, auth.ID, req.Model); known && !supported {
 			now := time.Now().UTC()
-			r := fingerprintResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Mode: mode.ID, Effort: "low", Status: "skipped", Error: unsupportedModelMessage}
-			r.Attribution.Status, r.Attribution.Message = "skipped", unsupportedModelMessage
-			history := append(fingerprintResults[auth.ID], r)
-			fingerprintResults[auth.ID] = history[max(0, len(history)-fingerprintHistoryLimit):]
+			appendFingerprintResult(auth.ID, fingerprintResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Mode: mode.ID, Effort: "low", Status: "skipped", Error: unsupportedModelMessage})
 			summary.Skipped++
 			continue
 		} else if !known {
@@ -145,31 +147,29 @@ func fingerprintRunResponse(body []byte) managementResponse {
 	return jsonResponse(http.StatusOK, summary)
 }
 
+func appendFingerprintResult(id string, r fingerprintResult) {
+	history := append(fingerprintResults[id], r)
+	fingerprintResults[id] = history[max(0, len(history)-fingerprintHistoryLimit):]
+}
+
 func runFingerprint(ctx context.Context, auth credential, model string, mode fingerprintMode, p *fingerprintProgress) {
 	id := auth.ID
 	defer tasks.Done()
 	started := time.Now()
+	var inputTokens, outputTokens, reasoningTokens int64
 	r := fingerprintResult{ID: fmt.Sprintf("%d", started.UnixNano()), Time: started.UTC(), Model: model, Mode: mode.ID, Concurrency: p.Concurrency, Effort: "low", Status: "completed", Total: mode.Cells * mode.Samples}
+	r.InputTokens, r.OutputTokens, r.ReasoningTokens = &inputTokens, &outputTokens, &reasoningTokens
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			r.Status, r.Error = "failed", fmt.Sprint(recovered)
 		}
 		r.DurationMS = time.Since(started).Milliseconds()
 		mu.Lock()
-		if ctx.Err() != nil && r.Status != "failed" {
+		if ctx.Err() != nil && r.Done < r.Total && r.Status != "failed" {
 			r.Status = "cancelled"
 		}
 		p.cancel()
-		if r.Status != "completed" {
-			r.Attribution.Status = r.Status
-			if r.Status == "cancelled" {
-				r.Attribution.Message = "采集已停止，部分样本仅供参考"
-			} else {
-				r.Attribution.Message = "采集失败，部分样本仅供参考"
-			}
-		}
-		history := append(fingerprintResults[id], r)
-		fingerprintResults[id] = history[max(0, len(history)-fingerprintHistoryLimit):]
+		appendFingerprintResult(id, r)
 		delete(fingerprintRunning, id)
 		_ = saveStateLocked()
 		mu.Unlock()
@@ -194,9 +194,7 @@ func runFingerprint(ctx context.Context, auth credential, model string, mode fin
 					return
 				}
 				sample := collectFingerprintSample(ctx, auth, model, jobs[i])
-				if sample.Category != "cancelled" {
-					events <- sample
-				}
+				events <- sample
 			}
 		}()
 	}
@@ -204,6 +202,12 @@ func runFingerprint(ctx context.Context, auth credential, model string, mode fin
 	valid := map[string][]string{}
 	consecutiveErrors := 0
 	for sample := range events {
+		inputTokens += sample.Output.InputTokens
+		outputTokens += sample.Output.OutputTokens
+		reasoningTokens += sample.Output.ReasoningTokens
+		if sample.Category == "cancelled" {
+			continue
+		}
 		r.Done++
 		if sample.Category == "error" {
 			r.Errors++
@@ -239,8 +243,9 @@ func collectFingerprintSample(ctx context.Context, auth credential, model string
 		"temperature": 1.0, "reasoning": map[string]string{"effort": "low"},
 		"store": false, "stream": false,
 	}, fingerprintSlots)
+	sample.Output = out
 	if err != nil {
-		if ctx.Err() != nil {
+		if errors.Is(err, context.Canceled) {
 			sample.Category = "cancelled"
 			return
 		}

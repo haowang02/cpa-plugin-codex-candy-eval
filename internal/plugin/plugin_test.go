@@ -52,6 +52,12 @@ func TestHasStandalone21(t *testing.T) {
 	}
 }
 
+func TestFooterVersion(t *testing.T) {
+	if !bytes.Contains(uiHTML, []byte("版本: v"+pluginVersion)) || bytes.Contains(uiHTML, []byte("<!--PLUGIN_VERSION-->")) {
+		t.Fatal("footer must use the active plugin version")
+	}
+}
+
 func TestEvaluate(t *testing.T) {
 	setupTest(t)
 	var sent struct {

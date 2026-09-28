@@ -45,7 +45,7 @@ function renderCandyRow(a) {
   const latest = last
     ? `<div class="latest-top">${verdict(last)}
          ${modelMeta(last)}</div>
-       <div class="metrics">${metrics(last)}</div>`
+       <div class="metrics">${last.skipped ? "" : metrics(last)}</div>`
     : `<span class="none">尚未测试</span>`;
   const rate = graded.length
     ? `<b class="mono">${Math.round((correct / graded.length) * 100)}%</b><small class="mono">${correct}/${graded.length}</small>`
@@ -79,7 +79,7 @@ function showTip(target) {
   hideTip();
   const tip = $("tip");
   tip.innerHTML = `${resultMeta(r)}
-    <div class="metrics">${metrics(r)}</div>
+    <div class="metrics">${r.skipped ? "" : metrics(r)}</div>
     <div class="tip-text ${r.error ? "error" : ""}">${esc(oneLine(r.error || r.answer))}</div>`;
   tip.hidden = false;
   const box = target.getBoundingClientRect();

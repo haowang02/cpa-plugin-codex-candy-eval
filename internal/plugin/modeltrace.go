@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -56,18 +57,19 @@ type traceSample struct {
 }
 
 type traceResult struct {
-	BankRevision string            `json:"bank_revision,omitempty"`
-	ID           string            `json:"id"`
-	Time         time.Time         `json:"time"`
-	Model        string            `json:"model"`
-	Concurrency  int               `json:"concurrency,omitempty"`
-	Status       string            `json:"status"`
-	Error        string            `json:"error,omitempty"`
-	DurationMS   int64             `json:"duration_ms"`
-	InputTokens  int64             `json:"input_tokens"`
-	OutputTokens int64             `json:"output_tokens"`
-	Samples      []traceSample     `json:"samples"`
-	Attribution  *traceAttribution `json:"attribution,omitempty"`
+	BankRevision    string            `json:"bank_revision,omitempty"`
+	ID              string            `json:"id"`
+	Time            time.Time         `json:"time"`
+	Model           string            `json:"model"`
+	Concurrency     int               `json:"concurrency,omitempty"`
+	Status          string            `json:"status"`
+	Error           string            `json:"error,omitempty"`
+	DurationMS      int64             `json:"duration_ms"`
+	InputTokens     int64             `json:"input_tokens"`
+	OutputTokens    int64             `json:"output_tokens"`
+	ReasoningTokens int64             `json:"reasoning_tokens"`
+	Samples         []traceSample     `json:"samples"`
+	Attribution     *traceAttribution `json:"attribution,omitempty"`
 }
 
 type traceProgress struct {
@@ -155,17 +157,18 @@ func appendTraceResult(id string, r traceResult) {
 func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p *traceProgress) {
 	defer tasks.Done()
 	started := time.Now()
+	done := 0
 	r := traceResult{ID: fmt.Sprint(started.UnixNano()), Time: started.UTC(), Model: req.Model, Concurrency: req.Concurrency, Status: "completed"}
 	defer func() {
+		if ctx.Err() != nil && done < traceTarget {
+			r.Status = "cancelled"
+		}
 		if recovered := recover(); recovered != nil {
 			r.Status, r.Error = "failed", fmt.Sprint(recovered)
 		}
 		r.DurationMS = time.Since(started).Milliseconds()
 		mu.Lock()
 		defer mu.Unlock()
-		if ctx.Err() != nil {
-			r.Status = "cancelled"
-		}
 		p.cancel()
 		appendTraceResult(auth.ID, r)
 		delete(traceRunning, auth.ID)
@@ -176,6 +179,7 @@ func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p 
 		index  int
 		sample traceSample
 		output modelResponse
+		err    error
 	}
 	jobs, events := make(chan int, traceTarget), make(chan event, traceTarget)
 	for i := range challenges {
@@ -191,21 +195,24 @@ func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p 
 				if ctx.Err() != nil {
 					return
 				}
-				sample, output := collectTraceSample(ctx, auth, req.Model, challenges[i])
+				sample, output, err := collectTraceSample(ctx, auth, req.Model, challenges[i])
 				if sample.Attempts > 0 {
-					events <- event{i, sample, output}
+					events <- event{i, sample, output, err}
 				}
 			}
 		}()
 	}
 	go func() { workers.Wait(); close(events) }()
 	samples := make([]*traceSample, traceTarget)
-	done, valid := 0, 0
+	valid := 0
 	for e := range events {
 		samples[e.index] = &e.sample
 		r.InputTokens += e.output.InputTokens
 		r.OutputTokens += e.output.OutputTokens
-		done++
+		r.ReasoningTokens += e.output.ReasoningTokens
+		if !errors.Is(e.err, context.Canceled) {
+			done++
+		}
 		if e.sample.Valid {
 			valid++
 		}
@@ -235,9 +242,8 @@ func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p 
 	}
 }
 
-func collectTraceSample(ctx context.Context, auth credential, model string, challenge traceChallenge) (sample traceSample, out modelResponse) {
+func collectTraceSample(ctx context.Context, auth credential, model string, challenge traceChallenge) (sample traceSample, out modelResponse, err error) {
 	sample.traceChallenge = challenge
-	var err error
 	out, sample.Attempts, err = executeProbe(ctx, auth, model, map[string]any{
 		"model": model, "input": challenge.Prompt, "store": false, "stream": false,
 	}, traceSlots)

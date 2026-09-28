@@ -81,6 +81,21 @@ func TestModelRequiresCredentialRoute(t *testing.T) {
 	}
 }
 
+func TestCredentialListResponse(t *testing.T) {
+	setupTest(t)
+	for _, body := range []string{`null`, `{}`, `{"files":null}`, `{"files":{}}`, `{"files":[]}`} {
+		hostCall = func(string, any) (json.RawMessage, error) { return json.RawMessage(body), nil }
+		response := stateResponse()
+		want := 502
+		if body == `{"files":[]}` {
+			want = 200
+		}
+		if response.StatusCode != want {
+			t.Fatalf("body=%s status=%d, want %d", body, response.StatusCode, want)
+		}
+	}
+}
+
 func TestCredentialModelCatalog(t *testing.T) {
 	for _, tc := range []struct {
 		model            string
@@ -157,7 +172,7 @@ func TestFingerprintPreflightSkipsWithoutRequests(t *testing.T) {
 	if string(response.Body) != `{"started":0,"skipped":1}` {
 		t.Fatalf("response = %s", response.Body)
 	}
-	if r := fingerprintResults["a"][0]; r.Status != "skipped" || r.Total != 0 || r.Done != 0 || r.Attribution.Status != "skipped" {
+	if r := fingerprintResults["a"][0]; r.Status != "skipped" || r.Total != 0 || r.Done != 0 || r.Attribution.Status != "" {
 		t.Fatalf("result = %+v", r)
 	}
 	fingerprintResults = map[string][]fingerprintResult{}

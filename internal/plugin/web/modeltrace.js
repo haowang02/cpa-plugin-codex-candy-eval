@@ -37,7 +37,7 @@ function renderModelTraceRow(a) {
     <div class="mt-test-model mono">${esc(p?.model || last?.model || "—")}</div>
     <div class="latest">${latest}</div>
     <div class="test-time mono">${!p && last ? esc(fmtTime(last.time)) : "—"}</div>
-    <div class="action">${p ? `<button class="btn ghost" type="button" data-mt-cancel="${esc(a.id)}" ${pending || p.phase === "cancelling" ? "disabled" : ""}>停止</button>` : `<button class="btn" type="button" data-mt-run="${esc(a.id)}" ${disabled ? "disabled" : ""}>${icon("play")}测试</button>`}</div></div>
+    <div class="action">${collectionButton("mt", a, p, "测试")}</div></div>
     ${open ? historyPanel([...history].reverse().map((r) => historyEntry("mt", a.id, r, mtOutcome(r))).join("")) : ""}</div>`;
 }
 

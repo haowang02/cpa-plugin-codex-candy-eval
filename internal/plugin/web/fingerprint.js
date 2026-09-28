@@ -10,7 +10,7 @@ const fpConcurrency = () => boundedInput("fp-concurrency", FP_CONFIG.default_con
 const fpSavePrefs = () => store(PREF_STORE + ".fingerprint", { model: $("fp-model").value, mode: $("fp-mode").value, concurrency: fpConcurrency() });
 
 function fpOutcome(r) {
-  const status = r.attribution?.status;
+  const status = r.status && r.status !== "completed" ? r.status : r.attribution?.status;
   const model = `<span class="mono">${esc(r.model)}</span>`;
   const retry = r.mode === "strict" ? "建议稍后重新采集" : "建议用严格模式复测";
   const states = {
@@ -28,9 +28,6 @@ function fpOutcome(r) {
   const [tone, symbol, title, detail] = states[status] || ["idle", "fingerprint", "等待采集", ""];
   return resultOutcome({ tone, symbol, titleHTML: title, detailHTML: detail });
 }
-function fpHistory(a, r) {
-  return historyEntry("fp", a.id, r, fpOutcome(r), metric("fingerprint", "采集模式", fpModeName(r.mode)));
-}
 const fpMetric = (n) => n == null ? "—" : Number(n).toFixed(4);
 const fpComparisonNames = { match: "相似", uncertain: "不确定", mismatch: "不同", insufficient: "样本不足" };
 const fpProbeNames = { "random-number-1-100": "随机数 1–100", "random-number-1-10": "随机数 1–10", "random-letter": "随机字母", "random-color": "随机颜色", "coin-flip": "抛硬币", "random-animal": "随机动物", "random-city": "随机城市", "favorite-number": "喜欢的数字" };
@@ -42,7 +39,8 @@ function showFingerprintDetail(r, credentialID) {
   const stat = (label, value) => `<div class="fp-stat"><dt>${label}</dt><dd class="mono">${esc(value)}</dd></div>`;
   $("fp-detail-body").innerHTML = `<p class="result-dialog-meta"><span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}模式 · <time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time></p>
     ${fpOutcome(r)}
-    <p class="detail-note">${esc(attr.message || "尚无归因结果")}</p>
+    ${r.status === "cancelled" || r.status === "failed" ? `<p class="detail-note">已有样本仅供参考</p>` : ""}
+    ${attr.message ? `<p class="detail-note">${esc(attr.message)}</p>` : ""}
     ${r.error ? `<p class="detail-note detail-warning">${esc(r.error)}</p>` : ""}
     ${r.status === "skipped" ? "" : `<dl class="fp-stats">${stat("采集进度", `${r.done} / ${r.total}`)}${stat("有效回答", r.valid)}${stat("请求失败", r.errors)}${stat("用时", fmtSec(r.duration_ms))}</dl>
     <section class="result-dialog-section"><h3>基准比对</h3>
@@ -79,8 +77,8 @@ function renderFingerprintRow(a) {
     <div class="latest">${latest}</div>
     <div class="fp-mode">${esc(fpModeName(p?.mode || last?.mode))}</div>
     <div class="test-time mono" ${last && !p ? `title="${esc(fmtTime(last.time))}"` : ""}>${last && !p ? esc(fmtTime(last.time)) : "—"}</div>
-    <div class="action">${p ? `<button class="btn ghost" type="button" data-fp-cancel="${esc(a.id)}" ${pending || p.phase === "cancelling" ? "disabled" : ""}>停止</button>` : `<button class="btn" type="button" data-fp-run="${esc(a.id)}" ${pending || !$("fp-model").value || !availableCredential(a) ? "disabled" : ""}>${icon("play")}采集</button>`}</div></div>
-    ${open ? historyPanel([...history].reverse().map((r) => fpHistory(a, r)).join("")) : ""}</div>`;
+    <div class="action">${collectionButton("fp", a, p, "采集")}</div></div>
+    ${open ? historyPanel([...history].reverse().map((r) => historyEntry("fp", a.id, r, fpOutcome(r), metric("fingerprint", "采集模式", fpModeName(r.mode)))).join("")) : ""}</div>`;
 }
 function renderFingerprints() {
   renderSelection("fp-", fpSelected, "采集");

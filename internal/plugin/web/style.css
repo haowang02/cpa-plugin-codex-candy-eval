@@ -1,6 +1,6 @@
 /* Theme and base */
 :root {
-  --list-padding: 22px; --list-gap: 16px; --list-checkbox: 22px;
+  --list-padding: 22px; --list-gap: 16px; --list-checkbox: 22px; --credential-indent: 20px;
   --bg: #f2f5f3; --surface: #ffffff; --sunken: #f7f9f8; --ink: #15201b; --muted: #66726c; --faint: #a0aaa5; --line: #e1e7e4;
   --apple: #2b9a58; --apple-ink: #1d7a43; --apple-soft: #e5f4ea; --apple-soft-hover: #d5ecdd; --peach: #e0533f; --peach-soft: #fceae6;
   --peach-soft-hover: #f9dcd5; --band: #f3f6f4; --warning-ink: #ad701e; --warning-soft: #fcf3df;
@@ -21,7 +21,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
-main { max-width: 1120px; margin: 0 auto; padding: 32px 24px 56px; }
+main { display: flow-root; min-height: 100dvh; max-width: 1120px; margin: 0 auto; padding: 32px 24px 0; }
+.page-footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 0; padding: 24px 12px max(32px, env(safe-area-inset-bottom)); color: var(--faint); font-size: 11px; }
+.page-footer span { white-space: nowrap; }
+.page-footer a { color: inherit; text-decoration: none; }
+.page-footer a:hover, .page-footer a:focus-visible { color: var(--muted); }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--apple); outline-offset: 2px; }
 .icon { display: block; width: 16px; height: 16px; flex: none; }
@@ -115,7 +119,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 #modeltrace-panel { --toolbar-columns: 200px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) minmax(0, 1fr) minmax(0, .85fr) minmax(0, 1.35fr) 104px 90px; --mobile-areas: "select credential action" ". model model" ". latest latest" ". time time"; }
 .list-head, .list-row { display: grid; grid-template-columns: var(--list-columns); align-items: center; gap: var(--list-gap); padding-inline: var(--list-padding); }
 .list-head { padding-block: 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.list-head > :nth-child(2) { padding-left: 20px; }
+.list-head > :nth-child(2) { padding-left: var(--credential-indent); }
 .list-row { padding-block: 14px; min-height: 80px; }
 .row { border-bottom: 1px solid var(--line); }
 .row:last-child { border-bottom: 0; }
@@ -125,7 +129,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .toggle { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: left; }
 .toggle .chev { color: var(--faint); }
 .toggle .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.credential .tags { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 20px; margin-top: 4px; }
+.credential .tags { display: flex; flex-wrap: wrap; gap: 5px; padding-left: var(--credential-indent); margin-top: 4px; }
 .credential .name { transition: filter .15s; }
 .masked .credential .name { filter: blur(5px); user-select: none; }
 .tag { max-width: 100%; padding: 0 6px; border-radius: 6px; background: var(--sunken); border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -279,7 +283,7 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
 @media (hover: none) { .copy-btn { opacity: 1; } }
 @media (max-width: 1000px) {
   :root { --list-padding: 18px; --list-gap: 10px; }
-  main { padding: 20px 14px 40px; }
+  main { padding: 20px 14px 0; }
   #candy-panel { --list-columns: var(--list-checkbox) minmax(0, 1.1fr) minmax(0, 1.4fr) 56px 112px 118px; --marks-width: 112px; }
   .legend #rate-scope { width: 100%; margin-left: 0; }
 }
@@ -289,9 +293,10 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
   .list-row { grid-template-columns: var(--list-checkbox) minmax(0, 1fr) auto; grid-template-areas: var(--mobile-areas); row-gap: 16px; padding-block: 16px; }
   .list-row > input { grid-area: select; }
   .list-row > .credential { grid-area: credential; }
-  .list-row > .latest { grid-area: latest; padding-left: 20px; }
+  .list-row > .latest, .row-summary, .fp-mode, .mt-test-model { padding-left: var(--credential-indent); }
+  .list-row > .latest { grid-area: latest; }
   .list-row > .action { grid-area: action; }
-  .row-summary { grid-area: summary; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding-left: 20px; }
+  .row-summary { grid-area: summary; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
   .row-summary.empty-history { display: none; }
   .rate { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
   .rate::before { content: "正确率"; color: var(--muted); font-size: 12px; }
@@ -300,7 +305,7 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
 
   .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toolbar > .btn { min-width: 0; width: 100%; }
-  .fp-mode { grid-area: mode; padding-left: 20px; }
+  .fp-mode { grid-area: mode; }
   .test-time { grid-area: time; text-align: right; }
   .history-panel { padding-top: 0; padding-bottom: 16px; }
   .history-card-body { flex-wrap: wrap; }
@@ -309,7 +314,7 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
   .fp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .result-dialog { --dialog-padding: 16px; }
   #mt-toolbar > .btn { grid-column: 1 / -1; }
-  .mt-test-model { grid-area: model; padding-left: 20px; }
+  .mt-test-model { grid-area: model; }
   .mt-test-model::before { content: "测试模型 "; font-family: inherit; }
   .mt-summary { grid-template-columns: 1fr 1fr; }
   .mt-summary > div:first-child { grid-column: 1 / -1; }

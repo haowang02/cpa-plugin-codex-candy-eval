@@ -136,13 +136,13 @@ func evaluateCandy(auth credential, model, effort string) candyResult {
 	start := time.Now()
 	out, _, err := executeModel(auth, model, payload)
 	r.DurationMS = time.Since(start).Milliseconds()
+	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if err != nil {
 		r.Error = truncate(err.Error(), 500)
 		return r
 	}
 	r.Answer = truncate(out.Answer, 4000)
 	r.OK = hasStandalone21(out.Answer)
-	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if r.Answer == "" {
 		r.Error = "模型没有返回文本"
 	}

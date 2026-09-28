@@ -106,7 +106,7 @@ func traceTestHost(t *testing.T, answer func() (string, int)) {
 			t.Error("unexpected probe parameters")
 		}
 		text, status := answer()
-		response, _ := json.Marshal(map[string]any{"status": "completed", "output": []any{map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": text}}}}})
+		response, _ := json.Marshal(map[string]any{"usage": map[string]any{"input_tokens": 12, "output_tokens": 3, "output_tokens_details": map[string]int{"reasoning_tokens": 1}}, "status": "completed", "output": []any{map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": text}}}}})
 		return json.Marshal(map[string]any{"status_code": status, "body": response})
 	}
 }
@@ -128,7 +128,7 @@ func TestModelTraceRunAndPersistence(t *testing.T) {
 	}
 	tasks.Wait()
 	r := traceResults["a"][0]
-	if calls.Load() != 3 || r.Status != "partial" || r.Attribution.Used != 2 || len(r.Samples) != 3 || r.Concurrency != 3 {
+	if calls.Load() != 3 || r.Status != "partial" || r.Attribution.Used != 2 || len(r.Samples) != 3 || r.Concurrency != 3 || r.InputTokens != 36 || r.OutputTokens != 9 || r.ReasoningTokens != 3 {
 		t.Fatalf("result=%+v calls=%d", r, calls.Load())
 	}
 	if len(traceResults["off"]) != 0 {
@@ -137,7 +137,7 @@ func TestModelTraceRunAndPersistence(t *testing.T) {
 	traceResults = map[string][]traceResult{}
 	loaded = false
 	loadState()
-	if len(traceResults["a"]) != 1 || traceResults["a"][0].Attribution.Prediction != r.Attribution.Prediction {
+	if len(traceResults["a"]) != 1 || traceResults["a"][0].Attribution.Prediction != r.Attribution.Prediction || traceResults["a"][0].ReasoningTokens != 3 || traceResults["a"][0].InputTokens != 36 || traceResults["a"][0].OutputTokens != 9 {
 		t.Fatal("history did not survive reload")
 	}
 	if clearHistoryResponse("candy").StatusCode != 200 || len(traceResults["a"]) != 1 {
@@ -183,8 +183,38 @@ func TestModelTraceCancellationAndBusy(t *testing.T) {
 	cancelCollectionResponse("modeltrace", []byte(`{"auth_ids":["a"]}`))
 	close(release)
 	tasks.Wait()
-	if calls.Load() != 1 || traceResults["a"][0].Status != "cancelled" || len(traceRunning) != 0 {
+	if calls.Load() != 1 || traceResults["a"][0].Status != "cancelled" || len(traceRunning) != 0 || traceResults["a"][0].InputTokens != 12 || traceResults["a"][0].OutputTokens != 3 || traceResults["a"][0].ReasoningTokens != 1 {
 		t.Fatal("cancellation failed")
+	}
+}
+
+func TestModelTraceStopDuringLastRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name, answer, want string
+		status             int
+	}{
+		{"completed", strings.Repeat("42,", 320), "completed", 200},
+		{"invalid_answer", "拒答", "partial", 200},
+		{"terminal_error", "", "partial", 401},
+		{"interrupted_retry", "", "cancelled", 503},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupTest(t)
+			var calls atomic.Int32
+			traceTestHost(t, func() (string, int) {
+				if calls.Add(1) == traceTarget {
+					cancelCollectionResponse("modeltrace", []byte(`{"auth_ids":["a"]}`))
+					return tc.answer, tc.status
+				}
+				return strings.Repeat("42,", 320), 200
+			})
+			traceRunResponse([]byte(`{"all":true,"model":"test-model","concurrency":1}`))
+			tasks.Wait()
+			r := traceResults["a"][0]
+			if calls.Load() != traceTarget || r.Status != tc.want || len(r.Samples) != traceTarget || r.InputTokens != 36 || r.OutputTokens != 9 || r.ReasoningTokens != 3 {
+				t.Fatalf("calls=%d result=%+v", calls.Load(), r)
+			}
+		})
 	}
 }
 

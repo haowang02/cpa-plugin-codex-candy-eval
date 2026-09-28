@@ -10,8 +10,8 @@ const ICONS = {
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-  "arrow-down": '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
-  "arrow-up": '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  "square-arrow-right-enter": '<path d="m10 16 4-4-4-4"/><path d="M3 12h11"/><path d="M3 8V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3"/>',
+  "square-arrow-right-exit": '<path d="M10 12h11"/><path d="m17 16 4-4-4-4"/><path d="M21 6.344V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1.344"/>',
   brain: '<path d="M12 18V5a3 3 0 0 0-5.997-.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 18V5a3 3 0 0 1 5.997-.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4M6 17a4 4 0 0 1-1.967-.767M18 17a4 4 0 0 0 1.967-.767"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
   astroid: '<path d="M12.983 21.186a1 1 0 0 1-1.966 0 10 10 0 0 0-8.203-8.203 1 1 0 0 1 0-1.966 10 10 0 0 0 8.203-8.203 1 1 0 0 1 1.966 0 10 10 0 0 0 8.203 8.203 1 1 0 0 1 0 1.966 10 10 0 0 0-8.203 8.203"/>',
@@ -60,10 +60,10 @@ function fmtTime(iso) {
 const modelName = (r) => r.effort ? `${r.model}(${r.effort})` : r.model;
 const metric = (name, label, value, cls = "") => `<span class="metric ${cls}" title="${esc(`${label} ${value}`)}" aria-label="${esc(`${label} ${value}`)}">${icon(name)}<span class="meta mono">${esc(value)}</span></span>`;
 const modelMeta = (r) => metric("astroid", "模型", modelName(r), "model-meta");
-const metrics = (r) => r.skipped || r.status === "skipped" ? "" :
-  (r.duration_ms != null ? metric("clock", "用时", fmtSec(r.duration_ms)) : "") +
-  (r.input_tokens != null ? metric("arrow-down", "输入 tokens", fmtNum(r.input_tokens)) : "") +
-  (r.output_tokens != null ? metric("arrow-up", "输出 tokens", fmtNum(r.output_tokens)) : "") +
+const metrics = (r) =>
+  metric("clock", "耗时", r.duration_ms != null ? fmtSec(r.duration_ms) : "—") +
+  metric("square-arrow-right-enter", "输入 tokens", r.input_tokens != null ? fmtNum(r.input_tokens) : "—") +
+  metric("square-arrow-right-exit", "输出 tokens", r.output_tokens != null ? fmtNum(r.output_tokens) : "—") +
   (r.reasoning_tokens > 0 ? metric("brain", "推理 tokens", fmtNum(r.reasoning_tokens)) : "");
 
 const PLAN_NAMES = {
@@ -85,13 +85,19 @@ function resultOutcome({ tone = "", symbol, titleHTML, detailHTML = "", progress
   return `<div class="outcome ${tone}"><span class="outcome-icon">${icon(symbol, progressHTML ? "spin" : "")}</span><div class="outcome-copy"><div class="outcome-title">${titleHTML}</div>${detailHTML ? `<div class="outcome-detail">${detailHTML}</div>` : ""}${progressHTML}</div></div>`;
 }
 function collectionOutcome(p, total, showModel = false) {
-  const phase = p.phase === "cancelling" ? "正在停止" : p.phase === "comparing" ? "正在分析指纹" : "正在采集";
+  const stopping = p.phase === "cancelling";
+  const phase = stopping ? "等待当前请求结束" : p.phase === "comparing" ? "正在分析指纹" : "正在采集";
   return resultOutcome({
     symbol: "loader-circle",
     titleHTML: `${phase} <span class="meta mono">${p.done}/${total}</span>`,
-    detailHTML: showModel ? `<span class="mono">${esc(p.model)}</span>` : "",
+    detailHTML: stopping ? "已停止后续请求，当前请求返回后保存结果" : showModel ? `<span class="mono">${esc(p.model)}</span>` : "",
     progressHTML: `<progress class="collection-progress" value="${p.done}" max="${total}" aria-label="采集进度"></progress>`,
   });
+}
+function collectionButton(type, credential, progress, label) {
+  if (progress) return `<button class="btn ghost" type="button" data-${type}-cancel="${esc(credential.id)}" title="停止后续请求；已发出的请求需等待返回" ${pending || progress.phase === "cancelling" ? "disabled" : ""}>停止</button>`;
+  const disabled = pending || !$(type + "-model").value || !availableCredential(credential);
+  return `<button class="btn" type="button" data-${type}-run="${esc(credential.id)}" ${disabled ? "disabled" : ""}>${icon("play")}${esc(label)}</button>`;
 }
 function historyCard(r, contentHTML, extraMetaHTML = "") {
   return `<article class="history-card">
