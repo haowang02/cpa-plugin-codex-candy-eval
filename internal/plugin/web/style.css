@@ -209,7 +209,8 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
 .confirm p { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .dialog-actions .btn { height: 34px; }
-.result-dialog { --dialog-padding: 22px; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border-radius: 16px; }
+/* Centered dialogs leave 80px above the header for CPA's floating controls. */
+.result-dialog { --dialog-padding: 22px; width: min(920px, calc(100vw - 32px)); max-height: calc(100dvh - 160px); padding: 0; border-radius: 16px; }
 .result-dialog-head { --heading-padding: 18px var(--dialog-padding); --heading-size: 18px; position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .result-dialog-body { padding: var(--dialog-padding); }
 .result-dialog-meta { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
