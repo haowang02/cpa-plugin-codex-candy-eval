@@ -380,3 +380,21 @@ func TestQuiesceDrainsBothTests(t *testing.T) {
 		t.Fatal("reconfiguration did not resume the plugin")
 	}
 }
+
+func TestRegisteredRoutesAreHandled(t *testing.T) {
+	setupTest(t)
+	hostCall = func(string, any) (json.RawMessage, error) { return json.RawMessage(`{"files":[]}`), nil }
+	var env struct {
+		Result struct {
+			Routes []struct{ Method, Path string } `json:"routes"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(HandleMethod("management.register", nil), &env); err != nil || len(env.Result.Routes) == 0 {
+		t.Fatalf("routes = %+v, %v", env, err)
+	}
+	for _, route := range env.Result.Routes {
+		if res := handleManagement(managementRequest{Method: route.Method, Path: route.Path}); bytes.Contains(res.Body, []byte("Route not found")) {
+			t.Errorf("%s %s is registered but not handled", route.Method, route.Path)
+		}
+	}
+}

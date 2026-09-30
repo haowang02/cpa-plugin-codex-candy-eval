@@ -40,7 +40,6 @@ function renderCandyRow(a) {
   const last = results[results.length - 1];
   const graded = results.filter((r) => scopeMatch(r) && !r.error && !r.skipped);
   const correct = graded.filter((r) => r.ok).length;
-  const open = candyExpanded.has(a.id);
 
   const latest = last
     ? `<div class="latest-top">${verdict(last)}
@@ -51,20 +50,17 @@ function renderCandyRow(a) {
     ? `<b class="mono">${Math.round((correct / graded.length) * 100)}%</b><small class="mono">${correct}/${graded.length}</small>`
     : `<span class="none">—</span>`;
   const marks = results.map((r, i) => `<button class="mark-hit" type="button" data-auth="${esc(a.id)}" data-i="${i}" aria-label="${esc(`${fmtTime(r.time)} ${modelName(r)} ${VERDICT[kind(r)]}`)}">${icon(MARK[kind(r)], `mark ${kind(r)} ${scopeMatch(r) ? "" : "dim"}`)}</button>`).join("");
-  const action = a.running
-    ? `<button class="btn ghost" type="button" disabled>${icon("loader-circle", "spin")}测试中 <span class="mono">${a.running.done}/${a.running.total}</span></button>`
-    : `<button class="btn" type="button" data-run="${esc(a.id)}" ${pending || !$("model").value || !availableCredential(a) ? "disabled" : ""}>${icon("play")}测试</button>`;
+  const progress = a.running && `${a.running.done}/${a.running.total}`;
+  const canRun = runnable("", a);
+  const button = progress
+    ? `<button class="btn ghost" type="button" title="测试中" aria-label="测试中 ${progress}" disabled>${icon("loader-circle", "spin")}<span class="mono">${progress}</span></button>`
+    : `<button class="btn" type="button" data-candy-run="${esc(a.id)}" ${canRun ? "" : "disabled"}>${icon("play")}测试</button>`;
 
-  return `<div class="row ${open ? "open" : ""}">
-    <div class="list-row row-main" data-row="${esc(a.id)}">
-      <div class="selection-cell"><input type="checkbox" data-candy-select="${esc(a.id)}" aria-label="选择此凭证" ${candySelected.has(a.id) ? "checked" : ""} ${pending || !$("model").value || !availableCredential(a) ? "disabled" : ""}></div>
-      ${credentialView(a, open)}
-      <div class="latest">${latest}</div>
-      <div class="row-summary ${results.length ? "" : "empty-history"}"><div class="rate">${rate}</div><div class="marks">${marks}</div></div>
-      <div class="action">${action}<button class="btn ghost ${a.disabled ? "" : "danger"}" type="button" data-status="${esc(a.id)}" ${pending || !canToggleCredential(a) ? "disabled" : ""} ${a.source !== "auth_files" ? 'title="请在 AI 提供商设置中启用或停用此凭证"' : ""}>${a.disabled ? "启用账户" : "停用账户"}</button></div>
-    </div>
-    ${open ? historyPanel([...results].reverse().map((r, i) => candyHistory(a, r, i)).join("")) : ""}
-  </div>`;
+  return credentialRow({
+    type: "candy", credential: a, selected: candySelected.has(a.id), open: candyExpanded.has(a.id), selectable: canRun, button,
+    result: latest, meta: `<div class="rate">${rate}</div><div class="marks">${marks}</div>`, tested: results.length > 0,
+    history: () => [...results].reverse().map((r, i) => candyHistory(a, r, i)).join(""),
+  });
 }
 
 function runCandy(body) {
@@ -165,7 +161,7 @@ function initializeCandy() {
   $("effort").addEventListener("change", () => { candySavePrefs(); render(); });
   $("runs").addEventListener("change", () => { $("runs").value = candyRuns(); candySavePrefs(); });
   $("rows").addEventListener("click", (e) => {
-    if (e.target.closest(".selection-cell")) return;
+    if (e.target.closest("label")) return;
     const hit = e.target.closest("[data-auth]");
     if (hit) return showTip(hit);
     const answer = e.target.closest("[data-answer]");
@@ -179,10 +175,8 @@ function initializeCandy() {
       answer.innerHTML = answerToggle(open);
       return;
     }
-    const status = e.target.closest("[data-status]");
-    if (status) return toggleCredentialStatus(status.dataset.status);
-    const btn = e.target.closest("[data-run]");
-    if (btn) return runCandy({ auth_ids: [btn.dataset.run] });
+    const btn = e.target.closest("[data-candy-run]");
+    if (btn) return runCandy({ auth_ids: [btn.dataset.candyRun] });
     const row = e.target.closest("[data-row]");
     if (!row) return;
     const id = row.dataset.row;

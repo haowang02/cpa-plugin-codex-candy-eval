@@ -21,7 +21,7 @@ function fpOutcome(r) {
     insufficient: ["neutral", "circle-help", "有效回答不足", "建议重新采集"],
     no_baseline: ["neutral", "circle-help", "暂不支持判断此模型", model],
     unstable: ["warn", "circle-alert", "结果不稳定", retry],
-    cancelled: ["neutral", "pause", "采集已停止", model],
+    cancelled: ["neutral", "circle-pause", "采集已停止", model],
     failed: ["bad", "circle-x", "采集失败", "请稍后重试"],
     skipped: ["neutral", "ban", "已跳过", "此凭证不含所选模型"],
   };
@@ -32,7 +32,7 @@ const fpMetric = (n) => n == null ? "—" : Number(n).toFixed(4);
 const fpComparisonNames = { match: "相似", uncertain: "不确定", mismatch: "不同", insufficient: "样本不足" };
 const fpProbeNames = { "random-number-1-100": "随机数 1–100", "random-number-1-10": "随机数 1–10", "random-letter": "随机字母", "random-color": "随机颜色", "coin-flip": "抛硬币", "random-animal": "随机动物", "random-city": "随机城市", "favorite-number": "喜欢的数字" };
 let fpDetailRecord = null;
-function showFingerprintDetail(r, credentialID) {
+function showFingerprintDetail(r) {
   fpDetailRecord = r;
   const attr = r.attribution || {};
   const comparisons = attr.comparisons || [];
@@ -55,7 +55,6 @@ function showFingerprintDetail(r, credentialID) {
     </section>
     <section class="result-dialog-section"><h3>逐项比对</h3><label class="field fp-probe-select"><span class="field-label">对比模型</span><span class="native-select"><select id="fp-detail-baseline">${comparisons.map((c) => `<option>${esc(c.model)}</option>`).join("")}</select></span></label><div id="fp-detail-probes" class="fp-detail-scroll"></div></section>`}`;
   if (r.status !== "skipped") renderFingerprintProbes();
-  openResultDetail("fp", r.id, credentialID);
 }
 function renderFingerprintProbes() {
   const comparison = fpDetailRecord?.attribution?.comparisons?.find((c) => c.model === $("fp-detail-baseline").value);
@@ -69,16 +68,13 @@ function renderFingerprintRow(a) {
   const history = a.fingerprints || [];
   const last = history[history.length - 1];
   const p = a.fingerprint_running;
-  const open = fpExpanded.has(a.id);
   const latest = p ? collectionOutcome(p, p.total, true) : fpOutcome(last || {});
-  return `<div class="row ${open ? "open" : ""}"><div class="list-row row-main" data-row="${esc(a.id)}">
-    <div class="selection-cell"><input type="checkbox" data-fp-select="${esc(a.id)}" aria-label="选择此凭证" ${fpSelected.has(a.id) ? "checked" : ""} ${pending || !$("fp-model").value || !availableCredential(a) ? "disabled" : ""}></div>
-    ${credentialView(a, open)}
-    <div class="latest">${latest}</div>
-    <div class="fp-mode">${esc(fpModeName(p?.mode || last?.mode))}</div>
-    <div class="test-time mono" ${last && !p ? `title="${esc(fmtTime(last.time))}"` : ""}>${last && !p ? esc(fmtTime(last.time)) : "—"}</div>
-    <div class="action">${collectionButton("fp", a, p, "采集")}</div></div>
-    ${open ? historyPanel([...history].reverse().map((r) => historyEntry("fp", a.id, r, fpOutcome(r), metric("fingerprint", "采集模式", fpModeName(r.mode)))).join("")) : ""}</div>`;
+  return credentialRow({
+    type: "fp", credential: a, selected: fpSelected.has(a.id), open: fpExpanded.has(a.id), selectable: runnable("fp-", a), button: collectionButton("fp", a, p, "采集"),
+    result: latest, tested: !!(last || p),
+    meta: `<div class="fp-mode">${esc(fpModeName(p?.mode || last?.mode))}</div>${listTime(!p && last?.time)}`,
+    history: () => [...history].reverse().map((r) => historyEntry("fp", a.id, r, fpOutcome(r), metric("fingerprint", "采集模式", fpModeName(r.mode)))).join(""),
+  });
 }
 function renderFingerprints() {
   renderSelection("fp-", fpSelected, "采集");
@@ -106,5 +102,5 @@ function initializeFingerprint() {
 
   for (const id of ["fp-model", "fp-mode"]) $(id).addEventListener("change", () => { fpSavePrefs(); renderFingerprints(); });
   $("fp-concurrency").addEventListener("change", () => { $("fp-concurrency").value = fpConcurrency(); fpSavePrefs(); });
-  bindCollectionActions({ type: "fp", scope: "fingerprint", historyKey: "fingerprints", expanded: fpExpanded, renderRows: renderFingerprints, run: runFingerprint, showDetail: showFingerprintDetail });
+  bindCollectionActions({ type: "fp", scope: "fingerprint", expanded: fpExpanded, renderRows: renderFingerprints, run: runFingerprint, showDetail: showFingerprintDetail });
 }

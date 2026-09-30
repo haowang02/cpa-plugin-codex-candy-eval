@@ -1,11 +1,13 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -139,6 +141,16 @@ func TestModelTraceRunAndPersistence(t *testing.T) {
 	loadState()
 	if len(traceResults["a"]) != 1 || traceResults["a"][0].Attribution.Prediction != r.Attribution.Prediction || traceResults["a"][0].ReasoningTokens != 3 || traceResults["a"][0].InputTokens != 36 || traceResults["a"][0].OutputTokens != 9 {
 		t.Fatal("history did not survive reload")
+	}
+	if summary := r.summary(); summary.Samples != nil || summary.Attribution.Results != nil || summary.Attribution.Prediction != r.Attribution.Prediction || len(r.Samples) != 3 {
+		t.Fatal("summaries must drop details without touching stored records")
+	}
+	detail := handleManagement(managementRequest{Method: http.MethodGet, Path: managementBase + "/modeltrace/record", Query: url.Values{"auth_id": {"a"}, "id": {r.ID}}})
+	if detail.StatusCode != 200 || !bytes.Contains(detail.Body, []byte(`"samples":[`)) {
+		t.Fatalf("record = %s", detail.Body)
+	}
+	if recordResponse("modeltrace", url.Values{"auth_id": {"a"}, "id": {"missing"}}).StatusCode != http.StatusNotFound {
+		t.Fatal("missing record was found")
 	}
 	if clearHistoryResponse("candy").StatusCode != 200 || len(traceResults["a"]) != 1 {
 		t.Fatal("candy clear removed ModelTrace history")

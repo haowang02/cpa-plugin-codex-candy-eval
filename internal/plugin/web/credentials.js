@@ -68,19 +68,20 @@ async function configuredCredentials(config) {
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("CPA 凭证配置格式无效");
   const credentials = [], counters = new Map();
   const text = (v) => String(v || "").trim();
-  const enabled = (entry) => entry.disabled !== true && (entry.weight ?? 1) > 0;
+  // CPA and CPAMC disable a config API key by excluding every model.
+  const excludesAll = (entry) => Array.isArray(entry["excluded-models"]) && entry["excluded-models"].some((model) => text(model) === "*");
   const headers = (entry) => Object.keys(entry.headers || {}).sort().map((key) => key + "\0" + entry.headers[key] + "\0").join("");
   const entries = (field, value = config[field]) => {
     if (value == null) return [];
     if (!Array.isArray(value) || value.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))) throw new Error("CPA 凭证配置格式无效：" + field);
     return value;
   };
-  async function add(kind, parts, provider, active, apiKey) {
+  async function add(kind, parts, provider, disabled, apiKey) {
     const digest = await sha256Hex(kind + parts.map((part) => "\0" + text(part)).join(""));
     const base = kind + ":" + digest.slice(0, 12), collision = counters.get(base) || 0;
     counters.set(base, collision + 1);
     const id = collision ? base + "-" + collision : base;
-    credentials.push({ id, provider, name: previewCredential(apiKey) || provider + " · " + id.slice(kind.length + 1), disabled: !active });
+    credentials.push({ id, provider, name: previewCredential(apiKey) || provider + " · " + id.slice(kind.length + 1), disabled });
   }
   for (const [field, provider] of [
     ["gemini-api-key", "gemini"], ["interactions-api-key", "gemini-interactions"],
@@ -88,7 +89,7 @@ async function configuredCredentials(config) {
   ]) {
     for (const entry of entries(field)) {
       if (!text(entry["api-key"]) && !text(entry["base-url"])) continue;
-      await add(provider + ":apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"], entry.prefix, headers(entry)], provider, enabled(entry), entry["api-key"]);
+      await add(provider + ":apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"], entry.prefix, headers(entry)], provider, excludesAll(entry), entry["api-key"]);
     }
   }
   for (const entry of entries("openai-compatibility")) {
@@ -97,11 +98,11 @@ async function configuredCredentials(config) {
     const name = text(entry.name).toLowerCase() || "openai-compatibility";
     const provider = name === "openai-compatibility" || name.startsWith("openai-compatible-") ? name : "openai-compatible-" + name;
     const keys = entries("api-key-entries", entry["api-key-entries"]);
-    if (!keys.length) await add("openai-compatibility:" + name, [entry["base-url"]], provider, true);
-    for (const entryKey of keys) await add("openai-compatibility:" + name, [entryKey["api-key"], entry["base-url"], entryKey["proxy-url"]], provider, enabled(entryKey), entryKey["api-key"]);
+    if (!keys.length) await add("openai-compatibility:" + name, [entry["base-url"]], provider, false);
+    for (const entryKey of keys) await add("openai-compatibility:" + name, [entryKey["api-key"], entry["base-url"], entryKey["proxy-url"]], provider, false, entryKey["api-key"]);
   }
   for (const entry of entries("vertex-api-key")) {
-    await add("vertex:apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"]], "vertex", enabled(entry), entry["api-key"]);
+    await add("vertex:apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"]], "vertex", excludesAll(entry), entry["api-key"]);
   }
   return credentials;
 }

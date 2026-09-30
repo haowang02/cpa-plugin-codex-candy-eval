@@ -56,6 +56,12 @@ type fingerprintResult struct {
 	Attribution     fingerprintAttribution `json:"attribution"`
 }
 
+// summary drops the comparison tables that only the detail dialog shows.
+func (r fingerprintResult) summary() fingerprintResult {
+	r.Attribution.Comparisons, r.Attribution.Warnings = nil, nil
+	return r
+}
+
 type fingerprintProgress struct {
 	Model       string `json:"model"`
 	Mode        string `json:"mode"`

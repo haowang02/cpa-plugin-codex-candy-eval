@@ -17,7 +17,7 @@ function mtComparison(r) {
 function mtOutcome(r) {
   const a = r?.attribution;
   const comparison = mtComparison(r);
-  const state = { failed: ["bad", "circle-x", "测试失败", "查看详情了解原因"], cancelled: ["neutral", "pause", "测试已停止", ""], skipped: ["neutral", "ban", "已跳过", "此凭证不含所选模型"] }[r?.status];
+  const state = { failed: ["bad", "circle-x", "测试失败", "查看详情了解原因"], cancelled: ["neutral", "circle-pause", "测试已停止", ""], skipped: ["neutral", "ban", "已跳过", "此凭证不含所选模型"] }[r?.status];
   const [tone, symbol, title] = state || (a ? [comparison.tone, comparison.symbol, a.prediction] : ["idle", "fingerprint", "等待测试"]);
   const detail = state ? state[3] : a ? `${comparison.label}${r.status === "partial" ? " · 部分结果" : ""}` : "";
   return resultOutcome({
@@ -28,17 +28,14 @@ function mtOutcome(r) {
 }
 
 function renderModelTraceRow(a) {
-  const history = a.modeltraces || [], last = history.at(-1), p = a.modeltrace_running, open = mtExpanded.has(a.id);
-  const disabled = pending || !$("mt-model").value || !availableCredential(a);
+  const history = a.modeltraces || [], last = history.at(-1), p = a.modeltrace_running;
   const latest = p ? collectionOutcome(p, MT_CONFIG.requests) : mtOutcome(last);
-  return `<div class="row ${open ? "open" : ""}"><div class="list-row row-main" data-row="${esc(a.id)}">
-    <div class="selection-cell"><input type="checkbox" data-mt-select="${esc(a.id)}" aria-label="选择此凭证" ${mtSelected.has(a.id) ? "checked" : ""} ${disabled ? "disabled" : ""}></div>
-    ${credentialView(a, open)}
-    <div class="mt-test-model mono">${esc(p?.model || last?.model || "—")}</div>
-    <div class="latest">${latest}</div>
-    <div class="test-time mono">${!p && last ? esc(fmtTime(last.time)) : "—"}</div>
-    <div class="action">${collectionButton("mt", a, p, "测试")}</div></div>
-    ${open ? historyPanel([...history].reverse().map((r) => historyEntry("mt", a.id, r, mtOutcome(r))).join("")) : ""}</div>`;
+  return credentialRow({
+    type: "mt", credential: a, selected: mtSelected.has(a.id), open: mtExpanded.has(a.id), selectable: runnable("mt-", a), button: collectionButton("mt", a, p, "测试"),
+    result: latest, tested: !!(last || p),
+    meta: `<div class="mt-test-model mono">${esc(p?.model || last?.model || "—")}</div>${listTime(!p && last?.time)}`,
+    history: () => [...history].reverse().map((r) => historyEntry("mt", a.id, r, mtOutcome(r))).join(""),
+  });
 }
 
 function renderModelTrace() {
@@ -63,7 +60,7 @@ function mtResultHTML(r) {
     <div class="mt-ranking">${(a.results || []).map((r, i) => `<div class="mt-rank"><span class="meta mono">${String(i + 1).padStart(2, "0")}</span><span class="mono mt-rank-name">${esc(r.display_name || r.model)}</span><div class="mt-bar" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, (r.probability || 0) * 100))}%"></span></div><span class="mono">${mtPercent(r.probability)}</span></div>`).join("")}</div>`;
 }
 
-function showModelTraceDetail(r, credentialID) {
+function showModelTraceDetail(r) {
   const samples = r.samples || [];
   const sampleEntries = samples.map((s, i) => `<details class="mt-sample">
     <summary>${icon("chevron-right", "chev")}挑战 ${i + 1}<span class="meta">${s.parsed_numbers} / ${s.expected_count} 个数字${s.attempts > 1 ? ` · 重试 ${s.attempts - 1} 次` : ""}</span><span class="verdict ${s.accepted ? "ok" : "err"}">${s.accepted ? "有效" : "未计入"}</span></summary>
@@ -74,7 +71,6 @@ function showModelTraceDetail(r, credentialID) {
     ${r.attribution ? mtResultHTML(r) : mtOutcome(r)}
     ${r.error ? `<p class="detail-note detail-warning">${esc(r.error)}</p>` : ""}
     ${samples.length ? `<div class="mt-result-heading"><h3>挑战记录</h3><span class="meta">${samples.reduce((n, s) => n + (s.attempts || 1), 0)} 次请求</span></div>${sampleEntries}` : ""}`;
-  openResultDetail("mt", r.id, credentialID);
 }
 
 function initializeModelTrace() {
@@ -83,5 +79,5 @@ function initializeModelTrace() {
   $("mt-concurrency").value = mtConcurrency();
   $("mt-model").addEventListener("change", () => { mtSavePrefs(); renderModelTrace(); });
   $("mt-concurrency").addEventListener("change", () => { $("mt-concurrency").value = mtConcurrency(); mtSavePrefs(); });
-  bindCollectionActions({ type: "mt", scope: "modeltrace", historyKey: "modeltraces", expanded: mtExpanded, renderRows: renderModelTrace, run: runModelTrace, showDetail: showModelTraceDetail });
+  bindCollectionActions({ type: "mt", scope: "modeltrace", expanded: mtExpanded, renderRows: renderModelTrace, run: runModelTrace, showDetail: showModelTraceDetail });
 }

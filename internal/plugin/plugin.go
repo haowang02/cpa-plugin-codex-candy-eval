@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 )
 
 const (
 	pluginID       = "cpa-codex-candy-eval"
-	pluginVersion  = "0.3.3"
+	pluginVersion  = "0.3.4"
 	ABIVersion     = 1
 	schemaVersion  = 6
 	managementBase = "/v0/management/plugins/" + pluginID
@@ -98,9 +99,10 @@ type EnvelopeError struct {
 func (e *EnvelopeError) Error() string { return e.Code + ": " + e.Message }
 
 type managementRequest struct {
-	Method string `json:"Method"`
-	Path   string `json:"Path"`
-	Body   []byte `json:"Body"`
+	Method string     `json:"Method"`
+	Path   string     `json:"Path"`
+	Query  url.Values `json:"Query"`
+	Body   []byte     `json:"Body"`
 }
 
 type managementResponse struct {
@@ -142,9 +144,11 @@ func HandleMethod(method string, request []byte) (response []byte) {
 				{"Method": http.MethodDelete, "Path": managementBase + "/results", "Description": "Clear candy test results"},
 				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/run", "Description": "Collect and compare model fingerprints"},
 				{"Method": http.MethodPost, "Path": managementBase + "/fingerprint/cancel", "Description": "Stop fingerprint collection"},
+				{"Method": http.MethodGet, "Path": managementBase + "/fingerprint/record", "Description": "View a fingerprint record"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/fingerprint/results", "Description": "Clear fingerprint history"},
 				{"Method": http.MethodPost, "Path": managementBase + "/modeltrace/run", "Description": "Run ModelTrace on credentials"},
 				{"Method": http.MethodPost, "Path": managementBase + "/modeltrace/cancel", "Description": "Stop ModelTrace collection"},
+				{"Method": http.MethodGet, "Path": managementBase + "/modeltrace/record", "Description": "View a ModelTrace record"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/modeltrace/results", "Description": "Clear ModelTrace history"},
 			},
 			"resources": []map[string]string{
@@ -189,6 +193,8 @@ func handleManagement(req managementRequest) managementResponse {
 		return fingerprintRunResponse(req.Body)
 	case req.Method == http.MethodPost && path == managementBase+"/fingerprint/cancel":
 		return cancelCollectionResponse("fingerprint", req.Body)
+	case req.Method == http.MethodGet && path == managementBase+"/fingerprint/record":
+		return recordResponse("fingerprint", req.Query)
 	case req.Method == http.MethodDelete && path == managementBase+"/fingerprint/results":
 		return clearHistoryResponse("fingerprint")
 	case req.Method == http.MethodDelete && path == managementBase+"/results":
@@ -197,6 +203,8 @@ func handleManagement(req managementRequest) managementResponse {
 		return traceRunResponse(req.Body)
 	case req.Method == http.MethodPost && path == managementBase+"/modeltrace/cancel":
 		return cancelCollectionResponse("modeltrace", req.Body)
+	case req.Method == http.MethodGet && path == managementBase+"/modeltrace/record":
+		return recordResponse("modeltrace", req.Query)
 	case req.Method == http.MethodDelete && path == managementBase+"/modeltrace/results":
 		return clearHistoryResponse("modeltrace")
 	default:
@@ -225,18 +233,20 @@ func stateResponse() managementResponse {
 		}
 		view.Running = candyRunning[auth.ID]
 		view.FingerprintRunning = fingerprintRunning[auth.ID]
-		view.Fingerprints = fingerprintResults[auth.ID]
-		if view.Fingerprints == nil {
-			view.Fingerprints = []fingerprintResult{}
-		}
+		view.Fingerprints = summaries(fingerprintResults[auth.ID])
 		view.ModelTraceRunning = traceRunning[auth.ID]
-		view.ModelTraces = traceResults[auth.ID]
-		if view.ModelTraces == nil {
-			view.ModelTraces = []traceResult{}
-		}
+		view.ModelTraces = summaries(traceResults[auth.ID])
 		views = append(views, view)
 	}
 	return jsonResponse(http.StatusOK, map[string]any{"auths": views, "storage_error": storageError})
+}
+
+func summaries[T interface{ summary() T }](records []T) []T {
+	out := make([]T, len(records))
+	for i, record := range records {
+		out[i] = record.summary()
+	}
+	return out
 }
 
 func Quiesce() {

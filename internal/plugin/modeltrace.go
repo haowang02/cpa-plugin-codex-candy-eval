@@ -71,6 +71,17 @@ type traceResult struct {
 	Attribution     *traceAttribution `json:"attribution,omitempty"`
 }
 
+// summary drops the samples and rankings that only the detail dialog shows.
+func (r traceResult) summary() traceResult {
+	r.Samples = nil
+	if r.Attribution != nil {
+		attribution := *r.Attribution
+		attribution.Results, attribution.Families, attribution.Diagnostics = nil, nil, nil
+		r.Attribution = &attribution
+	}
+	return r
+}
+
 type traceProgress struct {
 	Model       string `json:"model"`
 	Phase       string `json:"phase"`

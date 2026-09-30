@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
+	"slices"
 )
 
 type persistedState struct {
@@ -82,6 +84,27 @@ func saveStateLocked() (err error) {
 		return err
 	}
 	return os.Rename(tmp, statePath)
+}
+
+func recordResponse(scope string, query url.Values) managementResponse {
+	authID, id := query.Get("auth_id"), query.Get("id")
+	mu.Lock()
+	defer mu.Unlock()
+	var record any
+	switch scope {
+	case "fingerprint":
+		if i := slices.IndexFunc(fingerprintResults[authID], func(r fingerprintResult) bool { return r.ID == id }); i >= 0 {
+			record = fingerprintResults[authID][i]
+		}
+	case "modeltrace":
+		if i := slices.IndexFunc(traceResults[authID], func(r traceResult) bool { return r.ID == id }); i >= 0 {
+			record = traceResults[authID][i]
+		}
+	}
+	if record == nil {
+		return jsonError(http.StatusNotFound, "记录不存在，可能已被清空")
+	}
+	return jsonResponse(http.StatusOK, record)
 }
 
 func clearHistoryResponse(scope string) managementResponse {

@@ -23,7 +23,7 @@ const ICONS = {
   "arrow-right": '<path d="M5 12h14m-6-6 6 6-6 6"/>',
   "shuffle": '<path d="m18 14 4 4-4 4m0-20 4 4-4 4M2 18h2.5c6 0 9-12 15-12H22M2 6h2.5c2 0 3.7 1.3 5.2 3.2M14.3 14.8c1.5 1.9 3.2 3.2 5.2 3.2H22"/>',
   "fingerprint": '<path d="M12 11a2 2 0 0 1 2 2c0 4-1 6-2 8M8 16c.4-1 .5-2 .5-3a3.5 3.5 0 0 1 7 0c0 4-1 7-2 9M5 16c.4-1 .5-2 .5-3a6.5 6.5 0 0 1 13 0c0 3-.4 5-1 7M2 12a10 10 0 0 1 20 0M8 20l1-2"/>',
-  "pause": '<path d="M9 5H6v14h3zm9 0h-3v14h3z"/>',
+  "circle-pause": '<circle cx="12" cy="12" r="10"/><line x1="10" x2="10" y1="15" y2="9"/><line x1="14" x2="14" y1="15" y2="9"/>',
   "x": '<path d="m18 6-12 12M6 6l12 12"/>',
   "chart": '<path d="M3 3v18h18M7 14v3m5-8v8m5-12v12"/>',
   "loader-circle": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
@@ -51,12 +51,13 @@ const boundedInput = (id, fallback, maximum) => Math.min(Math.max(parseInt($(id)
 
 const fmtNum = (n) => (n ? Number(n).toLocaleString("en-US") : "0");
 const fmtSec = (ms) => (ms / 1000).toFixed(1) + "s";
-function fmtTime(iso) {
+function fmtTime(iso, seconds = true) {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "—";
   const p = (n) => String(n).padStart(2, "0");
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${seconds ? ":" + p(d.getSeconds()) : ""}`;
 }
+const listTime = (iso) => `<div class="test-time mono" ${iso ? `title="${esc(fmtTime(iso))}"` : ""}>${iso ? esc(fmtTime(iso, false)) : "—"}</div>`;
 const modelName = (r) => r.effort ? `${r.model}(${r.effort})` : r.model;
 const metric = (name, label, value, cls = "") => `<span class="metric ${cls}" title="${esc(`${label} ${value}`)}" aria-label="${esc(`${label} ${value}`)}">${icon(name)}<span class="meta mono">${esc(value)}</span></span>`;
 const modelMeta = (r) => metric("astroid", "模型", modelName(r), "model-meta");
@@ -66,26 +67,55 @@ const metrics = (r) =>
   metric("square-arrow-right-exit", "输出 tokens", r.output_tokens != null ? fmtNum(r.output_tokens) : "—") +
   (r.reasoning_tokens > 0 ? metric("brain", "推理 tokens", fmtNum(r.reasoning_tokens)) : "");
 
-const PLAN_NAMES = {
-  free: "Free", plus: "Plus", team: "Team", pro: "Pro 20x",
-  prolite: "Pro 5x", "pro-lite": "Pro 5x", pro_lite: "Pro 5x",
-  self_serve_business_prolite: "Business Premium",
-};
-function planName(plan) {
-  const name = String(plan || "").trim();
-  return Object.hasOwn(PLAN_NAMES, name.toLowerCase()) ? PLAN_NAMES[name.toLowerCase()] : name || "其他";
-}
-
+// Codex plans in sort order, labelled like the official Codex client.
+// Badges follow CPAMC: platinum for top Pro plans, gold for Pro 100 and Business Premium.
+const CODEX_PLANS = [
+  { label: "Pro 500", ids: ["promax"], badge: "elite", pro: true },
+  { label: "Pro 200", ids: ["pro"], badge: "elite", pro: true },
+  { label: "Pro 100", ids: ["prolite", "pro-lite", "pro_lite"], badge: "premium", pro: true },
+  { label: "Plus", ids: ["plus"], badge: "plus" },
+  { label: "Go", ids: ["go"], badge: "go" },
+  { label: "Business Premium", ids: ["self_serve_business_prolite"], badge: "premium" },
+  { label: "Business", ids: ["team", "self_serve_business_usage_based"], badge: "business" },
+  { label: "Enterprise", ids: ["business", "enterprise", "ent26", "enterprise_cbp_usage_based", "hc"], badge: "business" },
+  { label: "Enterprise (Automation)", ids: ["enterprise_cbp_automation"], badge: "business" },
+  { label: "Edu Pro", ids: ["edu_pro"], badge: "" },
+  { label: "Edu Plus", ids: ["edu_plus"], badge: "" },
+  { label: "Edu", ids: ["edu", "education"], badge: "" },
+  { label: "Free", ids: ["free"], badge: "free" },
+];
+const PLAN_BY_ID = new Map(CODEX_PLANS.flatMap((plan, rank) => plan.ids.map((id) => [id, { ...plan, rank }])));
 function credentialPlan(a) {
-  if (a.source !== "auth_files" || a.provider !== "codex") return "other";
-  const type = String(a.plan_type || "").trim().toLowerCase();
-  return ["pro", "prolite", "pro-lite", "pro_lite"].includes(type) ? "pro" : ["plus", "team", "free"].includes(type) ? type : "other";
+  if (a.source !== "auth_files" || a.provider !== "codex") return null;
+  const id = String(a.plan_type || "").trim();
+  return PLAN_BY_ID.get(id.toLowerCase()) || { label: id || "未知", badge: "", rank: CODEX_PLANS.length };
 }
-const credentialPlanRank = (a) => ({ pro: 0, plus: 1, team: 2, other: 2, free: 3 })[credentialPlan(a)];
+const planRank = (a) => credentialPlan(a)?.rank ?? CODEX_PLANS.length + 1;
 
 function credentialView(a, open) {
+  const plan = credentialPlan(a);
   return `<div class="credential"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
-    <div class="tags"><span class="tag source-tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(a.provider)}</span></span>${a.source === "auth_files" && a.provider === "codex" ? `<span class="tag plan-tag plan-${credentialPlan(a)}">${esc(planName(a.plan_type))}</span>` : ""}${a.disabled ? `<span class="tag">已停用</span>` : ""}</div></div>`;
+    <div class="tags"><span class="tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(a.provider)}</span></span>${plan ? `<span class="tag ${plan.badge ? "plan-" + plan.badge : ""}"><span>${esc(plan.label)}</span></span>` : ""}${a.unavailable ? `<span class="tag warn" title="${esc(unavailableReason(a))}"><span>不可用</span></span>` : ""}</div></div>`;
+}
+function unavailableReason(a) {
+  const retry = a.next_retry_after && `预计 ${fmtTime(a.next_retry_after, false)} 恢复`;
+  return [a.status_message, retry].filter(Boolean).join(" · ") || "CPA 暂时无法使用此凭证";
+}
+
+// CPA toggles auth files and config API keys (IDs "<provider>:apikey:…");
+// OpenAI-compatible providers can only be switched as a whole in CPA.
+const switchable = (a) => a.source === "auth_files" || a.id.startsWith(a.provider + ":apikey:");
+function enableSwitch(a) {
+  const locked = !switchable(a) ? "请在 CPA 中启用或停用此凭证" : credentialBusy(a) ? "测试结束后才能切换" : "";
+  return `<label class="switch" ${locked ? `title="${locked}"` : ""}><input type="checkbox" role="switch" data-enable="${esc(a.id)}" aria-label="启用此凭证" aria-busy="${switching.has(a.id)}" ${a.disabled ? "" : "checked"} ${switching.has(a.id) || locked ? "disabled" : ""}></label>`;
+}
+
+// Row details are separate columns on wide screens and one footer line on narrow ones.
+function credentialRow({ type, credential: a, selected, open, selectable, result, meta, tested, button, history }) {
+  return `<div class="row ${open ? "open" : ""}"><div class="list-row row-main" data-row="${esc(a.id)}">
+    <label class="select-cell"><input type="checkbox" data-${type}-select="${esc(a.id)}" aria-label="选择此凭证" ${selected ? "checked" : ""} ${selectable ? "" : "disabled"}></label>
+    ${credentialView(a, open)}<div class="latest">${result}</div><div class="row-meta ${tested ? "" : "untested"}">${meta}${enableSwitch(a)}</div>${button}</div>
+    ${open ? historyPanel(history()) : ""}</div>`;
 }
 
 function resultOutcome({ tone = "", symbol, titleHTML, detailHTML = "", progressHTML = "" }) {
@@ -103,8 +133,7 @@ function collectionOutcome(p, total, showModel = false) {
 }
 function collectionButton(type, credential, progress, label) {
   if (progress) return `<button class="btn ghost" type="button" data-${type}-cancel="${esc(credential.id)}" title="停止后续请求；已发出的请求需等待返回" ${pending || progress.phase === "cancelling" ? "disabled" : ""}>停止</button>`;
-  const disabled = pending || !$(type + "-model").value || !availableCredential(credential);
-  return `<button class="btn" type="button" data-${type}-run="${esc(credential.id)}" ${disabled ? "disabled" : ""}>${icon("play")}${esc(label)}</button>`;
+  return `<button class="btn" type="button" data-${type}-run="${esc(credential.id)}" ${runnable(type + "-", credential) ? "" : "disabled"}>${icon("play")}${esc(label)}</button>`;
 }
 function historyCard(r, contentHTML, extraMetaHTML = "") {
   return `<article class="history-card">
@@ -118,11 +147,21 @@ function historyEntry(type, credentialID, r, outcomeHTML, extraMetaHTML = "") {
 function historyPanel(entries) {
   return `<div class="history-panel"><div class="history-title">历史记录</div><div class="result-history">${entries || `<div class="empty">暂无记录</div>`}</div></div>`;
 }
-function openResultDetail(type, recordID, credentialID) {
-  const dialog = $(type + "-detail");
+// Lists carry record summaries; a detail dialog loads its full record.
+async function openResultDetail(type, scope, credentialID, recordID, showDetail) {
+  const dialog = $(type + "-detail"), body = $(type + "-detail-body");
+  const current = () => dialog.open && dialog.dataset.record === recordID && dialog.dataset.credential === credentialID;
   dialog.dataset.record = recordID;
   dialog.dataset.credential = credentialID;
-  dialog.showModal();
+  body.innerHTML = `<div class="empty">正在加载详情…</div>`;
+  if (!dialog.open) dialog.showModal();
+  try {
+    const record = await api(`${BASE}/${scope}/record?${new URLSearchParams({ auth_id: credentialID, id: recordID })}`);
+    if (current()) showDetail(record);
+  } catch (err) {
+    if (err instanceof AuthError) return showLogin(err.message);
+    if (current()) body.innerHTML = `<div class="empty">${esc("读取详情失败：" + err.message)}</div>`;
+  }
 }
 
 const notices = new Map();
@@ -151,8 +190,8 @@ function setNotice(id, message, tone = "error") {
 
 function credentialCard(prefix, columns) {
   const label = prefix === "mt-" ? "ModelTrace" : prefix ? "指纹" : "糖果";
-  return `<div class="section-head"><div class="credential-heading"><h2>凭证</h2><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span><span class="native-select credential-filter"><select id="${prefix}select-plan" aria-label="快速选取凭证"><option value="">快速选取凭证</option><option value="plus">选取所有 PLUS</option><option value="pro">选取所有 PRO</option><option value="team">选取所有 TEAM</option></select></span></div>
+  return `<div class="section-head"><div class="credential-heading"><h2>凭证</h2><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span><span id="${prefix}plan-filter" class="native-select credential-filter" hidden><select id="${prefix}credential-plan" aria-label="订阅类型"><option value="all">所有订阅类型</option></select></span></div>
     <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" title="清空${label}历史" aria-label="清空${label}历史" disabled>${icon("trash-2")}</button></div></div>
-    <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${columns.map((label) => `<div>${label}</div>`).join("")}</div>
+    <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${[...columns, "启用", ""].map((label) => `<div>${label}</div>`).join("")}</div>
     <div id="${prefix}rows"><div class="empty">正在加载…</div></div>`;
 }

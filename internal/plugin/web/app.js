@@ -15,7 +15,8 @@ let loadController = null;
 let pending = false;
 let storageError = "";
 let clearScope = "candy";
-const listMarkup = new Map();
+// Enable changes in flight, by credential ID; reloads keep these requested states.
+const switching = new Map();
 
 // The CPA management panel keeps its state in same-origin localStorage, optionally obfuscated.
 function panelValue(name) {
@@ -84,19 +85,49 @@ function fillModels() {
   fillSelect("fp-model", probeModels, $("fp-model").value || stored(PREF_STORE + ".fingerprint")?.model, DEFAULT_MODEL);
   fillSelect("mt-model", probeModels, $("mt-model").value || stored(PREF_STORE + ".modeltrace")?.model, DEFAULT_MODEL);
 }
+// Rows are keyed by credential, so an update only replaces the rows whose markup changed.
+const renderedLists = new Map();
 function renderList(prefix, renderRow) {
-  const id = prefix + "rows", list = $(id);
+  const list = $(prefix + "rows"), previous = renderedLists.get(list) || { rows: new Map(), empty: "" };
   const visible = visibleCredentials(prefix);
-  const empty = loadController && !credentials.length ? "正在读取凭证与历史记录…" : "当前类型没有凭证，请切换类型或在 CPA 中添加凭证。";
-  const html = visible.length ? visible.map(renderRow).join("") : `<div class="empty">${esc(loadError || empty)}</div>`;
-  if (listMarkup.get(id) === html) return;
+  if (!visible.length) {
+    const message = loadController && !credentials.length ? "正在读取凭证与历史记录…" : "没有符合筛选条件的凭证，请调整筛选或在 CPA 中添加凭证。";
+    const empty = `<div class="empty">${esc(loadError || message)}</div>`;
+    if (previous.empty !== empty) list.innerHTML = empty;
+    renderedLists.set(list, { rows: new Map(), empty });
+    return;
+  }
+  const rows = new Map(visible.map((a) => {
+    const html = renderRow(a), row = previous.rows.get(a.id);
+    return [a.id, row?.html === html ? row : { html, node: rowNode(html) }];
+  }));
+  renderedLists.set(list, { rows, empty: "" });
   const focused = list.contains(document.activeElement) ? document.activeElement : null;
-  const selector = focused && [...focused.attributes].filter((a) => a.name.startsWith("data-"))
-    .map((a) => `[${a.name}="${CSS.escape(a.value)}"]`).join("");
-  if (id === "rows") hideTip();
-  list.innerHTML = html;
-  listMarkup.set(id, html);
-  if (selector) list.querySelector(selector)?.focus({ preventScroll: true });
+  const kept = new Set([...rows.values()].map((row) => row.node));
+  let cursor = list.firstChild;
+  const dropStale = () => {
+    while (cursor && !kept.has(cursor)) {
+      const next = cursor.nextSibling;
+      cursor.remove();
+      cursor = next;
+    }
+  };
+  for (const { node } of rows.values()) {
+    dropStale();
+    if (node === cursor) cursor = cursor.nextSibling;
+    else list.insertBefore(node, cursor);
+  }
+  dropStale();
+  if (focused && !focused.isConnected) {
+    const selector = [...focused.attributes].filter((a) => a.name.startsWith("data-")).map((a) => `[${a.name}="${CSS.escape(a.value)}"]`).join("");
+    if (selector) list.querySelector(selector)?.focus({ preventScroll: true });
+  }
+  if (tipTarget && !tipTarget.isConnected) hideTip();
+}
+function rowNode(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  return template.content.firstElementChild;
 }
 
 function renderRefresh() {
@@ -107,6 +138,7 @@ function renderRefresh() {
 function render() {
   renderRefresh();
   setNotice("storage-error", storageError);
+  for (const prefix of ["", "fp-", "mt-"]) fillPlanFilter(prefix);
   renderCandy();
   renderFingerprints();
   renderModelTrace();
@@ -147,19 +179,20 @@ async function load({ refresh = false } = {}) {
     const data = await api(BASE + "/state", { signal: controller.signal });
     if (controller.signal.aborted) return;
     credentials = stateCredentials(data);
+    for (const a of credentials) if (switching.has(a.id)) a.disabled = switching.get(a.id);
     pruneCredentialCatalog();
     fillCredentialTypes();
     storageError = data.storage_error || "";
     loadError = "";
     setNotice("load-error", "");
     const ids = new Set(credentials.map((a) => a.id));
-    const enabled = new Set(credentials.filter((a) => !a.disabled).map((a) => a.id));
+    const usable = new Set(credentials.filter(usableCredential).map((a) => a.id));
     const answers = new Set(credentials.flatMap((a) => a.results.map((r) => answerKey(a.id, r))));
     for (const expanded of [candyExpanded, fpExpanded, mtExpanded]) {
       for (const id of expanded) if (!ids.has(id)) expanded.delete(id);
     }
     for (const selection of [candySelected, fpSelected, mtSelected]) {
-      for (const id of selection) if (!enabled.has(id)) selection.delete(id);
+      for (const id of selection) if (!usable.has(id)) selection.delete(id);
     }
     for (const id of candyAnswersExpanded) if (!answers.has(id)) candyAnswersExpanded.delete(id);
   } catch (err) {
@@ -171,7 +204,7 @@ async function load({ refresh = false } = {}) {
     if (loadController === controller) {
       loadController = null;
       render();
-      pollTimer = setTimeout(load, credentials.some((a) => a.running || a.fingerprint_running || a.modeltrace_running) ? 2500 : 20000);
+      pollTimer = setTimeout(load, credentials.some(credentialBusy) ? 2500 : 20000);
     }
   }
 }
@@ -260,56 +293,36 @@ function switchTab(name) {
   store(PREF_STORE + ".tab", name);
 }
 const credentialBusy = (a) => !!(a.running || a.fingerprint_running || a.modeltrace_running);
-const availableCredential = (a) => !a.disabled && !credentialBusy(a);
-const canToggleCredential = (a) => a.source === "auth_files" && !credentialBusy(a);
+const usableCredential = (a) => !a.disabled && !a.unavailable;
+const availableCredential = (a) => usableCredential(a) && !credentialBusy(a);
+const runnable = (prefix, a) => !pending && !!$(prefix + "model").value && availableCredential(a);
 const selectedCredentials = (prefix, selection) => visibleCredentials(prefix).filter((a) => selection.has(a.id));
 const batchCredentials = (prefix, selection) => {
   const selected = selectedCredentials(prefix, selection);
   return (selected.length ? selected : visibleCredentials(prefix)).filter(availableCredential);
 };
-function planMatches(a, plan) {
-  return ["plus", "pro", "team"].includes(plan) && credentialPlan(a) === plan;
-}
-function selectPlan(prefix, selection, plan) {
-  if (pending || !["plus", "pro", "team"].includes(plan)) return;
-  const matches = visibleCredentials(prefix).filter((a) => availableCredential(a) && planMatches(a, plan));
-  if (!matches.length) return;
-  selection.clear();
-  for (const a of matches) selection.add(a.id);
-  render();
-}
-async function toggleCredentialStatus(id) {
+async function setCredentialEnabled(id, enabled) {
   const a = credentials.find((entry) => entry.id === id);
-  if (pending || !a || !canToggleCredential(a)) return;
-  const disabled = !a.disabled;
-  const action = disabled ? "停用" : "启用";
-  pending = true;
-  stopPolling();
-  setNotice("flash", "");
+  if (!a || switching.has(id)) return;
+  switching.set(id, !enabled);
+  a.disabled = !enabled;
   render();
   try {
-    await api("/v0/management/auth-files/status", { method: "PATCH", body: { name: a.name, disabled } });
-    a.disabled = disabled;
-    if (disabled) for (const selection of [candySelected, fpSelected, mtSelected]) selection.delete(id);
-    pruneCredentialCatalog();
-    setNotice("flash", `账户已${action}`, "info");
+    await api("/v0/management/auth-files/status", { method: "PATCH", body: { name: id, disabled: !enabled } });
   } catch (err) {
     if (err instanceof AuthError) return showLogin(err.message);
-    setNotice("flash", `${action}账户失败：` + err.message);
+    setNotice("flash", (enabled ? "启用凭证失败：" : "停用凭证失败：") + err.message);
+    const current = credentials.find((entry) => entry.id === id);
+    if (current) current.disabled = enabled;
   } finally {
-    pending = false;
-    render();
-    if (!$("app").hidden) await load();
+    switching.delete(id);
   }
+  render();
+  // Config API keys live in CPA's config, which the page syncs to the plugin.
+  if (!$("app").hidden) await load({ refresh: a.source !== "auth_files" });
 }
 function renderSelection(prefix, selection, action) {
   const available = visibleCredentials(prefix).filter(availableCredential);
-  const quick = $(prefix + "select-plan");
-  quick.value = "";
-  quick.disabled = pending || !available.length || !$(prefix + "model").value;
-  for (const option of quick.options || []) {
-    if (option.value) option.disabled = !available.some((a) => planMatches(a, option.value));
-  }
   const selected = selectedCredentials(prefix, selection);
   const targets = batchCredentials(prefix, selection);
   const button = $(prefix + "run-batch");
@@ -321,14 +334,14 @@ function renderSelection(prefix, selection, action) {
   checkbox.disabled = pending || (!available.length && !selected.length);
 }
 
-function bindCollectionActions({ type, scope, historyKey, expanded, renderRows, run, showDetail }) {
+function bindCollectionActions({ type, scope, expanded, renderRows, run, showDetail }) {
   const rows = $(type + "-rows"), dialog = $(type + "-detail");
   $(type + "-detail-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", () => {
     rows.querySelector(`[data-${type}-detail="${CSS.escape(dialog.dataset.record)}"][data-${type}-credential="${CSS.escape(dialog.dataset.credential)}"]`)?.focus();
   });
   rows.addEventListener("click", (e) => {
-    if (e.target.closest(".selection-cell, input")) return;
+    if (e.target.closest("label")) return;
     const action = (name) => e.target.closest(`[data-${type}-${name}]`)?.getAttribute(`data-${type}-${name}`);
     const runID = action("run");
     if (runID) return run({ auth_ids: [runID] });
@@ -340,16 +353,26 @@ function bindCollectionActions({ type, scope, historyKey, expanded, renderRows, 
       return renderRows();
     }
     const recordID = action("detail"), credentialID = action("credential");
-    if (recordID && credentialID) {
-      const record = credentials.find((a) => a.id === credentialID)?.[historyKey]?.find((r) => r.id === recordID);
-      if (record) showDetail(record, credentialID);
-    }
+    if (recordID && credentialID) openResultDetail(type, scope, credentialID, recordID, showDetail);
   });
 }
 
 const credentialType = (a) => a.source + ":" + a.provider;
 const credentialTypeLabel = (a) => `${a.source === "ai_providers" ? "AI 提供商" : "认证文件"} · ${a.provider}`;
-const visibleCredentials = (prefix) => credentials.filter((a) => $(prefix + "credential-type").value === "all" || credentialType(a) === $(prefix + "credential-type").value).sort((a, b) => credentialPlanRank(a) - credentialPlanRank(b));
+const typedCredentials = (prefix) => credentials.filter((a) => $(prefix + "credential-type").value === "all" || credentialType(a) === $(prefix + "credential-type").value);
+const PRO_ALL = "Pro ALL";
+function visibleCredentials(prefix) {
+  const filter = $(prefix + "credential-plan").value;
+  const matches = (plan) => filter === "all" || (filter === PRO_ALL ? plan?.pro : plan?.label === filter);
+  return typedCredentials(prefix).filter((a) => matches(credentialPlan(a))).sort((a, b) => planRank(a) - planRank(b));
+}
+function fillPlanFilter(prefix) {
+  const plans = [...new Map(typedCredentials(prefix).map(credentialPlan).filter(Boolean).map((plan) => [plan.label, plan])).values()]
+    .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label));
+  const groups = plans.filter((plan) => plan.pro).length > 1 ? [PRO_ALL] : [];
+  $(prefix + "plan-filter").hidden = !plans.length;
+  fillSelect(prefix + "credential-plan", [["all", "所有订阅类型"], ...groups, ...plans.map((plan) => plan.label)], $(prefix + "credential-plan").value, "all");
+}
 function fillCredentialTypes() {
   const types = new Map(credentials.map((a) => [credentialType(a), credentialTypeLabel(a)]));
   // Keep the requested default visible even when there are no Codex files.
@@ -359,9 +382,9 @@ function fillCredentialTypes() {
 }
 
 function initializeLayout() {
-  $("candy-credentials").innerHTML = credentialCard("", ["凭证", "最近一次", "正确率", "最近 20 次", ""]);
-  $("fp-credentials").innerHTML = credentialCard("fp-", ["凭证", "指纹结果", "模式", "测试时间", ""]);
-  $("mt-credentials").innerHTML = credentialCard("mt-", ["凭证", "测试模型", "归因结果", "测试时间", ""]);
+  $("candy-credentials").innerHTML = credentialCard("", ["凭证", "最近一次", "正确率", "最近 20 次"]);
+  $("fp-credentials").innerHTML = credentialCard("fp-", ["凭证", "指纹结果", "模式", "测试时间"]);
+  $("mt-credentials").innerHTML = credentialCard("mt-", ["凭证", "归因结果", "测试模型", "测试时间"]);
   $("notifications").innerHTML = ["flash", "load-error", "catalog-error", "storage-error"].map((id) => `<div id="${id}" class="global-flash" role="alert" hidden><span class="notice-symbol" aria-hidden="true"></span><span class="notice-message"></span><button class="notice-close" type="button" title="隐藏提示" aria-label="隐藏提示">${icon("x")}</button></div>`).join("");
 }
 
@@ -426,8 +449,7 @@ for (const name of tabNames) {
 switchTab(tabNames.includes(stored(PREF_STORE + ".tab")) ? stored(PREF_STORE + ".tab") : "candy");
 
 for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint], ["mt-", "mt", mtSelected, runModelTrace]]) {
-  $(prefix + "select-plan").addEventListener("change", (e) => selectPlan(prefix, selection, e.target.value));
-  $(prefix + "credential-type").addEventListener("change", () => { selection.clear(); render(); });
+  for (const filter of ["credential-type", "credential-plan"]) $(prefix + filter).addEventListener("change", () => { selection.clear(); render(); });
   $(prefix + "toolbar").addEventListener("submit", (e) => {
     e.preventDefault();
     const ids = batchCredentials(prefix, selection).map((a) => a.id);
@@ -441,6 +463,7 @@ for (const [prefix, type, selection, submit] of [["", "candy", candySelected, ru
     render();
   });
   $(prefix + "rows").addEventListener("change", (e) => {
+    if (e.target.dataset.enable) return setCredentialEnabled(e.target.dataset.enable, e.target.checked);
     const id = e.target.getAttribute(`data-${type}-select`);
     if (!id) return;
     e.target.checked ? selection.add(id) : selection.delete(id);

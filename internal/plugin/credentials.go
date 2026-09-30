@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 )
 
 const (
@@ -15,30 +16,37 @@ const (
 )
 
 type credential struct {
-	ID        string `json:"id"`
-	Provider  string `json:"provider"`
-	Source    string `json:"source"`
-	Name      string `json:"name"`
-	Email     string `json:"email,omitempty"`
-	PlanType  string `json:"plan_type,omitempty"`
-	Disabled  bool   `json:"disabled"`
-	AuthIndex string `json:"-"`
+	ID       string `json:"id"`
+	Provider string `json:"provider"`
+	Source   string `json:"source"`
+	Name     string `json:"name"`
+	Email    string `json:"email,omitempty"`
+	PlanType string `json:"plan_type,omitempty"`
+	Disabled bool   `json:"disabled"`
+	// CPA marks enabled credentials unavailable while they cool down, e.g. after exhausting quota.
+	Unavailable    bool      `json:"unavailable,omitempty"`
+	StatusMessage  string    `json:"status_message,omitempty"`
+	NextRetryAfter time.Time `json:"next_retry_after,omitzero"`
+	AuthIndex      string    `json:"-"`
 }
 
 type hostAuthFile struct {
-	ID          string `json:"id"`
-	AuthIndex   string `json:"auth_index"`
-	Name        string `json:"name"`
-	Provider    string `json:"provider"`
-	Type        string `json:"type"`
-	Source      string `json:"source"`
-	Path        string `json:"path"`
-	RuntimeOnly bool   `json:"runtime_only"`
-	Account     string `json:"account"`
-	AccountType string `json:"account_type"`
-	Email       string `json:"email"`
-	PlanType    string `json:"plan_type"`
-	Disabled    bool   `json:"disabled"`
+	ID             string    `json:"id"`
+	AuthIndex      string    `json:"auth_index"`
+	Name           string    `json:"name"`
+	Provider       string    `json:"provider"`
+	Type           string    `json:"type"`
+	Source         string    `json:"source"`
+	Path           string    `json:"path"`
+	RuntimeOnly    bool      `json:"runtime_only"`
+	Account        string    `json:"account"`
+	AccountType    string    `json:"account_type"`
+	Email          string    `json:"email"`
+	PlanType       string    `json:"plan_type"`
+	Disabled       bool      `json:"disabled"`
+	Unavailable    bool      `json:"unavailable"`
+	StatusMessage  string    `json:"status_message"`
+	NextRetryAfter time.Time `json:"next_retry_after"`
 }
 
 type credentialView struct {
@@ -98,7 +106,7 @@ func credentials() ([]credential, error) {
 	if list.Files == nil {
 		return nil, fmt.Errorf("凭证响应缺少有效的 files 列表")
 	}
-	byID := make(map[string]credential, len(list.Files))
+	byID, now := make(map[string]credential, len(list.Files)), time.Now()
 	for _, file := range list.Files {
 		provider := strings.ToLower(strings.TrimSpace(file.Provider))
 		if provider == "" {
@@ -108,6 +116,10 @@ func credentials() ([]credential, error) {
 			continue
 		}
 		auth := credential{ID: file.ID, AuthIndex: file.AuthIndex, Name: file.Name, Provider: provider, Email: file.Email, PlanType: file.PlanType, Disabled: file.Disabled, Source: credentialSourceFile}
+		// Like CPA's scheduler, treat a cooldown as over once its retry time passes, even if the flag remains.
+		if file.Unavailable && !file.Disabled && (file.NextRetryAfter.IsZero() || file.NextRetryAfter.After(now)) {
+			auth.Unavailable, auth.StatusMessage, auth.NextRetryAfter = true, strings.TrimSpace(file.StatusMessage), file.NextRetryAfter
+		}
 		source := strings.ToLower(strings.TrimSpace(file.Source))
 		if file.RuntimeOnly || source == "config" || strings.HasPrefix(source, "config:") || (source == "memory" && file.Path == "") {
 			auth.Source, auth.Name, auth.Email, auth.AuthIndex, auth.PlanType = credentialSourceProvider, auth.ID, "", "", ""
@@ -127,6 +139,9 @@ func credentials() ([]credential, error) {
 				continue
 			}
 			auth.Disabled = auth.Disabled || runtime.Disabled
+			if !auth.Disabled {
+				auth.Unavailable, auth.StatusMessage, auth.NextRetryAfter = runtime.Unavailable, runtime.StatusMessage, runtime.NextRetryAfter
+			}
 		}
 		byID[id] = auth
 	}
@@ -163,7 +178,7 @@ func selectedCredentials(ids []string, all bool) ([]credential, error) {
 	}
 	selected := auths[:0]
 	for _, auth := range auths {
-		if !auth.Disabled && (all || wanted[auth.ID]) {
+		if !auth.Disabled && !auth.Unavailable && (all || wanted[auth.ID]) {
 			selected = append(selected, auth)
 		}
 	}

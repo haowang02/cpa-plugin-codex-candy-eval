@@ -15,9 +15,11 @@ func TestCredentialInventoryAndSync(t *testing.T) {
 		}
 		return json.RawMessage(`{"files":[
 			{"id":"old.json","provider":"codex","source":"file"},
+			{"id":"cooling.json","provider":"codex","source":"file","status":"error","status_message":"quota exhausted","unavailable":true,"next_retry_after":"2999-01-01T00:00:00Z"},
+			{"id":"recovered.json","provider":"codex","source":"file","unavailable":true,"next_retry_after":"2000-01-01T00:00:00Z"},
 			{"id":"claude.json","type":"claude","source":"file","disabled":true},
 			{"id":"runtime","provider":"gemini","source":"memory","label":"secret-key","email":"secret-key","account_type":"api_key","account":"synthetic-secret-key"},
-			{"id":"configured","provider":"codex","runtime_only":true,"disabled":true},
+			{"id":"configured","provider":"codex","runtime_only":true,"disabled":true,"unavailable":true},
 			{"provider":"codex","name":"missing-id"}]}`), nil
 	}
 	response := syncCredentialsResponse([]byte(`{"credentials":[{"id":"configured","provider":"codex","name":"Configured Codex","disabled":true,"email":"must-not-sync"},{"id":"compat","provider":"openai-compatible-demo","name":"Configured Demo"}]}`))
@@ -25,22 +27,25 @@ func TestCredentialInventoryAndSync(t *testing.T) {
 		t.Fatal(string(response.Body))
 	}
 	all, err := credentials()
-	if err != nil || len(all) != 5 {
+	if err != nil || len(all) != 7 {
 		t.Fatalf("credentials = %+v, %v", all, err)
 	}
 	for _, auth := range all {
-		if auth.ID == "configured" && (!auth.Disabled || auth.Source != "ai_providers" || auth.Email != "") {
+		if auth.ID == "configured" && (!auth.Disabled || auth.Unavailable || auth.Source != "ai_providers" || auth.Email != "") {
 			t.Fatalf("config merge: %+v", auth)
 		}
 		if auth.ID == "runtime" && (auth.Name != "synthe…-key" || auth.Email != "") {
 			t.Fatalf("unsafe runtime display: %+v", auth)
 		}
+		if auth.ID == "cooling.json" && (!auth.Unavailable || auth.StatusMessage != "quota exhausted" || auth.NextRetryAfter.IsZero()) || auth.ID == "recovered.json" && auth.Unavailable {
+			t.Fatalf("unavailable state: %+v", auth)
+		}
 	}
 	selected, err := selectedCredentials(nil, true)
-	if err != nil || len(selected) != 3 {
+	if err != nil || len(selected) != 4 {
 		t.Fatalf("selected = %+v, %v", selected, err)
 	}
-	selected, _ = selectedCredentials([]string{"compat", "configured"}, false)
+	selected, _ = selectedCredentials([]string{"compat", "configured", "cooling.json"}, false)
 	if len(selected) != 1 || selected[0].Provider != "openai-compatible-demo" {
 		t.Fatalf("selection = %+v", selected)
 	}
