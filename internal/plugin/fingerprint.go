@@ -89,8 +89,7 @@ func fingerprintRunResponse(body []byte) managementResponse {
 		return jsonError(http.StatusBadRequest, "请求格式错误："+err.Error())
 	}
 	req.Model = strings.TrimSpace(req.Model)
-	// Suffixes such as gpt-5.5(high) override the body effort in the host.
-	if req.Model == "" || strings.ContainsAny(req.Model, "()\r\n") {
+	if !validModelName(req.Model, false) {
 		return jsonError(http.StatusBadRequest, "请选择不含推理强度后缀的模型")
 	}
 	var mode fingerprintMode

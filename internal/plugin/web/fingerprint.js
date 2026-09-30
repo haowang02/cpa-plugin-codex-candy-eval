@@ -73,7 +73,7 @@ function renderFingerprintRow(a) {
   const latest = p ? collectionOutcome(p, p.total, true) : fpOutcome(last || {});
   return `<div class="row ${open ? "open" : ""}"><div class="list-row row-main" data-row="${esc(a.id)}">
     <input type="checkbox" data-fp-select="${esc(a.id)}" aria-label="选择此凭证" ${fpSelected.has(a.id) ? "checked" : ""} ${pending || !$("fp-model").value || !availableCredential(a) ? "disabled" : ""}>
-    ${credentialView(a, open, "data-fp-toggle")}
+    ${credentialView(a, open)}
     <div class="latest">${latest}</div>
     <div class="fp-mode">${esc(fpModeName(p?.mode || last?.mode))}</div>
     <div class="test-time mono" ${last && !p ? `title="${esc(fmtTime(last.time))}"` : ""}>${last && !p ? esc(fmtTime(last.time)) : "—"}</div>

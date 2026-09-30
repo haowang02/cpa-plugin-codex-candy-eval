@@ -3,10 +3,27 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"sync/atomic"
 	"testing"
 )
+
+func TestRunModelValidation(t *testing.T) {
+	setupTest(t)
+	hostCall = func(string, any) (json.RawMessage, error) {
+		t.Fatal("invalid model must not reach the host")
+		return nil, nil
+	}
+	for _, model := range []string{"", strings.Repeat("m", 201), "model\x00name", "model\nname"} {
+		body, _ := json.Marshal(map[string]any{"model": model, "mode": "quick"})
+		for _, run := range []func([]byte) managementResponse{candyRunResponse, fingerprintRunResponse, traceRunResponse} {
+			if response := run(body); response.StatusCode != http.StatusBadRequest {
+				t.Fatalf("accepted invalid model %q: %s", model, response.Body)
+			}
+		}
+	}
+}
 
 func TestModelTraceRetriesSameProbe(t *testing.T) {
 	setupTest(t)

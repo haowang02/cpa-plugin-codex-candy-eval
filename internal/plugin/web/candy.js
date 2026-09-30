@@ -58,7 +58,7 @@ function renderCandyRow(a) {
   return `<div class="row ${open ? "open" : ""}">
     <div class="list-row row-main" data-row="${esc(a.id)}">
       <input type="checkbox" data-candy-select="${esc(a.id)}" aria-label="选择此凭证" ${candySelected.has(a.id) ? "checked" : ""} ${pending || !$("model").value || !availableCredential(a) ? "disabled" : ""}>
-      ${credentialView(a, open, "data-toggle")}
+      ${credentialView(a, open)}
       <div class="latest">${latest}</div>
       <div class="row-summary ${results.length ? "" : "empty-history"}"><div class="rate">${rate}</div><div class="marks">${marks}</div></div>
       <div class="action">${action}</div>

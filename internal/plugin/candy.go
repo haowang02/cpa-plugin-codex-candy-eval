@@ -61,7 +61,7 @@ func candyRunResponse(body []byte) managementResponse {
 	}
 	req.Model = strings.TrimSpace(req.Model)
 	req.Effort = strings.TrimSpace(req.Effort)
-	if req.Model == "" {
+	if !validModelName(req.Model, true) {
 		return jsonError(http.StatusBadRequest, "请选择模型")
 	}
 	req.Runs = min(max(req.Runs, 1), candyMaxRuns)
@@ -143,9 +143,6 @@ func evaluateCandy(auth credential, model, effort string) candyResult {
 	}
 	r.Answer = truncate(out.Answer, 4000)
 	r.OK = hasStandalone21(out.Answer)
-	if r.Answer == "" {
-		r.Error = "模型没有返回文本"
-	}
 	return r
 }
 

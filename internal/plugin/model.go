@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 )
 
 type modelResponse struct {
@@ -15,6 +16,11 @@ type modelResponse struct {
 	InputTokens     int64
 	OutputTokens    int64
 	ReasoningTokens int64
+}
+
+func validModelName(model string, allowEffort bool) bool {
+	return model != "" && len(model) <= 200 && strings.IndexFunc(model, unicode.IsControl) < 0 &&
+		(allowEffort || !strings.ContainsAny(model, "()"))
 }
 
 func retryableModelStatus(status int) bool {
@@ -139,5 +145,8 @@ func executeModel(auth credential, model string, payload map[string]any) (result
 		}
 	}
 	result.Answer = answer.String()
+	if strings.TrimSpace(result.Answer) == "" {
+		return result, response.StatusCode, fmt.Errorf("模型没有返回文本")
+	}
 	return result, response.StatusCode, nil
 }

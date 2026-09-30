@@ -17,9 +17,9 @@ function mtComparison(r) {
 function mtOutcome(r) {
   const a = r?.attribution;
   const comparison = mtComparison(r);
-  const state = { failed: ["bad", "circle-x", "测试失败"], cancelled: ["neutral", "pause", "测试已停止"], skipped: ["neutral", "ban", "已跳过"] }[r?.status];
+  const state = { failed: ["bad", "circle-x", "测试失败", "查看详情了解原因"], cancelled: ["neutral", "pause", "测试已停止", ""], skipped: ["neutral", "ban", "已跳过", "此凭证不含所选模型"] }[r?.status];
   const [tone, symbol, title] = state || (a ? [comparison.tone, comparison.symbol, a.prediction] : ["idle", "fingerprint", "等待测试"]);
-  const detail = state ? (r.error || "") : a ? `${comparison.label}${r.status === "partial" ? " · 部分结果" : ""}` : "";
+  const detail = state ? state[3] : a ? `${comparison.label}${r.status === "partial" ? " · 部分结果" : ""}` : "";
   return resultOutcome({
     tone, symbol,
     titleHTML: `<span class="mt-prediction"><span>${esc(title)}</span>${a && !state ? `<span class="mt-probability mono">${mtPercent(a.probability)}</span>` : ""}</span>`,
@@ -33,7 +33,7 @@ function renderModelTraceRow(a) {
   const latest = p ? collectionOutcome(p, MT_CONFIG.requests) : mtOutcome(last);
   return `<div class="row ${open ? "open" : ""}"><div class="list-row row-main" data-row="${esc(a.id)}">
     <input type="checkbox" data-mt-select="${esc(a.id)}" aria-label="选择此凭证" ${mtSelected.has(a.id) ? "checked" : ""} ${disabled ? "disabled" : ""}>
-    ${credentialView(a, open, "data-mt-toggle")}
+    ${credentialView(a, open)}
     <div class="mt-test-model mono">${esc(p?.model || last?.model || "—")}</div>
     <div class="latest">${latest}</div>
     <div class="test-time mono">${!p && last ? esc(fmtTime(last.time)) : "—"}</div>
@@ -70,8 +70,9 @@ function showModelTraceDetail(r, credentialID) {
     <pre>${esc(s.prompt)}</pre>${s.error ? `<p class="detail-warning">${esc(s.error)}</p>` : ""}${s.text ? `<pre class="mono">${esc(s.text)}</pre>` : ""}
   </details>`).join("");
   $("mt-detail-body").innerHTML = `<p class="result-dialog-meta"><span class="mono">${esc(r.model)}</span> · ${esc(fmtTime(r.time))} · ${fmtSec(r.duration_ms)}${r.concurrency ? ` · 并发 ${esc(r.concurrency)}` : ""}</p>
-    ${r.attribution && r.status !== "completed" ? `<p class="detail-note">${esc({ partial: "部分结果", cancelled: "测试已停止", failed: "测试失败", skipped: "已跳过" }[r.status] || r.status)}${r.error ? `：${esc(r.error)}` : ""}</p>` : ""}
+    ${r.attribution && r.status !== "completed" ? `<p class="detail-note">${esc({ partial: "部分结果", cancelled: "测试已停止", failed: "测试失败", skipped: "已跳过" }[r.status] || r.status)}</p>` : ""}
     ${r.attribution ? mtResultHTML(r) : mtOutcome(r)}
+    ${r.error ? `<p class="detail-note detail-warning">${esc(r.error)}</p>` : ""}
     ${samples.length ? `<div class="mt-result-heading"><h3>挑战记录</h3><span class="meta">${samples.reduce((n, s) => n + (s.attempts || 1), 0)} 次请求</span></div>${sampleEntries}` : ""}`;
   openResultDetail("mt", r.id, credentialID);
 }

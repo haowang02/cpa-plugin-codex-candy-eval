@@ -3,7 +3,7 @@ const BASE = "/v0/management/plugins/cpa-codex-candy-eval";
 const KEY_STORE = "cpa-codex-candy-eval.key";
 const PREF_STORE = "cpa-codex-candy-eval.prefs";
 const MASK_STORE = "cpa-codex-candy-eval.masked";
-const DEFAULT_MODEL = "gpt-5.6-sol";
+const DEFAULT_MODEL = "gpt-6.1-sol";
 const HIDDEN_MODEL = (id) => id.toLowerCase().includes("image") || id.toLowerCase().split("/").pop().split("(")[0] === "codex-auto-review";
 const tabNames = ["candy", "fingerprint", "modeltrace"];
 
@@ -67,7 +67,7 @@ async function api(path, { method = "GET", body, apiKey, signal } = {}) {
     const err = data?.error;
     throw new Error(String((typeof err === "string" ? err : err?.message) || text || "HTTP " + resp.status).slice(0, 500));
   }
-  if (!data || typeof data !== "object") throw new Error("服务器返回了无效数据，请稍后重试。");
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("服务器返回了无效数据，请稍后重试。");
   return data;
 }
 
@@ -78,15 +78,17 @@ function store(name, value) {
   try { localStorage.setItem(name, JSON.stringify(value)); } catch (_) {}
 }
 function fillModels() {
-  const ids = [...new Set(catalogCache.models?.ids || [])].sort();
+  const ids = [...new Set(catalogCache.models?.ids || [])].sort(compareModels);
+  const probeModels = ids.filter((id) => !/[()]/.test(id));
   fillSelect("model", ids, $("model").value || candyPrefs().model, DEFAULT_MODEL);
-  fillSelect("fp-model", ids.filter((id) => !/[()]/.test(id)), $("fp-model").value || stored(PREF_STORE + ".fingerprint")?.model, DEFAULT_MODEL);
-  fillSelect("mt-model", ids.filter((id) => !/[()]/.test(id)), $("mt-model").value || stored(PREF_STORE + ".modeltrace")?.model, DEFAULT_MODEL);
+  fillSelect("fp-model", probeModels, $("fp-model").value || stored(PREF_STORE + ".fingerprint")?.model, DEFAULT_MODEL);
+  fillSelect("mt-model", probeModels, $("mt-model").value || stored(PREF_STORE + ".modeltrace")?.model, DEFAULT_MODEL);
 }
 function renderList(prefix, renderRow) {
   const id = prefix + "rows", list = $(id);
   const visible = visibleCredentials(prefix);
-  const html = visible.length ? visible.map(renderRow).join("") : `<div class="empty">${esc(loadError || "当前类型没有凭证，请切换类型或在 CPA 中添加凭证。")}</div>`;
+  const empty = loadController && !credentials.length ? "正在读取凭证与历史记录…" : "当前类型没有凭证，请切换类型或在 CPA 中添加凭证。";
+  const html = visible.length ? visible.map(renderRow).join("") : `<div class="empty">${esc(loadError || empty)}</div>`;
   if (listMarkup.get(id) === html) return;
   const focused = list.contains(document.activeElement) ? document.activeElement : null;
   const selector = focused && [...focused.attributes].filter((a) => a.name.startsWith("data-"))
@@ -130,7 +132,7 @@ async function load({ refresh = false } = {}) {
   stopPolling();
   const controller = new AbortController();
   loadController = controller;
-  renderRefresh();
+  render();
   try {
     try {
       await refreshCatalog({ signal: controller.signal, force: refresh });
@@ -148,15 +150,16 @@ async function load({ refresh = false } = {}) {
     pruneCredentialCatalog();
     fillCredentialTypes();
     storageError = data.storage_error || "";
-    setNotice("load-error", "");
     loadError = "";
+    setNotice("load-error", "");
     const ids = new Set(credentials.map((a) => a.id));
+    const enabled = new Set(credentials.filter((a) => !a.disabled).map((a) => a.id));
     const answers = new Set(credentials.flatMap((a) => a.results.map((r) => answerKey(a.id, r))));
     for (const expanded of [candyExpanded, fpExpanded, mtExpanded]) {
       for (const id of expanded) if (!ids.has(id)) expanded.delete(id);
     }
     for (const selection of [candySelected, fpSelected, mtSelected]) {
-      for (const id of selection) if (!credentials.some((a) => a.id === id && !a.disabled)) selection.delete(id);
+      for (const id of selection) if (!enabled.has(id)) selection.delete(id);
     }
     for (const id of candyAnswersExpanded) if (!answers.has(id)) candyAnswersExpanded.delete(id);
   } catch (err) {
@@ -164,10 +167,13 @@ async function load({ refresh = false } = {}) {
     if (err instanceof AuthError) return showLogin(err.message);
     loadError = "读取测试结果失败：" + err.message;
     setNotice("load-error", loadError);
+  } finally {
+    if (loadController === controller) {
+      loadController = null;
+      render();
+      pollTimer = setTimeout(load, credentials.some((a) => a.running || a.fingerprint_running || a.modeltrace_running) ? 2500 : 20000);
+    }
   }
-  loadController = null;
-  render();
-  pollTimer = setTimeout(load, credentials.some((a) => a.running || a.fingerprint_running || a.modeltrace_running) ? 2500 : 20000);
 }
 
 async function update(path, options, errorPrefix) {
@@ -203,6 +209,8 @@ async function update(path, options, errorPrefix) {
 
 function showLogin(message) {
   stopPolling();
+  key = "";
+  try { sessionStorage.removeItem(KEY_STORE); } catch (_) {}
   resetCatalogCache();
   credentials = [];
   loadError = storageError = "";
@@ -283,7 +291,7 @@ function bindCollectionActions({ type, scope, historyKey, expanded, renderRows, 
     if (runID) return run({ auth_ids: [runID] });
     const cancelID = action("cancel");
     if (cancelID) return update(`/${scope}/cancel`, { method: "POST", body: { auth_ids: [cancelID] } }, "停止测试失败");
-    const toggleID = action("toggle") || e.target.closest("[data-row]")?.dataset.row;
+    const toggleID = e.target.closest("[data-row]")?.dataset.row;
     if (toggleID) {
       expanded.has(toggleID) ? expanded.delete(toggleID) : expanded.add(toggleID);
       return renderRows();

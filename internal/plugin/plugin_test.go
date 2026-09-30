@@ -299,6 +299,7 @@ func TestEvaluateErrors(t *testing.T) {
 		{"upstream error", http.StatusTooManyRequests, `{"error":{"message":"quota exhausted"}}`},
 		{"invalid response", http.StatusOK, `not json`},
 		{"missing answer", http.StatusOK, `{"output":[]}`},
+		{"blank answer", http.StatusOK, `{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":" \n\t "}]}]}`},
 		{"incomplete answer", http.StatusOK, `{"status":"incomplete","output":[{"type":"message","content":[{"type":"output_text","text":"21"}]}]}`},
 		{"cancelled answer", http.StatusOK, `{"status":"cancelled","output":[{"type":"message","content":[{"type":"output_text","text":"21"}]}]}`},
 		{"missing status code", 0, `{"output":[]}`},

@@ -69,11 +69,22 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`HIDDEN_MODEL('codex-auto-review')`), true);
   assert.equal(run(`HIDDEN_MODEL('provider/codex-auto-review(high)')`), true);
   assert.equal(run(`HIDDEN_MODEL('claude-sonnet')`), false);
-  run(`initializeCandy(); initializeFingerprint(); catalogCache.models = {time:Date.now(),ids:['prefix/model','gpt-5.6-sol','claude-sonnet']}; fillModels()`);
-  assert.equal(element('model').value, 'gpt-5.6-sol');
-  assert.equal(element('model').innerHTML, '<option value="claude-sonnet">claude-sonnet</option><option value="gpt-5.6-sol">gpt-5.6-sol</option><option value="prefix/model">prefix/model</option>');
+  run(`initializeCandy(); initializeFingerprint(); catalogCache.models = {time:Date.now(),ids:['prefix/model','gpt-5.6-sol','claude-sonnet','gpt-6.1-sol']}; fillModels()`);
+  assert.equal(element('model').value, 'gpt-6.1-sol');
+  assert.equal(element('effort').value, 'low');
+  assert.equal(element('model').innerHTML, '<option value="gpt-6.1-sol">gpt-6.1-sol</option><option value="gpt-5.6-sol">gpt-5.6-sol</option><option value="claude-sonnet">claude-sonnet</option><option value="prefix/model">prefix/model</option>');
   assert.equal(element('fp-model').innerHTML, element('model').innerHTML);
   assert.equal(element('mt-model').innerHTML, element('model').innerHTML);
+  const sortedModels = ['gpt-6.1-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6.1-luna','gpt-6-astra','gpt-6-sol','gpt-6-terra','gpt-6-luna','gpt-5.6-sol','claude-sonnet-4.6','claude-opus-4.6','claude-opus-4.5','gemini-pro','qwen'];
+  assert.deepEqual(plain(run(`${JSON.stringify([...sortedModels].reverse())}.sort(compareModels)`)), sortedModels);
+  assert.deepEqual(plain(run(`['gpt-6-luna','vendor/gpt-6.1-sol','gpt-6-astra','vendor/claude-sonnet','other'].sort(compareModels)`)), ['vendor/gpt-6.1-sol','gpt-6-astra','gpt-6-luna','vendor/claude-sonnet','other']);
+  element('model').value = 'gpt-5.6-sol';
+  element('effort').value = 'high';
+  run(`candySavePrefs(); fillModels(); initializeCandy()`);
+  assert.equal(element('model').value, 'gpt-5.6-sol', 'explicit saved selections should survive the new default');
+  assert.equal(element('effort').value, 'high');
+  element('effort').value = 'low';
+  run(`candySavePrefs()`);
   assert.equal(run(`availableCredential({modeltrace_running:{}})`), false);
   assert.equal(run(`mtPercent(0.12345)`), '12.3%');
   assert.equal(run(`mtConcurrency()`), 3);
@@ -86,7 +97,9 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`stored(PREF_STORE + '.modeltrace').temperature`), undefined);
   assert(run(`mtOutcome({status:'partial',attribution:{prediction:'<script>',family_prediction_name:'GPT',used_outputs:2}})`).includes('&lt;script&gt;'));
   assert(run(`mtOutcome({status:'cancelled'})`).includes('测试已停止'));
-  assert(run(`mtOutcome({status:'failed',error:'<error>'})`).includes('&lt;error&gt;'));
+  const failedOutcome = run(`mtOutcome({status:'failed',error:'<error>'})`);
+  assert(failedOutcome.includes('测试失败'));
+  assert(!failedOutcome.includes('&lt;error&gt;'), 'raw failures belong in the detail dialog, not the result table');
   assert(run(`mtOutcome({status:'completed',attribution:{prediction:'gpt-test',family_prediction_name:'GPT',used_outputs:3,probability:0.834}})`).includes('<span>gpt-test</span><span class="mt-probability mono">83.4%</span>'));
   assert.equal(run(`mtComparison({status:'completed',model:'provider/GPT-TEST',attribution:{prediction:'gpt-test'}}).tone`), 'ok');
   assert.equal(run(`mtComparison({status:'completed',model:'gpt-test',attribution:{prediction:'other-model'}}).tone`), 'warn');
@@ -301,6 +314,27 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(noticeTimers.size, 1);
 
   const validState = {auths:[{id:'valid-state',name:'Test',source:'auth_files',provider:'codex',results:[],fingerprints:[],modeltraces:[]}],storage_error:''};
+  run(`resetCatalogCache(); let finishModels, finishSync, modelsStarted, syncStarted;
+    const modelsWaiting = new Promise(resolve => {modelsStarted=resolve});
+    const syncWaiting = new Promise(resolve => {syncStarted=resolve});
+    api = async path => {
+      if (path.endsWith('/config')) return {};
+      if (path.endsWith('/v1/models')) return new Promise(resolve => {finishModels=resolve; modelsStarted();});
+      if (path.endsWith('/sync')) return new Promise(resolve => {finishSync=resolve; syncStarted();});
+      throw new Error('Unexpected endpoint');
+    }`);
+  const parallelCatalog = run(`refreshCatalog({force:true})`);
+  await Promise.all([run(`modelsWaiting`), run(`syncWaiting`)]);
+  run(`finishModels({data:[{id:'test-model'}]})`);
+  await new Promise(setImmediate);
+  assert.equal(run(`catalogCache.models`), null, 'a directory is ready only after credential sync');
+  run(`finishSync({synced:0})`);
+  await parallelCatalog;
+  assert.deepEqual(plain(run(`catalogCache.models.ids`)), ['test-model']);
+  run(`credentials = []; refreshCatalog = async () => {throw new Error('Directory unavailable')}; api = async () => (${JSON.stringify(validState)})`);
+  await run(`load()`);
+  assert.equal(run(`credentials[0].id`), 'valid-state', 'a directory failure should still allow viewing history');
+  assert.equal(element('catalog-error').hidden, false);
   run(`refreshCatalog = async () => {}; api = async () => (${JSON.stringify(validState)})`);
   await run(`load()`);
   for (const invalid of [{auths:null},{auths:[null]},{auths:[{id:'broken',results:null,fingerprints:[],modeltraces:[]}]},{auths:[{...validState.auths[0],results:[null]}]}]) {

@@ -3,6 +3,7 @@ package plugin
 // ModelTrace scoring, ported from xqy2006/ModelTrace (MIT).
 // See data/modeltrace/README.md for the pinned source and license.
 import (
+	"crypto/sha256"
 	_ "embed"
 	"fmt"
 	"math"
@@ -47,6 +48,7 @@ type traceBank struct {
 }
 
 var modelTraceBank = mustDecode[traceBank](modelTraceBankJSON)
+var traceBankRevision = fmt.Sprintf("sha256:%x", sha256.Sum256(modelTraceBankJSON))
 
 type traceOutput struct {
 	Text          string `json:"text"`

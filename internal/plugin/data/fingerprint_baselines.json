@@ -145,5 +145,26 @@
       "random-animal:zh": ["海豚", "水獭", "海豚", "海豚", "猫", "水獭", "水獭", "海豚", "水獭", "海豚", "猫", "海豚", "猫", "水獭", "猫", "猫", "水獭", "海豚", "水獭", "水獭", "海豚", "水獭", "猫", "海豚", "海豚"],
       "random-city:en": ["lisbon", "lisbon", "lisbon", "lisbon", "kyoto", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "kyoto", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon"]
     }
+  },
+  {
+    "model": "gpt-6.1-sol",
+    "cells": {
+      "random-number-1-100:en": ["47", "47", "47", "17", "47", "47", "47", "47", "47", "47", "47", "73", "47", "47", "47", "17", "17", "47", "47", "17", "47", "47", "17", "47", "17"],
+      "random-number-1-100:zh": ["47", "47", "73", "37", "47", "47", "47", "37", "47", "47", "47", "37", "47", "47", "47", "37", "47", "47", "47", "47", "47", "47", "47", "47", "47"],
+      "random-color:en": ["cerulean", "turquoise", "turquoise", "cerulean", "teal", "turquoise", "cerulean", "cerulean", "turquoise", "cerulean", "turquoise", "teal", "cerulean", "turquoise", "turquoise", "cerulean", "turquoise", "cerulean", "teal", "turquoise", "cerulean", "cerulean", "turquoise", "turquoise", "cerulean"],
+      "random-animal:en": ["otter", "otter", "otter", "otter", "otter", "otter", "pangolin", "otter", "otter", "otter", "otter", "otter", "otter", "pangolin", "otter", "pangolin", "otter", "pangolin", "otter", "otter", "otter", "pangolin", "otter", "otter", "otter"],
+      "random-number-1-10:en": ["7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7"],
+      "random-letter:en": ["k", "q", "q", "q", "q", "q", "q", "r", "q", "q", "q", "q", "q", "q", "q", "q", "q", "q", "q", "q", "q", "k", "q", "q", "q"],
+      "random-color:zh": ["蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝", "蓝"],
+      "coin-flip:en": ["heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads"],
+      "favorite-number:en": ["7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7"],
+      "random-city:en": ["lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "kyoto", "kyoto", "lisbon", "lisbon", "kyoto", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "lisbon", "kyoto", "lisbon", "kyoto", "lisbon"],
+      "random-number-1-10:zh": ["7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7"],
+      "coin-flip:zh": ["heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "tails", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads", "heads"],
+      "random-letter:zh": ["k", "k", "k", "q", "m", "k", "k", "m", "q", "k", "q", "q", "k", "m", "k", "q", "k", "k", "k", "q", "k", "q", "k", "k", "q"],
+      "random-animal:zh": ["海豚", "猫", "水獭", "海豚", "猫", "海豚", "水獭", "猫", "海豚", "水獭", "猫", "水獭", "水獭", "猫", "海豚", "海豚", "猫", "水獭", "海豚", "猫", "水獭", "水獭", "猫", "狐狸", "水獭"],
+      "random-city:zh": ["杭州", "北京", "成都", "杭州", "北京", "成都", "杭州", "杭州", "成都", "杭州", "北京", "成都", "杭州", "北京", "成都", "杭州", "北京", "杭州", "成都", "上海", "杭州", "成都", "上海", "成都", "成都"],
+      "favorite-number:zh": ["7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7", "7"]
+    }
   }
 ]

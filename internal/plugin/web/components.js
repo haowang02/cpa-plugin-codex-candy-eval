@@ -76,8 +76,8 @@ function planName(plan) {
   return Object.hasOwn(PLAN_NAMES, name.toLowerCase()) ? PLAN_NAMES[name.toLowerCase()] : name || "其他";
 }
 
-function credentialView(a, open, toggleAttribute) {
-  return `<div class="credential"><button class="toggle" type="button" ${toggleAttribute}="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
+function credentialView(a, open) {
+  return `<div class="credential"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
     <div class="tags"><span class="tag source-tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(a.provider)}</span></span>${a.source === "auth_files" && a.provider === "codex" ? `<span class="tag">${esc(planName(a.plan_type))}</span>` : ""}${a.disabled ? `<span class="tag">已停用</span>` : ""}</div></div>`;
 }
 
@@ -147,5 +147,5 @@ function credentialCard(prefix, columns) {
   return `<div class="section-head"><div class="credential-heading"><h2>凭证</h2><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span></div>
     <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" title="清空${label}历史" aria-label="清空${label}历史" disabled>${icon("trash-2")}</button></div></div>
     <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${columns.map((label) => `<div>${label}</div>`).join("")}</div>
-    <div id="${prefix}rows"><div class="notice">正在加载…</div></div>`;
+    <div id="${prefix}rows"><div class="empty">正在加载…</div></div>`;
 }

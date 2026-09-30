@@ -19,7 +19,6 @@ const (
 	traceMaxConcurrency     = traceTarget
 	traceGlobalConcurrency  = 6
 	traceMaxText            = 64000
-	traceBankRevision       = "df3a0f9d3e054c0dc02d6d586686db8daf8fa7c8"
 )
 
 type traceChallenge struct {
@@ -100,7 +99,7 @@ func traceRunResponse(body []byte) managementResponse {
 		return jsonError(http.StatusBadRequest, "请求格式错误")
 	}
 	req.Model = strings.TrimSpace(req.Model)
-	if req.Model == "" || len(req.Model) > 200 || strings.ContainsAny(req.Model, "()\r\n") {
+	if !validModelName(req.Model, false) {
 		return jsonError(http.StatusBadRequest, "请选择不含推理强度后缀的模型")
 	}
 	if req.Concurrency == 0 {

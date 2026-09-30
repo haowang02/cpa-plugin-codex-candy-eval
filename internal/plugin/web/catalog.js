@@ -65,6 +65,28 @@ function modelIDs(entries) {
   return [...new Set(entries.map((entry) => entry.id))].sort();
 }
 
+// Compare the model name after an optional provider prefix. Keep original IDs
+// intact for requests and use them to break ties between aliases.
+function compareModels(a, b) {
+  const name = (id) => id.toLowerCase().split("/").pop();
+  const group = (id) => id.startsWith("gpt-") ? 0 : id.startsWith("claude-") ? 1 : 2;
+  const left = name(a), right = name(b), family = group(left) - group(right);
+  const lexical = (x, y) => x < y ? -1 : x > y ? 1 : 0;
+  if (family) return family;
+  if (group(left) === 0) {
+    const generation = /^gpt-(\d+(?:\.\d+)*)(?:-(astra|sol|terra|luna))?(?=[-(]|$)/;
+    const l = left.match(generation), r = right.match(generation);
+    if (l && r) {
+      if (l[1] !== r[1]) return lexical(r[1], l[1]);
+      const tiers = ["astra", "sol", "terra", "luna"];
+      const rank = (tier) => tier ? tiers.indexOf(tier) : tiers.length;
+      const tier = rank(l[2]) - rank(r[2]);
+      if (tier) return tier;
+    }
+  }
+  return (group(left) < 2 ? lexical(right, left) : lexical(left, right)) || lexical(a, b);
+}
+
 async function refreshCatalog({ signal, force = false } = {}) {
   const age = Date.now() - catalogRefreshedAt;
   if (!force && age >= 0 && age < MODEL_CATALOG_TTL) return;
@@ -79,15 +101,19 @@ async function refreshCatalog({ signal, force = false } = {}) {
   // Detect routing and alias changes without storing the configuration or keys.
   const revision = await sha256Hex(JSON.stringify(config));
   checkCurrent();
-  await api(BASE + "/credentials/sync", { method: "POST", body: { credentials: inventory }, signal });
+  const [modelResult, syncResult] = await Promise.allSettled([
+    (async () => {
+      if (revision === cache.revision && freshCatalog(cache.models, MODEL_CATALOG_TTL)) return cache.models;
+      const keys = Array.isArray(config["api-keys"]) ? config["api-keys"] : [];
+      const data = await api("/v1/models", { apiKey: keys[0] || "", signal });
+      return { time: Date.now(), ids: modelIDs(data.data).filter((id) => !HIDDEN_MODEL(id)) };
+    })(),
+    api(BASE + "/credentials/sync", { method: "POST", body: { credentials: inventory }, signal }),
+  ]);
   checkCurrent();
-  let models = cache.models;
-  if (revision !== cache.revision || !freshCatalog(models, MODEL_CATALOG_TTL)) {
-    const keys = Array.isArray(config["api-keys"]) ? config["api-keys"] : [];
-    const data = await api("/v1/models", { apiKey: keys[0] || "", signal });
-    models = { time: Date.now(), ids: modelIDs(data.data).filter((id) => !HIDDEN_MODEL(id)) };
-  }
-  checkCurrent();
+  if (syncResult.status === "rejected") throw syncResult.reason;
+  if (modelResult.status === "rejected") throw modelResult.reason;
+  const models = modelResult.value;
   if (revision !== cache.revision || JSON.stringify(models.ids) !== JSON.stringify(cache.models?.ids)) {
     resetCatalogCache({ owner: cache.owner, revision, models, credentials: Object.create(null) });
   } else {

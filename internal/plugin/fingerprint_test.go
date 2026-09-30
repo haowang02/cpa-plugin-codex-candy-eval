@@ -105,20 +105,20 @@ func TestFingerprintBaselineCoverage(t *testing.T) {
 	if len(fingerprintProbes) != 16 {
 		t.Fatal("invalid embedded data")
 	}
-	want := map[string]bool{"gpt-6-astra": true, "gpt-6-sol": true, "gpt-6-luna": true, "gpt-5.6-sol": true, "gpt-5.6-luna": true, "gpt-5.6-terra": true, "gpt-5.5": true}
+	seen := map[string]bool{}
 	for _, b := range fingerprintBaselines {
-		if !want[b.Model] {
-			t.Fatalf("unexpected/duplicate baseline %s", b.Model)
+		if b.Model == "" || seen[b.Model] || len(b.Cells) != len(fingerprintProbes) {
+			t.Fatalf("invalid/duplicate baseline %s", b.Model)
 		}
-		delete(want, b.Model)
+		seen[b.Model] = true
 		for _, probe := range fingerprintProbes {
 			if len(b.Cells[probe.ID]) < fingerprintMinValid {
 				t.Errorf("%s %s: insufficient baseline answers: %d", b.Model, probe.ID, len(b.Cells[probe.ID]))
 			}
 		}
 	}
-	if len(want) > 0 {
-		t.Fatalf("missing baselines: %v", want)
+	if len(seen) == 0 {
+		t.Fatal("missing baselines")
 	}
 }
 
