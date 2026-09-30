@@ -76,9 +76,16 @@ function planName(plan) {
   return Object.hasOwn(PLAN_NAMES, name.toLowerCase()) ? PLAN_NAMES[name.toLowerCase()] : name || "其他";
 }
 
+function credentialPlan(a) {
+  if (a.source !== "auth_files" || a.provider !== "codex") return "other";
+  const type = String(a.plan_type || "").trim().toLowerCase();
+  return ["pro", "prolite", "pro-lite", "pro_lite"].includes(type) ? "pro" : ["plus", "team", "free"].includes(type) ? type : "other";
+}
+const credentialPlanRank = (a) => ({ pro: 0, plus: 1, team: 2, other: 2, free: 3 })[credentialPlan(a)];
+
 function credentialView(a, open) {
   return `<div class="credential"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
-    <div class="tags"><span class="tag source-tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(a.provider)}</span></span>${a.source === "auth_files" && a.provider === "codex" ? `<span class="tag">${esc(planName(a.plan_type))}</span>` : ""}${a.disabled ? `<span class="tag">已停用</span>` : ""}</div></div>`;
+    <div class="tags"><span class="tag source-tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(a.provider)}</span></span>${a.source === "auth_files" && a.provider === "codex" ? `<span class="tag plan-tag plan-${credentialPlan(a)}">${esc(planName(a.plan_type))}</span>` : ""}${a.disabled ? `<span class="tag">已停用</span>` : ""}</div></div>`;
 }
 
 function resultOutcome({ tone = "", symbol, titleHTML, detailHTML = "", progressHTML = "" }) {

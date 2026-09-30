@@ -61,7 +61,7 @@ function renderCandyRow(a) {
       ${credentialView(a, open)}
       <div class="latest">${latest}</div>
       <div class="row-summary ${results.length ? "" : "empty-history"}"><div class="rate">${rate}</div><div class="marks">${marks}</div></div>
-      <div class="action">${action}<button class="btn ghost danger" type="button" data-disable="${esc(a.id)}" ${pending || !availableCredential(a) || a.source !== "auth_files" ? "disabled" : ""} ${a.source !== "auth_files" ? 'title="请在 AI 提供商设置中停用此凭证"' : ""}>${a.disabled ? "已停用" : "停用账户"}</button></div>
+      <div class="action">${action}<button class="btn ghost ${a.disabled ? "" : "danger"}" type="button" data-status="${esc(a.id)}" ${pending || !canToggleCredential(a) ? "disabled" : ""} ${a.source !== "auth_files" ? 'title="请在 AI 提供商设置中启用或停用此凭证"' : ""}>${a.disabled ? "启用账户" : "停用账户"}</button></div>
     </div>
     ${open ? historyPanel([...results].reverse().map((r, i) => candyHistory(a, r, i)).join("")) : ""}
   </div>`;
@@ -179,8 +179,8 @@ function initializeCandy() {
       answer.innerHTML = answerToggle(open);
       return;
     }
-    const disable = e.target.closest("[data-disable]");
-    if (disable) return disableCredential(disable.dataset.disable);
+    const status = e.target.closest("[data-status]");
+    if (status) return toggleCredentialStatus(status.dataset.status);
     const btn = e.target.closest("[data-run]");
     if (btn) return runCandy({ auth_ids: [btn.dataset.run] });
     const row = e.target.closest("[data-row]");
