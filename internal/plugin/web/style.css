@@ -1,7 +1,7 @@
 /* Theme and base */
 :root {
   --page-top: 32px; --page-inline: 24px;
-  --list-padding: 22px; --list-gap: 16px; --list-checkbox: 22px; --credential-indent: 20px; --switch-width: 44px; --action-width: 88px;
+  --list-padding: 22px; --list-gap: 16px; --list-checkbox: 22px; --credential-indent: 20px; --switch-width: 32px; --action-width: 88px;
   --credential-track: minmax(0, 300px); --result-track: minmax(0, 280px); --marks-width: 208px;
   --bg: #f2f5f3; --surface: #ffffff; --sunken: #f7f9f8; --ink: #15201b; --muted: #66726c; --faint: #a0aaa5; --line: #e1e7e4;
   --apple: #2b9a58; --apple-ink: #1d7a43; --apple-soft: #e5f4ea; --apple-soft-hover: #d5ecdd; --peach: #e0533f; --peach-soft: #fceae6;
@@ -11,6 +11,7 @@
   --plus-ink: #2463b0; --plus-soft: #eaf2fd; --plus-line: #c8dcf6; --go-ink: #0e7773; --go-soft: #e3f5f3; --go-line: #bfe5e0;
   --business-ink: #6b46c1; --business-soft: #f2edfc; --business-line: #dcd0f5;
   --shadow: 0 1px 2px rgb(21 32 27 / 4%), 0 12px 32px -18px rgb(21 32 27 / 18%); --float: 0 10px 30px -8px rgb(21 32 27 / 25%);
+  --raised: 0 1px 2px rgb(21 32 27 / 8%), 0 2px 6px -2px rgb(29 122 67 / 35%);
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -21,7 +22,7 @@
   --premium-soft: radial-gradient(circle at 18% 24%, rgb(255 229 138 / 32%), rgb(255 214 98 / 0) 44%), linear-gradient(135deg, #4f3d0b, #6e5510 48%, #8f6d10);
   --plus-ink: #93c1f7; --plus-soft: #16283d; --plus-line: #2a4868; --go-ink: #7fd6cf; --go-soft: #112f2d; --go-line: #245450;
   --business-ink: #c4b0f5; --business-soft: #251e3a; --business-line: #45386b;
-  --shadow: none; --float: 0 10px 30px -8px rgb(0 0 0 / 60%);
+  --shadow: none; --float: 0 10px 30px -8px rgb(0 0 0 / 60%); --raised: 0 1px 2px rgb(0 0 0 / 50%), 0 2px 6px -2px rgb(0 0 0 / 70%);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -44,7 +45,7 @@ button, input, select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 
 /* Shared controls */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: clip; }
 .toolbar { display: grid; grid-template-columns: var(--toolbar-columns); align-items: end; gap: 12px 16px; padding: 14px 16px; margin-bottom: 8px; }
 .toolbar > .btn { justify-self: end; min-width: 138px; }
 .field { display: grid; gap: 4px; min-width: 0; width: 100%; }
@@ -72,10 +73,10 @@ button, input, select { font: inherit; color: inherit; }
 .btn.icon-button { width: 32px; padding: 0; }
 input[type="checkbox"] { accent-color: var(--apple); width: 15px; height: 15px; margin: 0; cursor: pointer; }
 .switch { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
-.switch > input { appearance: none; position: relative; flex: none; width: 44px; height: 24px; border-radius: 999px; background: var(--line); transition: background .15s; }
-.switch > input::before { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 20%); transition: transform .15s; }
+.switch > input { appearance: none; position: relative; flex: none; width: var(--switch-width); height: 18px; border-radius: 999px; background: color-mix(in srgb, var(--faint) 55%, var(--line)); transition: background .15s; }
+.switch > input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 20%); transition: transform .15s; }
 .switch > input:checked { background: var(--apple); }
-.switch > input:checked::before { transform: translateX(20px); }
+.switch > input:checked::before { transform: translateX(14px); }
 .switch > input:disabled { opacity: .55; cursor: default; }
 
 /* Page navigation and introduction */
@@ -97,10 +98,14 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .problem-body:hover .copy-btn, .problem-body:focus-within .copy-btn, .copy-btn.copied { opacity: 1; }
 .copy-btn:hover, .copy-btn.copied { color: var(--apple); border-color: currentColor; }
 .clipboard-buffer { position: fixed; opacity: 0; pointer-events: none; }
-.tabs { display: flex; flex: 1; min-width: 0; gap: 6px; overflow-x: auto; }
-.tab { flex: none; white-space: nowrap; padding: 10px 18px; border: 0; border-bottom: 2px solid transparent; background: transparent; cursor: pointer; color: var(--muted); font-weight: 600; }
-.tab[aria-selected="true"] { color: var(--apple-ink); border-bottom-color: var(--apple); }
-.page-navigation { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 2px; padding: 3px; overflow-x: auto; }
+.tab { flex: none; height: 32px; padding: 0 16px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-weight: 600; white-space: nowrap; cursor: pointer; transition: scale .3s cubic-bezier(.34, 1.56, .64, 1), translate .2s, box-shadow .2s; }
+.tab:hover { color: var(--ink); }
+.tab:active { scale: .95; transition-duration: .08s; }
+.tab:focus-visible { outline-offset: -2px; }
+.tab[aria-selected="true"] { background: var(--apple-soft); color: var(--apple-ink); box-shadow: var(--raised); }
+.tab[aria-selected="true"]:hover { translate: 0 -1px; }
+.page-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 #refresh { flex: none; width: 36px; height: 36px; border-radius: 50%; }
 #refresh[aria-busy="true"] .icon { animation: spin .8s linear infinite; }
 .panel-intro { margin-bottom: 18px; color: var(--muted); }
@@ -143,7 +148,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .row:last-child { border-bottom: 0; }
 .row-main { cursor: pointer; }
 .select-cell { align-self: stretch; display: flex; align-items: center; }
-.list-row > .btn { justify-self: end; }
+.list-row > .btn { width: var(--action-width); height: 36px; padding: 0; }
 .row-main:hover, .row.open .row-main { background: var(--sunken); }
 .credential { min-width: 0; }
 .toggle { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: left; }
@@ -228,7 +233,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .fp-mode, .test-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .history-title { padding: 0 0 8px; color: var(--muted); font-size: 12px; }
 .result-history { display: grid; gap: 8px; }
-.history-card { --outcome-size: 30px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.history-card { --outcome-size: 30px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: clip; }
 .history-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 12px; background: var(--band); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .history-card-body { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 13px; }
 .history-card-body > .verdict { align-self: flex-start; }
@@ -328,6 +333,7 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
 @media (max-width: 768px) {
   /* The CPA panel places floating controls over the top of narrow iframes. */
   :root { --list-padding: 16px; --page-top: calc(80px + env(safe-area-inset-top)); }
+  .tab { padding: 0 12px; }
   .list-head { display: none; }
   .list-row {
     --outcome-size: 30px; grid-template-columns: var(--list-checkbox) minmax(0, 1fr) auto; row-gap: 14px; padding-block: 16px;
@@ -367,5 +373,5 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
 }
 @media (prefers-reduced-motion: reduce) {
   .spin, #refresh[aria-busy="true"] .icon { animation: none; }
-  .mark-hit, .copy-btn, .chev, .credential .name, .switch > input, .switch > input::before { transition: none; }
+  .tab, .mark-hit, .copy-btn, .chev, .credential .name, .switch > input, .switch > input::before { transition: none; }
 }

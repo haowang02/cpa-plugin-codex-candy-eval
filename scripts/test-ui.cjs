@@ -124,10 +124,10 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   run(`showFingerprintDetail({id:'skipped',status:'skipped',model:'test',error:'不支持的模型'})`);
   assert.equal(element('fp-detail-body').innerHTML.match(/不支持的模型/g).length, 1);
   assert(!element('fp-detail-body').innerHTML.includes('基准比对'));
-  run(`loadController = {}; renderRefresh()`);
+  run(`refreshing = true; renderRefresh()`);
   assert.equal(element('refresh').disabled, true);
   assert.equal(element('refresh')['aria-busy'], true);
-  run(`loadController = null; pending = true; renderRefresh()`);
+  run(`refreshing = false; pending = true; renderRefresh()`);
   assert.equal(element('refresh').disabled, true);
   assert.equal(element('refresh')['aria-busy'], false);
   run(`pending = false; renderRefresh()`);

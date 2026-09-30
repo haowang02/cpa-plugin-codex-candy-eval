@@ -12,6 +12,8 @@ let credentials = [];
 let pollTimer = 0;
 let loadError = "";
 let loadController = null;
+// Whether a refresh started with the button is running; polling never shows progress.
+let refreshing = false;
 let pending = false;
 let storageError = "";
 let clearScope = "candy";
@@ -131,8 +133,8 @@ function rowNode(html) {
 }
 
 function renderRefresh() {
-  $("refresh").disabled = pending || !!loadController;
-  $("refresh").setAttribute("aria-busy", !!loadController);
+  $("refresh").disabled = pending || refreshing;
+  $("refresh").setAttribute("aria-busy", refreshing);
 }
 
 function render() {
@@ -148,7 +150,6 @@ function stopPolling() {
   clearTimeout(pollTimer);
   loadController?.abort();
   loadController = null;
-  renderRefresh();
 }
 
 function stateCredentials(data) {
@@ -399,10 +400,16 @@ for (const id of ["flash", "load-error", "catalog-error", "storage-error"]) {
   $(id).querySelector(".notice-close").addEventListener("click", () => hideNotice(id));
 }
 
-$("refresh").addEventListener("click", () => {
+$("refresh").addEventListener("click", async () => {
   if (pending) return;
   resetCatalogCache();
-  load({ refresh: true });
+  refreshing = true;
+  try {
+    await load({ refresh: true });
+  } finally {
+    refreshing = false;
+    renderRefresh();
+  }
 });
 
 applyTheme();
