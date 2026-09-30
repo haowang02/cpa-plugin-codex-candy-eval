@@ -265,8 +265,49 @@ const batchCredentials = (prefix, selection) => {
   const selected = selectedCredentials(prefix, selection);
   return (selected.length ? selected : visibleCredentials(prefix)).filter(availableCredential);
 };
+function planMatches(a, plan) {
+  if (a.source !== "auth_files" || a.provider !== "codex") return false;
+  const type = String(a.plan_type || "").trim().toLowerCase();
+  return plan === "pro" ? ["pro", "prolite", "pro-lite", "pro_lite"].includes(type) : type === plan;
+}
+function selectPlan(prefix, selection, plan) {
+  if (pending || !["plus", "pro", "team"].includes(plan)) return;
+  const matches = visibleCredentials(prefix).filter((a) => availableCredential(a) && planMatches(a, plan));
+  if (!matches.length) return;
+  selection.clear();
+  for (const a of matches) selection.add(a.id);
+  render();
+}
+async function disableCredential(id) {
+  const a = credentials.find((entry) => entry.id === id);
+  if (pending || !a || a.source !== "auth_files" || !availableCredential(a)) return;
+  pending = true;
+  stopPolling();
+  setNotice("flash", "");
+  render();
+  try {
+    await api("/v0/management/auth-files/status", { method: "PATCH", body: { name: a.name, disabled: true } });
+    a.disabled = true;
+    for (const selection of [candySelected, fpSelected, mtSelected]) selection.delete(id);
+    pruneCredentialCatalog();
+    setNotice("flash", "账户已停用", "info");
+  } catch (err) {
+    if (err instanceof AuthError) return showLogin(err.message);
+    setNotice("flash", "停用账户失败：" + err.message);
+  } finally {
+    pending = false;
+    render();
+    if (!$("app").hidden) await load();
+  }
+}
 function renderSelection(prefix, selection, action) {
   const available = visibleCredentials(prefix).filter(availableCredential);
+  const quick = $(prefix + "select-plan");
+  quick.value = "";
+  quick.disabled = pending || !available.length || !$(prefix + "model").value;
+  for (const option of quick.options || []) {
+    if (option.value) option.disabled = !available.some((a) => planMatches(a, option.value));
+  }
   const selected = selectedCredentials(prefix, selection);
   const targets = batchCredentials(prefix, selection);
   const button = $(prefix + "run-batch");
@@ -285,7 +326,7 @@ function bindCollectionActions({ type, scope, historyKey, expanded, renderRows, 
     rows.querySelector(`[data-${type}-detail="${CSS.escape(dialog.dataset.record)}"][data-${type}-credential="${CSS.escape(dialog.dataset.credential)}"]`)?.focus();
   });
   rows.addEventListener("click", (e) => {
-    if (e.target.closest("input")) return;
+    if (e.target.closest(".selection-cell, input")) return;
     const action = (name) => e.target.closest(`[data-${type}-${name}]`)?.getAttribute(`data-${type}-${name}`);
     const runID = action("run");
     if (runID) return run({ auth_ids: [runID] });
@@ -383,6 +424,7 @@ for (const name of tabNames) {
 switchTab(tabNames.includes(stored(PREF_STORE + ".tab")) ? stored(PREF_STORE + ".tab") : "candy");
 
 for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint], ["mt-", "mt", mtSelected, runModelTrace]]) {
+  $(prefix + "select-plan").addEventListener("change", (e) => selectPlan(prefix, selection, e.target.value));
   $(prefix + "credential-type").addEventListener("change", () => { selection.clear(); render(); });
   $(prefix + "toolbar").addEventListener("submit", (e) => {
     e.preventDefault();

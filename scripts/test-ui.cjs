@@ -11,7 +11,7 @@ const browserStorage = new Map();
 let now = Date.now(), storageBlocked = false, storageWrites = 0;
 let timerID = 0;
 function element(id) {
-  if (!elements.has(id)) elements.set(id, { value: id.endsWith('credential-type') ? 'auth_files:codex' : '', innerHTML: '', hidden: true, dataset: {}, setAttribute(name, value) { this[name] = value; }, querySelector(selector) { return element(id + ' ' + selector); }, addEventListener() {}, contains() { return false; }, focus() {}, showModal() { this.open = true; } });
+  if (!elements.has(id)) elements.set(id, { value: id.endsWith('credential-type') ? 'auth_files:codex' : '', innerHTML: '', hidden: true, dataset: {}, setAttribute(name, value) { this[name] = value; }, querySelector(selector) { return element(id + ' ' + selector); }, listeners: {}, addEventListener(name, fn) { this.listeners[name] = fn; }, contains() { return false; }, focus() {}, showModal() { this.open = true; } });
   return elements.get(id);
 }
 const context = vm.createContext({
@@ -174,6 +174,53 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('effort').value, 'low');
   run(`fillSelect('effort', DEFAULT_EFFORTS, 'none', DEFAULT_EFFORT)`);
   assert.equal(element('effort').value, 'none');
+  const selectionFixtures = [
+    {id:'plus',source:'auth_files',provider:'codex',plan_type:' PLUS ',name:'plus.json',results:[]},
+    {id:'pro',source:'auth_files',provider:'codex',plan_type:'pro',name:'pro.json',results:[]},
+    {id:'lite',source:'auth_files',provider:'codex',plan_type:'pro_lite',results:[]},
+    {id:'team',source:'auth_files',provider:'codex',plan_type:'team',results:[]},
+    {id:'off',source:'auth_files',provider:'codex',plan_type:'plus',disabled:true,results:[]},
+    {id:'busy',source:'auth_files',provider:'codex',plan_type:'plus',running:{},results:[]},
+    {id:'provider',source:'ai_providers',provider:'codex',plan_type:'plus',results:[]},
+  ];
+  run(`credentials = ${JSON.stringify(selectionFixtures)}; candySelected.clear(); fpSelected.clear(); mtSelected.clear()`);
+  for (const [prefix, selection] of [['','candySelected'],['fp-','fpSelected'],['mt-','mtSelected']]) {
+    element(prefix + 'credential-type').value = 'all';
+    run(`selectPlan('${prefix}', ${selection}, 'plus')`);
+    assert.deepEqual(plain(run(`[...${selection}]`)), ['plus']);
+    run(`selectPlan('${prefix}', ${selection}, 'pro')`);
+    assert.deepEqual(plain(run(`[...${selection}]`)), ['pro','lite']);
+    run(`selectPlan('${prefix}', ${selection}, 'team')`);
+    assert.deepEqual(plain(run(`[...${selection}]`)), ['team']);
+    element(prefix + 'credential-type').value = 'ai_providers:codex';
+    run(`selectPlan('${prefix}', ${selection}, 'plus')`);
+    assert.deepEqual(plain(run(`[...${selection}]`)), ['team'], 'an empty match must not reset selection and trigger run-all');
+    element(prefix + 'credential-type').value = 'auth_files:codex';
+  }
+  run(`pending = true; selectPlan('', candySelected, 'plus')`);
+  assert.deepEqual(plain(run(`[...candySelected]`)), ['team']);
+  run(`pending = false; candySelected.clear()`);
+  element('rows').listeners.click({target:{closest(selector) { return selector === '.selection-cell' ? {} : selector === '[data-row]' ? {dataset:{row:'plus'}} : null; }}});
+  assert.equal(run(`candyExpanded.has('plus')`), false, 'selection column whitespace must not expand history');
+  for (const type of ['fp','mt']) {
+    run(`initialize${type === 'fp' ? 'Fingerprint' : 'ModelTrace'}()`);
+    element(type + '-rows').listeners.click({target:{closest(selector) { return selector === '.selection-cell, input' ? {} : selector === '[data-row]' ? {dataset:{row:'plus'}} : null; }}});
+    assert.equal(run(`${type}Expanded.has('plus')`), false);
+  }
+  run(`let statusCalls = []; api = async (path, options) => {statusCalls.push({path,options});return {status:'ok'};}; candySelected.add('plus'); fpSelected.add('plus'); mtSelected.add('plus')`);
+  element('app').hidden = true; // Isolate mutation from the already-tested state loader.
+  await run(`disableCredential('plus')`);
+  assert.deepEqual(plain(run(`statusCalls`)), [{path:'/v0/management/auth-files/status',options:{method:'PATCH',body:{name:'plus.json',disabled:true}}}]);
+  assert.equal(run(`credentials[0].disabled`), true);
+  for (const selection of ['candySelected','fpSelected','mtSelected']) assert.equal(run(`${selection}.has('plus')`), false);
+  await run(`disableCredential('off'); disableCredential('busy'); disableCredential('provider')`);
+  assert.equal(run(`statusCalls.length`), 1);
+  run(`api = async () => {throw new Error('Denied')}`);
+  await run(`disableCredential('pro')`);
+  assert.equal(run(`credentials[1].disabled === true`), false);
+  assert(element('flash .notice-message').textContent.includes('停用账户失败：Denied'));
+  assert.equal(run(`pending`), false);
+  run(`setNotice('flash', ''); candySelected.clear(); fpSelected.clear(); mtSelected.clear()`);
   run(`credentials = [
     {id:'codex',source:'auth_files',provider:'codex'},
     {id:'claude',source:'ai_providers',provider:'claude'},

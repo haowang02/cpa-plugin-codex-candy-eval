@@ -115,7 +115,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .none { color: var(--faint); }
 
 /* Credential lists and history alignment */
-#candy-panel { --toolbar-columns: 200px 120px 84px minmax(0, 1fr); --mobile-areas: "select credential action" ". latest latest" ". summary summary"; --list-columns: var(--list-checkbox) minmax(0, 1.2fr) minmax(0, 1.8fr) 64px 208px 118px; --marks-width: 208px; }
+#candy-panel { --toolbar-columns: 200px 120px 84px minmax(0, 1fr); --mobile-areas: "select credential action" ". latest latest" ". summary summary"; --list-columns: var(--list-checkbox) minmax(0, 1.2fr) minmax(0, 1.8fr) 64px 208px 192px; --marks-width: 208px; }
 #fingerprint-panel { --toolbar-columns: 200px 190px 84px minmax(0, 1fr); --mobile-areas: "select credential action" ". latest latest" ". mode time"; --list-columns: var(--list-checkbox) minmax(0, 1.1fr) minmax(0, 1.6fr) 56px 104px 90px; }
 #modeltrace-panel { --toolbar-columns: 200px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) minmax(0, 1fr) minmax(0, .85fr) minmax(0, 1.35fr) 104px 90px; --mobile-areas: "select credential action" ". model model" ". latest latest" ". time time"; }
 .list-head, .list-row { display: grid; grid-template-columns: var(--list-columns); align-items: center; gap: var(--list-gap); padding-inline: var(--list-padding); }
@@ -125,6 +125,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .row { border-bottom: 1px solid var(--line); }
 .row:last-child { border-bottom: 0; }
 .row-main { cursor: pointer; }
+.selection-cell { align-self: stretch; display: flex; align-items: center; cursor: default; margin: -14px calc(var(--list-gap) / -2) -14px calc(-1 * var(--list-padding)); padding: 14px 0 14px var(--list-padding); }
 .row-main:hover, .row.open .row-main { background: var(--sunken); }
 .credential { min-width: 0; }
 .toggle { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; font-weight: 600; cursor: pointer; text-align: left; }
@@ -285,7 +286,7 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
 @media (hover: none) { .copy-btn { opacity: 1; } }
 @media (max-width: 1000px) {
   :root { --list-padding: 18px; --list-gap: 10px; --page-top: 20px; --page-inline: 14px; }
-  #candy-panel { --list-columns: var(--list-checkbox) minmax(0, 1.1fr) minmax(0, 1.4fr) 56px 112px 118px; --marks-width: 112px; }
+  #candy-panel { --list-columns: var(--list-checkbox) minmax(0, 1.1fr) minmax(0, 1.4fr) 56px 112px 192px; --marks-width: 112px; }
   .legend #rate-scope { width: 100%; margin-left: 0; }
 }
 @media (max-width: 768px) {
@@ -293,11 +294,12 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
   :root { --list-padding: 16px; --page-top: calc(80px + env(safe-area-inset-top)); }
   .list-head { display: none; }
   .list-row { grid-template-columns: var(--list-checkbox) minmax(0, 1fr) auto; grid-template-areas: var(--mobile-areas); row-gap: 16px; padding-block: 16px; }
-  .list-row > input { grid-area: select; }
+  .list-row > .selection-cell { grid-area: select; grid-row: 1 / -1; align-items: flex-start; margin-block: -16px; padding-block: 16px; }
   .list-row > .credential { grid-area: credential; }
   .list-row > .latest, .row-summary, .fp-mode, .mt-test-model { padding-left: var(--credential-indent); }
   .list-row > .latest { grid-area: latest; }
   .list-row > .action { grid-area: action; }
+  #candy-panel .action { flex-direction: column; }
   .row-summary { grid-area: summary; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
   .row-summary.empty-history { display: none; }
   .rate { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
