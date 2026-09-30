@@ -259,14 +259,57 @@ function switchTab(name) {
   hideTip();
   store(PREF_STORE + ".tab", name);
 }
-const availableCredential = (a) => !a.disabled && !a.running && !a.fingerprint_running && !a.modeltrace_running;
+const credentialBusy = (a) => !!(a.running || a.fingerprint_running || a.modeltrace_running);
+const availableCredential = (a) => !a.disabled && !credentialBusy(a);
+const canToggleCredential = (a) => a.source === "auth_files" && !credentialBusy(a);
 const selectedCredentials = (prefix, selection) => visibleCredentials(prefix).filter((a) => selection.has(a.id));
 const batchCredentials = (prefix, selection) => {
   const selected = selectedCredentials(prefix, selection);
   return (selected.length ? selected : visibleCredentials(prefix)).filter(availableCredential);
 };
+function planMatches(a, plan) {
+  return ["plus", "pro", "team"].includes(plan) && credentialPlan(a) === plan;
+}
+function selectPlan(prefix, selection, plan) {
+  if (pending || !["plus", "pro", "team"].includes(plan)) return;
+  const matches = visibleCredentials(prefix).filter((a) => availableCredential(a) && planMatches(a, plan));
+  if (!matches.length) return;
+  selection.clear();
+  for (const a of matches) selection.add(a.id);
+  render();
+}
+async function toggleCredentialStatus(id) {
+  const a = credentials.find((entry) => entry.id === id);
+  if (pending || !a || !canToggleCredential(a)) return;
+  const disabled = !a.disabled;
+  const action = disabled ? "停用" : "启用";
+  pending = true;
+  stopPolling();
+  setNotice("flash", "");
+  render();
+  try {
+    await api("/v0/management/auth-files/status", { method: "PATCH", body: { name: a.name, disabled } });
+    a.disabled = disabled;
+    if (disabled) for (const selection of [candySelected, fpSelected, mtSelected]) selection.delete(id);
+    pruneCredentialCatalog();
+    setNotice("flash", `账户已${action}`, "info");
+  } catch (err) {
+    if (err instanceof AuthError) return showLogin(err.message);
+    setNotice("flash", `${action}账户失败：` + err.message);
+  } finally {
+    pending = false;
+    render();
+    if (!$("app").hidden) await load();
+  }
+}
 function renderSelection(prefix, selection, action) {
   const available = visibleCredentials(prefix).filter(availableCredential);
+  const quick = $(prefix + "select-plan");
+  quick.value = "";
+  quick.disabled = pending || !available.length || !$(prefix + "model").value;
+  for (const option of quick.options || []) {
+    if (option.value) option.disabled = !available.some((a) => planMatches(a, option.value));
+  }
   const selected = selectedCredentials(prefix, selection);
   const targets = batchCredentials(prefix, selection);
   const button = $(prefix + "run-batch");
@@ -285,7 +328,7 @@ function bindCollectionActions({ type, scope, historyKey, expanded, renderRows, 
     rows.querySelector(`[data-${type}-detail="${CSS.escape(dialog.dataset.record)}"][data-${type}-credential="${CSS.escape(dialog.dataset.credential)}"]`)?.focus();
   });
   rows.addEventListener("click", (e) => {
-    if (e.target.closest("input")) return;
+    if (e.target.closest(".selection-cell, input")) return;
     const action = (name) => e.target.closest(`[data-${type}-${name}]`)?.getAttribute(`data-${type}-${name}`);
     const runID = action("run");
     if (runID) return run({ auth_ids: [runID] });
@@ -306,7 +349,7 @@ function bindCollectionActions({ type, scope, historyKey, expanded, renderRows, 
 
 const credentialType = (a) => a.source + ":" + a.provider;
 const credentialTypeLabel = (a) => `${a.source === "ai_providers" ? "AI 提供商" : "认证文件"} · ${a.provider}`;
-const visibleCredentials = (prefix) => credentials.filter((a) => $(prefix + "credential-type").value === "all" || credentialType(a) === $(prefix + "credential-type").value);
+const visibleCredentials = (prefix) => credentials.filter((a) => $(prefix + "credential-type").value === "all" || credentialType(a) === $(prefix + "credential-type").value).sort((a, b) => credentialPlanRank(a) - credentialPlanRank(b));
 function fillCredentialTypes() {
   const types = new Map(credentials.map((a) => [credentialType(a), credentialTypeLabel(a)]));
   // Keep the requested default visible even when there are no Codex files.
@@ -383,6 +426,7 @@ for (const name of tabNames) {
 switchTab(tabNames.includes(stored(PREF_STORE + ".tab")) ? stored(PREF_STORE + ".tab") : "candy");
 
 for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint], ["mt-", "mt", mtSelected, runModelTrace]]) {
+  $(prefix + "select-plan").addEventListener("change", (e) => selectPlan(prefix, selection, e.target.value));
   $(prefix + "credential-type").addEventListener("change", () => { selection.clear(); render(); });
   $(prefix + "toolbar").addEventListener("submit", (e) => {
     e.preventDefault();

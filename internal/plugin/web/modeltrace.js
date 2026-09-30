@@ -32,7 +32,7 @@ function renderModelTraceRow(a) {
   const disabled = pending || !$("mt-model").value || !availableCredential(a);
   const latest = p ? collectionOutcome(p, MT_CONFIG.requests) : mtOutcome(last);
   return `<div class="row ${open ? "open" : ""}"><div class="list-row row-main" data-row="${esc(a.id)}">
-    <input type="checkbox" data-mt-select="${esc(a.id)}" aria-label="选择此凭证" ${mtSelected.has(a.id) ? "checked" : ""} ${disabled ? "disabled" : ""}>
+    <div class="selection-cell"><input type="checkbox" data-mt-select="${esc(a.id)}" aria-label="选择此凭证" ${mtSelected.has(a.id) ? "checked" : ""} ${disabled ? "disabled" : ""}></div>
     ${credentialView(a, open)}
     <div class="mt-test-model mono">${esc(p?.model || last?.model || "—")}</div>
     <div class="latest">${latest}</div>

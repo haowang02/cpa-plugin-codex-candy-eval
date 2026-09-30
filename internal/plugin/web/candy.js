@@ -57,11 +57,11 @@ function renderCandyRow(a) {
 
   return `<div class="row ${open ? "open" : ""}">
     <div class="list-row row-main" data-row="${esc(a.id)}">
-      <input type="checkbox" data-candy-select="${esc(a.id)}" aria-label="选择此凭证" ${candySelected.has(a.id) ? "checked" : ""} ${pending || !$("model").value || !availableCredential(a) ? "disabled" : ""}>
+      <div class="selection-cell"><input type="checkbox" data-candy-select="${esc(a.id)}" aria-label="选择此凭证" ${candySelected.has(a.id) ? "checked" : ""} ${pending || !$("model").value || !availableCredential(a) ? "disabled" : ""}></div>
       ${credentialView(a, open)}
       <div class="latest">${latest}</div>
       <div class="row-summary ${results.length ? "" : "empty-history"}"><div class="rate">${rate}</div><div class="marks">${marks}</div></div>
-      <div class="action">${action}</div>
+      <div class="action">${action}<button class="btn ghost ${a.disabled ? "" : "danger"}" type="button" data-status="${esc(a.id)}" ${pending || !canToggleCredential(a) ? "disabled" : ""} ${a.source !== "auth_files" ? 'title="请在 AI 提供商设置中启用或停用此凭证"' : ""}>${a.disabled ? "启用账户" : "停用账户"}</button></div>
     </div>
     ${open ? historyPanel([...results].reverse().map((r, i) => candyHistory(a, r, i)).join("")) : ""}
   </div>`;
@@ -165,7 +165,7 @@ function initializeCandy() {
   $("effort").addEventListener("change", () => { candySavePrefs(); render(); });
   $("runs").addEventListener("change", () => { $("runs").value = candyRuns(); candySavePrefs(); });
   $("rows").addEventListener("click", (e) => {
-    if (e.target.closest("[data-candy-select]")) return;
+    if (e.target.closest(".selection-cell")) return;
     const hit = e.target.closest("[data-auth]");
     if (hit) return showTip(hit);
     const answer = e.target.closest("[data-answer]");
@@ -179,6 +179,8 @@ function initializeCandy() {
       answer.innerHTML = answerToggle(open);
       return;
     }
+    const status = e.target.closest("[data-status]");
+    if (status) return toggleCredentialStatus(status.dataset.status);
     const btn = e.target.closest("[data-run]");
     if (btn) return runCandy({ auth_ids: [btn.dataset.run] });
     const row = e.target.closest("[data-row]");
