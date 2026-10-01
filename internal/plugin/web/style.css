@@ -182,7 +182,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .history-panel { padding: 4px var(--list-padding) 20px calc(var(--list-padding) + var(--list-checkbox) + var(--list-gap)); background: var(--sunken); }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: var(--heading-padding, 14px var(--list-padding)); border-bottom: 1px solid var(--line); }
 .section-head h2 { margin: 0; font-size: var(--heading-size, 14px); font-weight: 600; }
-.credential-heading { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; }
+.credential-filters { display: flex; flex: 1; gap: 10px; min-width: 0; }
 .credential-filter { flex: 0 1 160px; }
 .credential-filter > select { height: 32px; font-size: 12px; }
 .list-actions { display: flex; gap: 8px; }
@@ -328,7 +328,6 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
 }
 @media (max-width: 1000px) {
   :root { --list-padding: 18px; --list-gap: 10px; --page-top: 20px; --page-inline: 14px; }
-  .legend #rate-scope { width: 100%; margin-left: 0; }
 }
 @media (max-width: 768px) {
   /* The CPA panel places floating controls over the top of narrow iframes. */
@@ -345,15 +344,13 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
   .list-row > .btn { grid-area: action; }
   .row-meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; padding-left: var(--credential-indent); }
   .row-meta.untested > :not(.switch) { display: none; }
-  .row-meta > .switch { order: 1; margin-left: auto; }
+  .row-meta > .switch { align-self: flex-end; margin-left: auto; }
   .row-meta > .switch::before { content: "启用"; }
-  .row-meta > .marks { order: 2; }
-  .credential-heading h2 { display: none; }
+  .row-meta > .marks { flex: 1; }
   .credential-filter { flex: 1 1 0; }
-  .rate { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+  .rate { display: flex; flex-basis: 100%; align-items: baseline; gap: 5px; white-space: nowrap; }
   .rate::before { content: "正确率"; color: var(--muted); font-size: 12px; }
   .rate b { font-size: 14px; } .rate small { display: inline; }
-  .marks { max-width: 208px; }
 
   .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toolbar > .btn { min-width: 0; width: 100%; }
@@ -370,6 +367,10 @@ dialog::backdrop { background: rgb(10 16 13 / 40%); }
   .mt-summary > div:first-child { grid-column: 1 / -1; }
   .mt-rank { grid-template-columns: 18px minmax(0, 1fr) 58px; gap: 8px; padding-inline: 6px; }
   .mt-rank .mt-bar { display: none; }
+}
+@media (max-width: 520px) {
+  .credential-head { flex-wrap: wrap; row-gap: 10px; }
+  .credential-filters { order: 1; flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .spin, #refresh[aria-busy="true"] .icon { animation: none; }
