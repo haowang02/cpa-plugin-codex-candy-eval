@@ -16,6 +16,7 @@
 - `internal/plugin/data/`: embedded fingerprint probes and baselines.
 - `docs/images/`: README screenshots.
 - Root `install.sh` and `install.ps1`: public installation entry points.
+- `scripts/`: one-command deployment (`deploy.sh`) and UI checks (`test-ui.cjs`).
 - `.github/workflows/`: release checks, platform builds, and packaging.
 - `dist/`: ignored build artifacts.
 
@@ -39,6 +40,7 @@ file dist/cpa-codex-candy-eval.so
 Expect an ELF x86-64 shared library. The glibc 2.17 target matches the release
 baseline; verify compatibility with the CPA container. Keep artifacts in
 ignored `dist/`. Set cross-compilation variables per command, not globally.
+`scripts/deploy.sh` runs this same build before deploying.
 
 ## Private Configuration
 
@@ -57,21 +59,24 @@ commits, or reports.
 After plugin code, UI, build, or installation changes, complete these steps
 without routine reconfirmation. Documentation and local setup changes are exempt.
 
-1. Build the updated Linux/amd64 library. Inspect the remote Compose file,
-   service name, plugin mount, and active version before deploying.
-2. Back up the current library outside the loader's search paths. Upload to
-   `CPA_REMOTE_PLUGIN_DIR`, verify the checksum, then atomically rename to
-   `cpa-codex-candy-eval-v<pluginVersion>.so`. Preserve state and history; ensure
-   plugin enablement and any `store.version`/`store.release-tag` pins select it.
-3. Restart only CPA via `docker compose -f <resolved CPA_REMOTE_COMPOSE_FILE>`
-   on `CPA_SSH_HOST`. Check service status and plugin-loading logs.
-4. Open `CPA_BASE_URL` in a browser and authenticate using the configured
+1. Run `scripts/deploy.sh`. It builds the Linux/amd64 library, uploads it to
+   `CPA_REMOTE_PLUGIN_DIR` with a checksum check, moves existing
+   `cpa-codex-candy-eval-v*.so` files to `plugin-backups/` beside the remote
+   `plugins/` directory, installs `cpa-codex-candy-eval-v<pluginVersion>.so`,
+   restarts only the `cli-proxy-api` Compose service, and fails unless the
+   management API reports the new file registered and enabled. Plugin state and
+   history are untouched. Inspect the server by hand only when the script fails
+   or the deployment layout changes. Before deploying a new `pluginVersion`,
+   update CPA's `store.version` and `store.release-tag` pins; the loader skips
+   files that do not match them.
+2. Open `CPA_BASE_URL` in a browser and authenticate using the configured
    password. Verify the changed flow and authenticated API calls. Run one
    evaluation on one enabled account; confirm completion, results, and history
    after refresh. Keep quota use minimal; a wrong model answer is not a plugin
    failure.
-5. Restore the backup and restart through the same Compose file if deployment
-   breaks CPA or the plugin. Report checks, artifact version/checksum, and
+3. If deployment breaks CPA or the plugin, move the backup printed by the script
+   back under its original name, remove the new file, and restart through the
+   same Compose file. Report checks, artifact version/checksum, and
    verification results; explicitly identify blockers and incomplete checks.
 
 ## Commits and Releases
