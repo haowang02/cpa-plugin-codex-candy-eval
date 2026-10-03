@@ -36,10 +36,11 @@ function panelValue(name) {
   } catch (_) { return null; }
 }
 
+// Panels resolve their "auto" theme to white or dark; CPAMC also has a light (paper) theme.
 function applyTheme() {
   const theme = panelValue("cli-proxy-theme")?.state?.theme;
-  const dark = theme === "dark" || (theme !== "white" && theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  document.documentElement.dataset.theme = ["light", "white", "dark"].includes(theme) ? theme
+    : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "white";
 }
 function panelKey() {
   const k = panelValue("cli-proxy-auth")?.state?.managementKey;
