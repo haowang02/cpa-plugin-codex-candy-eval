@@ -145,7 +145,7 @@ function historyEntry(type, credentialID, r, outcomeHTML, extraMetaHTML = "") {
   return historyCard(r, `${outcomeHTML}<button class="btn ghost" type="button" data-${type}-detail="${esc(r.id)}" data-${type}-credential="${esc(credentialID)}">${icon("chart")}查看详情</button>`, extraMetaHTML);
 }
 function historyPanel(entries) {
-  return `<div class="history-panel"><div class="history-title">历史记录</div><div class="result-history">${entries || `<div class="empty">暂无记录</div>`}</div></div>`;
+  return `<div class="history-panel"><div class="history-title">历史记录</div><div class="result-history">${entries || `<div class="none">暂无记录</div>`}</div></div>`;
 }
 // Lists carry record summaries; a detail dialog loads its full record.
 async function openResultDetail(type, scope, credentialID, recordID, showDetail) {

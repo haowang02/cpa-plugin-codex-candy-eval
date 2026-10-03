@@ -158,7 +158,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     }
     assert(!markup.includes('<model>'));
     const empty = run(`${renderer}(${JSON.stringify({...historyCredential,results:[],fingerprints:[],modeltraces:[]})})`);
-    assert(empty.includes('<div class="empty">暂无记录</div>'));
+    assert(empty.includes('<div class="none">暂无记录</div>'));
   }
   const unknownCard = run(`historyCard({duration_ms:1200,input_tokens:null,output_tokens:null}, '')`);
   assert(unknownCard.includes('输入 tokens —'));

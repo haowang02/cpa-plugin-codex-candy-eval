@@ -2,6 +2,8 @@
    Components read only these tokens. The panel embedding the page supplies most of them below; data-theme
    mirrors that panel's theme. */
 :root {
+  /* Content stays within CPAMP's 1280px .container width so wide screens don't spread the list apart. */
+  --page-width: 1280px;
   --list-padding: 22px; --list-gap: 16px; --list-checkbox: 22px; --credential-indent: 20px; --switch-width: 32px; --action-width: 88px;
   --credential-track: minmax(0, 300px); --result-track: minmax(0, 280px); --marks-width: 208px;
   --premium-ink: #6b4b00; --premium-line: rgb(217 165 22 / 72%); --premium-glow: 0 1px 3px rgb(133 92 0 / 16%), 0 0 10px rgb(255 214 98 / 28%);
@@ -25,7 +27,7 @@
 /* CPAMC, also used when the page is opened directly: paper (default), white and dark themes.
    Frame from .main-content; the band copies .top-gradient-blur as CPAMC's build renders it, without blur. */
 :root:not([data-cpamp-plugin-host]) {
-  --page-top: 70px; --page-inline: clamp(20px, 3vw, 48px); --page-width: 1120px; --section-gap: 24px;
+  --page-top: 70px; --page-inline: clamp(20px, 3vw, 48px); --section-gap: 24px;
   --bg: #faf9f5; --bg-image: none; --surface: #f0eee8; --sunken: #e9e6df; --field: #faf9f5; --line: #e3e1db; --card-line: var(--line);
   --ink: #2d2a26; --muted: #6d6760; --faint: #a29c95;
   --accent: #8b8680; --accent-ink: var(--ink); --accent-soft: color-mix(in srgb, var(--ink) 10%, transparent);
@@ -64,7 +66,7 @@
    Frame from .main-content with its pages' 16px card gaps, glass cards from .card, background and drifting
    blobs from AppBackground. */
 :root[data-cpamp-plugin-host] {
-  --page-top: 20px; --page-inline: 20px; --page-width: none; --section-gap: 16px;
+  --page-top: 20px; --page-inline: 20px; --section-gap: 16px;
   --bg: #eff2f7; --bg-image: linear-gradient(120deg, #f0f7ff 0%, #e7f2ff 50%, #edf7ff 100%);
   --surface: #ffffff; --sunken: #f6faff; --field: rgb(255 255 255 / 62%); --line: rgb(15 23 42 / 8%); --card-line: rgb(255 255 255 / 60%);
   --ink: #2c3e50; --muted: #5f6c7b; --faint: #8b95a6;
