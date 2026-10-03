@@ -255,7 +255,7 @@ func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p 
 func collectTraceSample(ctx context.Context, auth credential, model string, challenge traceChallenge) (sample traceSample, out modelResponse, err error) {
 	sample.traceChallenge = challenge
 	out, sample.Attempts, err = executeProbe(ctx, auth, model, map[string]any{
-		"model": model, "input": challenge.Prompt, "store": false, "stream": false,
+		"input": challenge.Prompt, "store": false,
 	}, traceSlots)
 	if err != nil {
 		sample.Error = truncate(err.Error(), 500)

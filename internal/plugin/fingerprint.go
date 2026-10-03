@@ -244,9 +244,9 @@ func collectFingerprintSample(ctx context.Context, auth credential, model string
 	sample.Cell = probe.ID
 	prompt := probe.Prompts[rand.Intn(len(probe.Prompts))]
 	out, _, err := executeProbe(ctx, auth, model, map[string]any{
-		"model": model, "instructions": probe.Instructions, "input": prompt,
+		"instructions": probe.Instructions, "input": prompt,
 		"temperature": 1.0, "reasoning": map[string]string{"effort": "low"},
-		"store": false, "stream": false,
+		"store": false,
 	}, fingerprintSlots)
 	sample.Output = out
 	if err != nil {

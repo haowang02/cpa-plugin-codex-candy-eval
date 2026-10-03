@@ -127,12 +127,12 @@ func runCandy(auth credential, model, effort string, runs int) {
 
 func evaluateCandy(auth credential, model, effort string) candyResult {
 	r := candyResult{Time: time.Now().UTC(), Model: model, Effort: effort}
-	payload := map[string]any{"model": model, "input": candyPrompt, "stream": false}
+	params := map[string]any{"input": candyPrompt}
 	if effort != "" && effort != "none" {
-		payload["reasoning"] = map[string]string{"effort": effort}
+		params["reasoning"] = map[string]string{"effort": effort}
 	}
 	start := time.Now()
-	out, _, err := executeModel(auth, model, payload)
+	out, _, err := executeModel(auth, model, params)
 	r.DurationMS = time.Since(start).Milliseconds()
 	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if err != nil {

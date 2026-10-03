@@ -1,10 +1,12 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -29,7 +31,7 @@ func retryableModelStatus(status int) bool {
 
 // Collection probes retry the same request at most twice, after 2s and 4s.
 // Invalid model answers are evaluated by the caller and do not trigger retries.
-func executeProbe(ctx context.Context, auth credential, model string, payload map[string]any, slots chan struct{}) (out modelResponse, attempts int, err error) {
+func executeProbe(ctx context.Context, auth credential, model string, params map[string]any, slots chan struct{}) (out modelResponse, attempts int, err error) {
 	for attempt := 0; attempt < 3; attempt++ {
 		if ctx.Err() != nil {
 			return out, attempts, ctx.Err()
@@ -48,7 +50,7 @@ func executeProbe(ctx context.Context, auth credential, model string, payload ma
 			}
 			attempts++
 			var response modelResponse
-			response, status, err = executeModel(auth, model, payload)
+			response, status, err = executeModel(auth, model, params)
 			out.Answer = response.Answer
 			out.InputTokens += response.InputTokens
 			out.OutputTokens += response.OutputTokens
@@ -68,7 +70,10 @@ func executeProbe(ctx context.Context, auth credential, model string, payload ma
 	return
 }
 
-func executeModel(auth credential, model string, payload map[string]any) (result modelResponse, status int, err error) {
+// executeModel runs one Responses request on auth's provider; CPA translates it to the provider's own
+// protocol. params holds the request fields besides model and stream. On failure, status is the upstream
+// HTTP status, or 0 when no complete response arrived.
+func executeModel(auth credential, model string, params map[string]any) (result modelResponse, status int, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("模型请求异常：%v", recovered)
@@ -77,13 +82,15 @@ func executeModel(auth credential, model string, payload map[string]any) (result
 	if strings.TrimSpace(auth.ID) == "" || strings.TrimSpace(auth.Provider) == "" {
 		return result, 0, fmt.Errorf("缺少凭证标识或提供商，无法固定路由")
 	}
-	body, err := json.Marshal(payload)
+	request := map[string]any{"model": model, "stream": true}
+	maps.Copy(request, params)
+	body, err := json.Marshal(request)
 	if err != nil {
 		return result, 0, err
 	}
-	raw, err := hostCall("host.model.execute", map[string]any{
+	raw, err := hostCall("host.model.execute_stream", map[string]any{
 		"entry_protocol": "openai-response", "exit_protocol": "openai-response",
-		"model": model, "stream": false, "body": body,
+		"model": model, "stream": true, "body": body,
 		"forced_provider": auth.Provider, "auth_id": auth.ID,
 	})
 	if err != nil {
@@ -93,45 +100,23 @@ func executeModel(auth credential, model string, payload map[string]any) (result
 		}
 		return result, 0, err
 	}
-	var response struct {
-		StatusCode int    `json:"status_code"`
-		Body       []byte `json:"body"`
+	var stream struct {
+		ID string `json:"stream_id"`
 	}
-	if err := json.Unmarshal(raw, &response); err != nil {
-		return result, 0, fmt.Errorf("解析宿主响应失败：%w", err)
+	if err := json.Unmarshal(raw, &stream); err != nil || stream.ID == "" {
+		return result, 0, fmt.Errorf("解析宿主响应失败：%s", raw)
 	}
-	var out struct {
-		Status string          `json:"status"`
-		Error  json.RawMessage `json:"error"`
-		Output []struct {
-			Type    string `json:"type"`
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
-		} `json:"output"`
-		Usage struct {
-			InputTokens         int64 `json:"input_tokens"`
-			OutputTokens        int64 `json:"output_tokens"`
-			OutputTokensDetails struct {
-				ReasoningTokens int64 `json:"reasoning_tokens"`
-			} `json:"output_tokens_details"`
-		} `json:"usage"`
+	// The host closes a stream by itself only once it is read to the end.
+	defer hostCall("host.model.stream_close", map[string]any{"stream_id": stream.ID})
+	out, err := readResponseStream(stream.ID)
+	if err != nil {
+		return result, 0, err
 	}
-	parseErr := json.Unmarshal(response.Body, &out)
-	if parseErr == nil {
-		result.InputTokens = out.Usage.InputTokens
-		result.OutputTokens = out.Usage.OutputTokens
-		result.ReasoningTokens = out.Usage.OutputTokensDetails.ReasoningTokens
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return result, response.StatusCode, fmt.Errorf("HTTP %d: %s", response.StatusCode, response.Body)
-	}
-	if parseErr != nil {
-		return result, 0, fmt.Errorf("解析模型响应失败：%w", parseErr)
-	}
+	result.InputTokens = out.Usage.InputTokens
+	result.OutputTokens = out.Usage.OutputTokens
+	result.ReasoningTokens = out.Usage.OutputTokensDetails.ReasoningTokens
 	if (out.Status != "" && out.Status != "completed") || (len(out.Error) > 0 && string(out.Error) != "null") {
-		return result, response.StatusCode, fmt.Errorf("模型响应未完成（%s）：%s", out.Status, out.Error)
+		return result, http.StatusOK, fmt.Errorf("模型响应未完成（%s）：%s", out.Status, out.Error)
 	}
 	var answer strings.Builder
 	for _, item := range out.Output {
@@ -146,7 +131,104 @@ func executeModel(auth credential, model string, payload map[string]any) (result
 	}
 	result.Answer = answer.String()
 	if strings.TrimSpace(result.Answer) == "" {
-		return result, response.StatusCode, fmt.Errorf("模型没有返回文本")
+		return result, http.StatusOK, fmt.Errorf("模型没有返回文本")
 	}
-	return result, response.StatusCode, nil
+	return result, http.StatusOK, nil
+}
+
+type responseItem struct {
+	Type    string `json:"type"`
+	Content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"content"`
+}
+
+type responseBody struct {
+	Status string          `json:"status"`
+	Error  json.RawMessage `json:"error"`
+	Output []responseItem  `json:"output"`
+	Usage  struct {
+		InputTokens         int64 `json:"input_tokens"`
+		OutputTokens        int64 `json:"output_tokens"`
+		OutputTokensDetails struct {
+			ReasoningTokens int64 `json:"reasoning_tokens"`
+		} `json:"output_tokens_details"`
+	} `json:"usage"`
+}
+
+// readResponseStream reads a Responses event stream to its end and returns the final response.
+func readResponseStream(id string) (out responseBody, err error) {
+	var events []byte
+	for done := false; !done; {
+		raw, err := hostCall("host.model.stream_read", map[string]any{"stream_id": id})
+		if err != nil {
+			return out, err
+		}
+		var chunk struct {
+			Payload []byte `json:"payload"`
+			Error   string `json:"error"`
+			Done    bool   `json:"done"`
+		}
+		if err := json.Unmarshal(raw, &chunk); err != nil {
+			return out, fmt.Errorf("解析模型流失败：%w", err)
+		}
+		if chunk.Error != "" {
+			return out, fmt.Errorf("模型流中断：%s", chunk.Error)
+		}
+		// A chunk may end mid-line, or start the next field without a line break.
+		if len(events) > 0 && !bytes.HasSuffix(events, []byte("\n")) && startsSSEField(chunk.Payload) {
+			events = append(events, '\n')
+		}
+		events = append(events, chunk.Payload...)
+		done = chunk.Done
+	}
+	var items []responseItem
+	final := false
+	for _, line := range bytes.Split(events, []byte("\n")) {
+		data, ok := bytes.CutPrefix(bytes.TrimSpace(line), []byte("data:"))
+		if !ok {
+			continue
+		}
+		var event struct {
+			Type     string          `json:"type"`
+			Response json.RawMessage `json:"response"`
+			Item     json.RawMessage `json:"item"`
+		}
+		if json.Unmarshal(data, &event) != nil {
+			continue
+		}
+		switch event.Type {
+		case "response.output_item.done":
+			var item responseItem
+			if json.Unmarshal(event.Item, &item) == nil {
+				items = append(items, item)
+			}
+		case "response.completed", "response.incomplete", "response.failed":
+			if err := json.Unmarshal(event.Response, &out); err != nil {
+				return out, fmt.Errorf("解析模型响应失败：%w", err)
+			}
+			final = true
+		case "error":
+			return out, fmt.Errorf("模型返回错误：%s", bytes.TrimSpace(data))
+		}
+	}
+	if !final {
+		return out, fmt.Errorf("模型流在响应完成前结束")
+	}
+	// Codex streams the output items but may leave the final response's output empty.
+	if len(out.Output) == 0 {
+		out.Output = items
+	}
+	return out, nil
+}
+
+func startsSSEField(chunk []byte) bool {
+	chunk = bytes.TrimLeft(chunk, " \t")
+	for _, field := range []string{"data:", "event:", "id:", "retry:", ":"} {
+		if bytes.HasPrefix(chunk, []byte(field)) {
+			return true
+		}
+	}
+	return false
 }

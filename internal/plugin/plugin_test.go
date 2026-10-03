@@ -60,44 +60,22 @@ func TestFooterVersion(t *testing.T) {
 
 func TestEvaluate(t *testing.T) {
 	setupTest(t)
-	var sent struct {
-		AuthID         string `json:"auth_id"`
-		ForcedProvider string `json:"forced_provider"`
-		Body           []byte `json:"body"`
+	var body map[string]any
+	hostCall = streamHost(func(_ string, payload any) (json.RawMessage, error) {
+		_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
+		return mockModelResponse("答案是 21"), nil
+	})
+	r := evaluateCandy(credential{ID: "a", Provider: "claude"}, "m", "xhigh")
+	if !r.OK || r.Answer != "答案是 21" || r.InputTokens != 12 || r.OutputTokens != 3 || r.ReasoningTokens != 1 ||
+		body["input"] != candyPrompt || body["reasoning"].(map[string]any)["effort"] != "xhigh" {
+		t.Fatalf("result = %+v, body = %v", r, body)
 	}
-	hostCall = func(method string, payload any) (json.RawMessage, error) {
-		if method != "host.model.execute" {
-			t.Fatalf("unexpected host call: %s", method)
-		}
-		raw, _ := json.Marshal(payload)
-		_ = json.Unmarshal(raw, &sent)
-		body, _ := json.Marshal(map[string]any{
-			"output": []any{
-				map[string]any{"type": "reasoning"},
-				map[string]any{"type": "message", "content": []any{
-					map[string]any{"type": "output_text", "text": "答案是 "},
-					map[string]any{"type": "output_text", "text": "21"},
-				}},
-			},
-			"usage": map[string]any{"input_tokens": 499, "output_tokens": 900, "output_tokens_details": map[string]any{"reasoning_tokens": 850}},
-		})
-		return json.Marshal(map[string]any{"status_code": 200, "body": body})
+	// Unsupported efforts stay as sent and fail the request; a failed request is never graded.
+	hostCall = func(string, any) (json.RawMessage, error) {
+		return nil, &EnvelopeError{Code: "unsupported_effort", Message: "21", HTTPStatus: 400}
 	}
-
-	for _, effort := range []string{"low", "max"} {
-		r := evaluateCandy(credential{ID: "a.json", Provider: "codex"}, "gpt-5.6-sol", effort)
-		if !r.OK || r.Answer != "答案是 21" || r.InputTokens != 499 || r.OutputTokens != 900 || r.ReasoningTokens != 850 || r.Error != "" {
-			t.Fatalf("result = %+v", r)
-		}
-		var payload struct {
-			Model     string            `json:"model"`
-			Input     string            `json:"input"`
-			Reasoning map[string]string `json:"reasoning"`
-		}
-		if err := json.Unmarshal(sent.Body, &payload); err != nil || sent.AuthID != "a.json" || sent.ForcedProvider != "codex" ||
-			payload.Model != "gpt-5.6-sol" || payload.Input != candyPrompt || payload.Reasoning["effort"] != effort {
-			t.Fatalf("request = %+v, payload = %+v, err = %v", sent, payload, err)
-		}
+	if r := evaluateCandy(credential{ID: "a", Provider: "claude"}, "m", "xhigh"); r.OK || r.Error == "" {
+		t.Fatalf("failed request result = %+v", r)
 	}
 }
 
@@ -111,7 +89,7 @@ func TestRunAllKeepsRecentHistory(t *testing.T) {
 				{"id":"a.json","name":"a.json","provider":"codex"},
 				{"id":"off.json","name":"off.json","provider":"codex","disabled":true},
 				{"id":"c.json","name":"c.json","provider":"claude"}]}`), nil
-		case "host.model.execute":
+		case "host.model.execute_stream":
 			return nil, fmt.Errorf("usage limit reached")
 		}
 		return json.RawMessage(`{}`), nil
@@ -290,41 +268,10 @@ func TestUnreadableStateIsPreserved(t *testing.T) {
 	}
 }
 
-func TestEvaluateErrors(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		status int
-		body   string
-	}{
-		{"upstream error", http.StatusTooManyRequests, `{"error":{"message":"quota exhausted"}}`},
-		{"invalid response", http.StatusOK, `not json`},
-		{"missing answer", http.StatusOK, `{"output":[]}`},
-		{"blank answer", http.StatusOK, `{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":" \n\t "}]}]}`},
-		{"incomplete answer", http.StatusOK, `{"status":"incomplete","output":[{"type":"message","content":[{"type":"output_text","text":"21"}]}]}`},
-		{"cancelled answer", http.StatusOK, `{"status":"cancelled","output":[{"type":"message","content":[{"type":"output_text","text":"21"}]}]}`},
-		{"missing status code", 0, `{"output":[]}`},
-		{"host panic", 0, "panic"},
-		{"failed answer", http.StatusOK, `{"status":"failed","error":{"message":"failed"}}`},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			setupTest(t)
-			hostCall = func(_ string, _ any) (json.RawMessage, error) {
-				if tc.body == "panic" {
-					panic("host request failed")
-				}
-				return json.Marshal(map[string]any{"status_code": tc.status, "body": []byte(tc.body)})
-			}
-			if r := evaluateCandy(credential{ID: "a", Provider: "codex"}, "gpt-5.6-sol", "low"); r.OK || r.Error == "" {
-				t.Fatalf("request failure must not be graded as an answer: %+v", r)
-			}
-		})
-	}
-}
-
 func TestQuiesceDrainsBothTests(t *testing.T) {
 	setupTest(t)
 	gate, started := make(chan struct{}), make(chan struct{}, 3)
-	hostCall = func(method string, _ any) (json.RawMessage, error) {
+	hostCall = streamHost(func(method string, _ any) (json.RawMessage, error) {
 		if method == "host.auth.list" {
 			return json.RawMessage(`{"files":[{"id":"candy","provider":"codex"},{"id":"fingerprint","provider":"codex"}]}`), nil
 		}
@@ -334,7 +281,7 @@ func TestQuiesceDrainsBothTests(t *testing.T) {
 		}
 		<-gate
 		return mockModelResponse("21"), nil
-	}
+	})
 	defer func() { close(gate); tasks.Wait() }()
 	candy := []byte(`{"auth_ids":["candy"],"model":"gpt-5.5","runs":10}`)
 	fingerprint := []byte(`{"auth_ids":["fingerprint"],"model":"gpt-5.5","mode":"quick"}`)

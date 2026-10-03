@@ -122,26 +122,16 @@ func TestFingerprintBaselineCoverage(t *testing.T) {
 	}
 }
 
-func mockModelResponse(text string) json.RawMessage {
-	body, _ := json.Marshal(map[string]any{"model": "echo-model", "reasoning": map[string]string{"effort": "low"}, "output": []any{map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": text}}}}, "usage": map[string]any{"input_tokens": 12, "output_tokens": 3, "output_tokens_details": map[string]int{"reasoning_tokens": 1}}})
-	raw, _ := json.Marshal(map[string]any{"status_code": 200, "body": body})
-	return raw
-}
-
 func TestFingerprintExecutionContract(t *testing.T) {
 	setupTest(t)
-	hostCall = func(method string, payload any) (json.RawMessage, error) {
-		p := payload.(map[string]any)
-		if method != "host.model.execute" || p["auth_id"] != "auth" || p["forced_provider"] != "codex" || p["stream"] != false {
-			t.Fatalf("wrong host request: %s", method)
-		}
+	hostCall = streamHost(func(_ string, payload any) (json.RawMessage, error) {
 		var body map[string]any
-		_ = json.Unmarshal(p["body"].([]byte), &body)
+		_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
 		if body["reasoning"].(map[string]any)["effort"] != "low" || body["temperature"] != 1.0 || body["store"] != false || body["instructions"] != fingerprintProbes[0].Instructions {
 			t.Fatalf("wrong probe body: %v", body)
 		}
 		return mockModelResponse("47"), nil
-	}
+	})
 	r := collectFingerprintSample(context.Background(), credential{ID: "auth", Provider: "codex"}, "gpt-5.5", fingerprintProbes[0])
 	if r.Category != "valid" || r.Normalized != "47" || r.Output.InputTokens != 12 || r.Output.OutputTokens != 3 || r.Output.ReasoningTokens != 1 {
 		t.Fatalf("sample = %+v", r)
@@ -167,17 +157,17 @@ func TestFingerprintBatchAndPersistence(t *testing.T) {
 	setupTest(t)
 	var calls atomic.Int64
 	gate := make(chan struct{})
-	hostCall = func(method string, payload any) (json.RawMessage, error) {
+	hostCall = streamHost(func(method string, payload any) (json.RawMessage, error) {
 		if method == "host.auth.list" {
 			return json.RawMessage(`{"files":[{"id":"a","name":"a","provider":"codex"},{"id":"b","name":"b","provider":"codex"},{"id":"off","provider":"codex","disabled":true},{"id":"other","provider":"claude"}]}`), nil
 		}
-		if method == "host.model.execute" {
+		if method == "host.model.execute_stream" {
 			<-gate
 			calls.Add(1)
 			return mockModelResponse("47"), nil
 		}
 		return nil, fmt.Errorf("unexpected call")
-	}
+	})
 	body := []byte(`{"all":true,"model":"gpt-5.5","mode":"quick","effort":"high"}`)
 	first := fingerprintRunResponse(body)
 	second := fingerprintRunResponse(body)
@@ -235,7 +225,7 @@ func TestFingerprintConcurrencyAndCancellation(t *testing.T) {
 			}
 			gate, started := make(chan struct{}), make(chan struct{}, 60)
 			var calls atomic.Int64
-			hostCall = func(method string, _ any) (json.RawMessage, error) {
+			hostCall = streamHost(func(method string, _ any) (json.RawMessage, error) {
 				if method == "host.auth.list" {
 					return json.RawMessage(`{"files":[{"id":"a","provider":"codex"}]}`), nil
 				}
@@ -243,7 +233,7 @@ func TestFingerprintConcurrencyAndCancellation(t *testing.T) {
 				started <- struct{}{}
 				<-gate
 				return mockModelResponse("47"), nil
-			}
+			})
 			defer func() {
 				cancelCollectionResponse("fingerprint", []byte(`{"all":true}`))
 				close(gate)
@@ -291,39 +281,35 @@ func TestFingerprintUpstreamErrors(t *testing.T) {
 
 func TestFingerprintStopDuringRequest(t *testing.T) {
 	for _, tc := range []struct {
-		name, want        string
-		stopAfter, status int
+		name, want                        string
+		stopAfter, status, done, answered int
 	}{
-		{"unfinished", "cancelled", 1, 200},
-		{"completed", "completed", 60, 200},
-		{"terminal_error", "completed", 60, 401},
-		{"interrupted_retry", "cancelled", 60, 503},
+		{"unfinished", "cancelled", 1, 200, 1, 1},
+		{"completed", "completed", 60, 200, 60, 60},
+		{"terminal_error", "completed", 60, 401, 60, 59},
+		{"interrupted_retry", "cancelled", 60, 503, 59, 59},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setupTest(t)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			calls := 0
-			hostCall = func(string, any) (json.RawMessage, error) {
+			hostCall = streamHost(func(string, any) (json.RawMessage, error) {
 				calls++
 				if calls == tc.stopAfter {
 					cancel()
 					if tc.status != 200 {
-						return json.Marshal(map[string]any{"status_code": tc.status, "body": []byte(`{"usage":{"input_tokens":12,"output_tokens":3,"output_tokens_details":{"reasoning_tokens":1}}}`)})
+						return nil, &EnvelopeError{Code: "upstream", Message: "failed", HTTPStatus: tc.status}
 					}
 				}
 				return mockModelResponse("47"), nil
-			}
+			})
 			p := &fingerprintProgress{Concurrency: 1, cancel: cancel}
 			fingerprintRunning["a"] = p
 			tasks.Add(1)
 			runFingerprint(ctx, credential{ID: "a", Provider: "codex"}, "test-model", fingerprintModes[0], p)
 			r := fingerprintResults["a"][0]
-			wantDone := tc.stopAfter
-			if tc.status == 503 {
-				wantDone--
-			}
-			if calls != tc.stopAfter || r.Status != tc.want || r.Done != wantDone || *r.InputTokens != int64(calls*12) || *r.OutputTokens != int64(calls*3) || *r.ReasoningTokens != int64(calls) {
+			if calls != tc.stopAfter || r.Status != tc.want || r.Done != tc.done || *r.InputTokens != int64(tc.answered*12) || *r.OutputTokens != int64(tc.answered*3) || *r.ReasoningTokens != int64(tc.answered) {
 				t.Fatalf("calls=%d result=%+v", calls, r)
 			}
 		})

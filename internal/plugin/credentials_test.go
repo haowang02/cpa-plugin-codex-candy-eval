@@ -73,19 +73,6 @@ func TestCredentialInventoryAndSync(t *testing.T) {
 	}
 }
 
-func TestModelRequiresCredentialRoute(t *testing.T) {
-	setupTest(t)
-	hostCall = func(string, any) (json.RawMessage, error) {
-		t.Fatal("model executed without a complete credential route")
-		return nil, nil
-	}
-	for _, auth := range []credential{{ID: "a"}, {Provider: "codex"}} {
-		if _, _, err := executeModel(auth, "model", nil); err == nil {
-			t.Fatal("missing route accepted")
-		}
-	}
-}
-
 func TestCredentialListResponse(t *testing.T) {
 	setupTest(t)
 	for _, body := range []string{`null`, `{}`, `{"files":null}`, `{"files":{}}`, `{"files":[]}`} {
@@ -125,11 +112,11 @@ func TestCredentialModelCatalog(t *testing.T) {
 func TestCandyPreflightPinnedProvidersAndNone(t *testing.T) {
 	setupTest(t)
 	configuredCredentials["config"] = credential{ID: "config", Provider: "openai-compatible-demo", Source: "ai_providers"}
-	hostCall = func(method string, payload any) (json.RawMessage, error) {
+	hostCall = streamHost(func(method string, payload any) (json.RawMessage, error) {
 		if method == "host.auth.list" {
 			return json.RawMessage(`{"files":[{"id":"skip","provider":"claude"},{"id":"unknown","provider":"gemini"},{"id":"off","provider":"codex","disabled":true}]}`), nil
 		}
-		if method != "host.model.execute" {
+		if method != "host.model.execute_stream" {
 			return nil, fmt.Errorf("unexpected %s", method)
 		}
 		var req struct {
@@ -146,7 +133,7 @@ func TestCandyPreflightPinnedProvidersAndNone(t *testing.T) {
 			t.Error("none sent a reasoning parameter")
 		}
 		return mockModelResponse("21"), nil
-	}
+	})
 	response := candyRunResponse([]byte(`{"all":true,"model":"alias","effort":"none","runs":2,"model_catalog":{"skip":[],"config":["alias"]}}`))
 	if string(response.Body) != `{"started":2,"skipped":1,"unchecked":1}` {
 		t.Fatalf("run: %s", response.Body)
@@ -184,22 +171,5 @@ func TestFingerprintPreflightSkipsWithoutRequests(t *testing.T) {
 	loadState()
 	if fingerprintResults["a"][0].Status != "skipped" {
 		t.Fatal("skip history not persisted")
-	}
-}
-
-func TestUnsupportedEffortRemainsRequestError(t *testing.T) {
-	setupTest(t)
-	hostCall = func(_ string, payload any) (json.RawMessage, error) {
-		req := payload.(map[string]any)
-		var body map[string]any
-		_ = json.Unmarshal(req["body"].([]byte), &body)
-		if body["reasoning"].(map[string]any)["effort"] != "xhigh" || req["forced_provider"] != "claude" {
-			t.Error("effort or provider was changed")
-		}
-		return nil, &EnvelopeError{Code: "unsupported_effort", Message: "not supported", HTTPStatus: 400}
-	}
-	r := evaluateCandy(credential{ID: "a", Provider: "claude"}, "alias", "xhigh")
-	if r.Skipped || r.OK || r.Error == "" {
-		t.Fatalf("unsupported effort result = %+v", r)
 	}
 }

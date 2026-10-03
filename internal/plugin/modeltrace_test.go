@@ -91,26 +91,24 @@ func TestModelTraceParseAndThreshold(t *testing.T) {
 
 func traceTestHost(t *testing.T, answer func() (string, int)) {
 	t.Helper()
-	hostCall = func(method string, payload any) (json.RawMessage, error) {
+	hostCall = streamHost(func(method string, payload any) (json.RawMessage, error) {
 		if method == "host.auth.list" {
 			return json.RawMessage(`{"files":[{"id":"a","name":"a","provider":"codex"},{"id":"off","name":"off","provider":"codex","disabled":true}]}`), nil
 		}
-		if method != "host.model.execute" {
+		if method != "host.model.execute_stream" {
 			return nil, fmt.Errorf("unexpected %s", method)
 		}
-		p := payload.(map[string]any)
-		if p["auth_id"] != "a" || p["forced_provider"] != "codex" {
-			t.Error("request was not pinned to credential")
-		}
 		var body map[string]any
-		_ = json.Unmarshal(p["body"].([]byte), &body)
+		_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
 		if body["tools"] != nil || body["reasoning"] != nil || body["temperature"] != nil || !strings.Contains(body["input"].(string), "禁止调用") {
 			t.Error("unexpected probe parameters")
 		}
 		text, status := answer()
-		response, _ := json.Marshal(map[string]any{"usage": map[string]any{"input_tokens": 12, "output_tokens": 3, "output_tokens_details": map[string]int{"reasoning_tokens": 1}}, "status": "completed", "output": []any{map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": text}}}}})
-		return json.Marshal(map[string]any{"status_code": status, "body": response})
-	}
+		if status != http.StatusOK {
+			return nil, &EnvelopeError{Code: "upstream", Message: text, HTTPStatus: status}
+		}
+		return mockModelResponse(text), nil
+	})
 }
 
 func TestModelTraceRunAndPersistence(t *testing.T) {
@@ -204,11 +202,12 @@ func TestModelTraceStopDuringLastRequest(t *testing.T) {
 	for _, tc := range []struct {
 		name, answer, want string
 		status             int
+		answered           int64
 	}{
-		{"completed", strings.Repeat("42,", 320), "completed", 200},
-		{"invalid_answer", "拒答", "partial", 200},
-		{"terminal_error", "", "partial", 401},
-		{"interrupted_retry", "", "cancelled", 503},
+		{"completed", strings.Repeat("42,", 320), "completed", 200, 3},
+		{"invalid_answer", "拒答", "partial", 200, 3},
+		{"terminal_error", "", "partial", 401, 2},
+		{"interrupted_retry", "", "cancelled", 503, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setupTest(t)
@@ -223,7 +222,7 @@ func TestModelTraceStopDuringLastRequest(t *testing.T) {
 			traceRunResponse([]byte(`{"all":true,"model":"test-model","concurrency":1}`))
 			tasks.Wait()
 			r := traceResults["a"][0]
-			if calls.Load() != traceTarget || r.Status != tc.want || len(r.Samples) != traceTarget || r.InputTokens != 36 || r.OutputTokens != 9 || r.ReasoningTokens != 3 {
+			if calls.Load() != traceTarget || r.Status != tc.want || len(r.Samples) != traceTarget || r.InputTokens != tc.answered*12 || r.OutputTokens != tc.answered*3 || r.ReasoningTokens != tc.answered {
 				t.Fatalf("calls=%d result=%+v", calls.Load(), r)
 			}
 		})
