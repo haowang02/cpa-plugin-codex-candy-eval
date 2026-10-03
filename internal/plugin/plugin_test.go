@@ -253,18 +253,22 @@ func TestStatePersistence(t *testing.T) {
 }
 
 func TestUnreadableStateIsPreserved(t *testing.T) {
-	setupTest(t)
-	data := []byte(`{"results":`)
-	if err := os.WriteFile(statePath, data, 0600); err != nil {
-		t.Fatal(err)
-	}
-	loadState()
-	if storageError == "" || saveStateLocked() == nil {
-		t.Fatal("unreadable history must report an error and block replacement")
-	}
-	got, err := os.ReadFile(statePath)
-	if err != nil || !bytes.Equal(got, data) {
-		t.Fatal("unreadable history was overwritten")
+	for _, input := range []string{`{"results":`, `null`} {
+		t.Run(input, func(t *testing.T) {
+			setupTest(t)
+			data := []byte(input)
+			if err := os.WriteFile(statePath, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			loadState()
+			if storageError == "" || saveStateLocked() == nil {
+				t.Fatal("unreadable history must report an error and block replacement")
+			}
+			got, err := os.ReadFile(statePath)
+			if err != nil || !bytes.Equal(got, data) {
+				t.Fatal("unreadable history was overwritten")
+			}
+		})
 	}
 }
 

@@ -16,13 +16,15 @@ const (
 )
 
 type credential struct {
-	ID       string `json:"id"`
-	Provider string `json:"provider"`
-	Source   string `json:"source"`
-	Name     string `json:"name"`
-	Email    string `json:"email,omitempty"`
-	PlanType string `json:"plan_type,omitempty"`
-	Disabled bool   `json:"disabled"`
+	ID           string `json:"id"`
+	Provider     string `json:"provider"`
+	Source       string `json:"source"`
+	Name         string `json:"name"`
+	BaseURL      string `json:"base_url,omitempty"`
+	ProviderName string `json:"provider_name,omitempty"`
+	Email        string `json:"email,omitempty"`
+	PlanType     string `json:"plan_type,omitempty"`
+	Disabled     bool   `json:"disabled"`
 	// CPA marks enabled credentials unavailable while they cool down, e.g. after exhausting quota.
 	Unavailable    bool      `json:"unavailable,omitempty"`
 	StatusMessage  string    `json:"status_message,omitempty"`
@@ -60,7 +62,7 @@ type credentialView struct {
 }
 
 // host.auth.list omits some config-backed credentials. The UI syncs their CPA
-// stable IDs and masked display names; keys and configuration stay in CPA.
+// stable IDs, masked key previews, base URLs and group names; keys stay in CPA.
 var configuredCredentials = map[string]credential{}
 
 func syncCredentialsResponse(body []byte) managementResponse {
@@ -75,7 +77,8 @@ func syncCredentialsResponse(body []byte) managementResponse {
 		auth.ID = strings.TrimSpace(auth.ID)
 		auth.Provider = strings.ToLower(strings.TrimSpace(auth.Provider))
 		auth.Name = strings.TrimSpace(auth.Name)
-		if auth.ID == "" || auth.Provider == "" || strings.ContainsAny(auth.ID+auth.Provider, "\x00\r\n") || len(auth.ID) > 512 || len(auth.Provider) > 128 || len(auth.Name) > 512 {
+		if auth.ID == "" || auth.Provider == "" || strings.ContainsAny(auth.ID+auth.Provider, "\x00\r\n") || len(auth.ID) > 512 || len(auth.Provider) > 128 ||
+			len(auth.Name) > 512 || len(auth.BaseURL) > 4096 || len(auth.ProviderName) > 512 {
 			return jsonError(http.StatusBadRequest, "无效的配置型凭证标识")
 		}
 		if _, exists := next[auth.ID]; exists {
@@ -84,7 +87,10 @@ func syncCredentialsResponse(body []byte) managementResponse {
 		if auth.Name == "" {
 			auth.Name = auth.ID
 		}
-		next[auth.ID] = credential{ID: auth.ID, Name: auth.Name, Provider: auth.Provider, Source: credentialSourceProvider, Disabled: auth.Disabled}
+		next[auth.ID] = credential{
+			ID: auth.ID, Name: auth.Name, Provider: auth.Provider, Source: credentialSourceProvider, Disabled: auth.Disabled,
+			BaseURL: strings.TrimSpace(auth.BaseURL), ProviderName: strings.TrimSpace(auth.ProviderName),
+		}
 	}
 	mu.Lock()
 	configuredCredentials = next

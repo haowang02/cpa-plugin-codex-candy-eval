@@ -82,7 +82,7 @@ const CODEX_PLANS = [
   { label: "Edu Pro", ids: ["edu_pro"], badge: "" },
   { label: "Edu Plus", ids: ["edu_plus"], badge: "" },
   { label: "Edu", ids: ["edu", "education"], badge: "" },
-  { label: "Free", ids: ["free"], badge: "free" },
+  { label: "Free", ids: ["free"], badge: "" },
 ];
 const PLAN_BY_ID = new Map(CODEX_PLANS.flatMap((plan, rank) => plan.ids.map((id) => [id, { ...plan, rank }])));
 function credentialPlan(a) {
@@ -92,10 +92,13 @@ function credentialPlan(a) {
 }
 const planRank = (a) => credentialPlan(a)?.rank ?? CODEX_PLANS.length + 1;
 
+// Config API keys are named by their endpoint, with the masked key on a second line.
 function credentialView(a, open) {
-  const plan = credentialPlan(a);
-  return `<div class="credential"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(a.email || a.name)}</span></button>
-    <div class="tags"><span class="tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(a.provider)}</span></span>${plan ? `<span class="tag ${plan.badge ? "plan-" + plan.badge : ""}"><span>${esc(plan.label)}</span></span>` : ""}${a.unavailable ? `<span class="tag warn" title="${esc(unavailableReason(a))}"><span>不可用</span></span>` : ""}</div></div>`;
+  const plan = credentialPlan(a), configured = a.source === "ai_providers";
+  const label = configured ? a.base_url?.replace(/^https:\/\//i, "") || "默认地址" : a.email || a.name;
+  return `<div class="credential"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(label)}</span></button>
+    ${configured ? `<div class="api-key name mono">${esc(a.name)}</div>` : ""}
+    <div class="tags"><span class="tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(providerType(a))}</span></span>${a.provider_name ? `<span class="tag"><span>${esc(a.provider_name)}</span></span>` : ""}${plan ? `<span class="tag ${plan.badge ? "plan-" + plan.badge : ""}"><span>${esc(plan.label)}</span></span>` : ""}${a.unavailable ? `<span class="tag warn" title="${esc(unavailableReason(a))}"><span>不可用</span></span>` : ""}</div></div>`;
 }
 function unavailableReason(a) {
   const retry = a.next_retry_after && `预计 ${fmtTime(a.next_retry_after, false)} 恢复`;

@@ -1,0 +1,122 @@
+/* Tokens
+   Components read only these tokens. The panel embedding the page supplies most of them below; data-theme
+   mirrors that panel's theme. */
+:root {
+  --premium-ink: #6b4b00; --premium-line: rgb(217 165 22 / 72%); --premium-glow: 0 1px 3px rgb(133 92 0 / 16%), 0 0 10px rgb(255 214 98 / 28%);
+  --premium-soft: radial-gradient(circle at 18% 24%, rgb(255 255 255 / 96%), rgb(255 255 255 / 0) 42%), linear-gradient(135deg, #fff9e3, #ffe07f 52%, #e0aa14);
+  --plus-ink: #2463b0; --plus-soft: #eaf2fd; --plus-line: #c8dcf6; --go-ink: #0e7773; --go-soft: #e3f5f3; --go-line: #bfe5e0;
+  --business-ink: #6b46c1; --business-soft: #f2edfc; --business-line: #dcd0f5;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --premium-ink: #fff0a8; --premium-line: rgb(226 180 50 / 70%); --premium-glow: 0 1px 6px rgb(0 0 0 / 28%), 0 0 12px rgb(255 196 44 / 22%);
+  --premium-soft: radial-gradient(circle at 18% 24%, rgb(255 229 138 / 32%), rgb(255 214 98 / 0) 44%), linear-gradient(135deg, #4f3d0b, #6e5510 48%, #8f6d10);
+  --plus-ink: #93c1f7; --plus-soft: #16283d; --plus-line: #2a4868; --go-ink: #7fd6cf; --go-soft: #112f2d; --go-line: #245450;
+  --business-ink: #c4b0f5; --business-soft: #251e3a; --business-line: #45386b;
+  color-scheme: dark;
+}
+
+/* Hosts
+   Each block styles the page like its panel: the full token set per theme, the page frame, and the backdrop the
+   panel leaves out around plugin pages. Values come from the panel's own styles. */
+
+/* CPAMC, also used when the page is opened directly: paper (default), white and dark themes.
+   Frame from .main-content; the band copies .top-gradient-blur as CPAMC's build renders it, without blur. */
+:root:not([data-cpamp-plugin-host]) {
+  --page-top: 70px; --page-inline: clamp(20px, 3vw, 48px); --section-gap: 24px;
+  --bg: #faf9f5; --bg-image: none; --surface: #f0eee8; --sunken: #e9e6df; --field: #faf9f5; --line: #e3e1db; --card-line: var(--line);
+  --ink: #2d2a26; --muted: #6d6760; --faint: #a29c95;
+  --control-bg: #f6f4ee; --control-line: #d5d2cb; --control-hover: #e9e6df; --control-hover-line: #cecac4;
+  --history-bg: var(--bg); --history-head-bg: var(--control-bg);
+  --tag-neutral-bg: var(--control-bg); --tag-neutral-ink: var(--muted); --tag-neutral-line: var(--control-line);
+  --accent: #8b8680; --accent-ink: var(--ink); --accent-soft: color-mix(in srgb, var(--ink) 10%, transparent);
+  --accent-soft-hover: color-mix(in srgb, var(--ink) 14%, transparent); --action-line: color-mix(in srgb, var(--accent) 30%, transparent);
+  --success: #10b981; --success-ink: #065f46; --success-soft: #d1fae5;
+  --danger: #c65746; --danger-ink: #8a3a30; --danger-soft: rgb(198 87 70 / 14%); --danger-soft-hover: rgb(198 87 70 / 24%); --danger-line: rgb(198 87 70 / 35%);
+  --warning-ink: #92400e; --warning-soft: rgb(217 119 6 / 10%); --warning-line: rgb(217 119 6 / 30%);
+  --radius: 12px; --shadow: 0 1px 2px rgb(0 0 0 / 8%); --float: 0 12px 26px rgb(0 0 0 / 14%); --glass: none;
+
+  &[data-theme="white"] {
+    --bg: #ffffff; --surface: #ffffff; --sunken: #f6f6f6; --field: #ffffff; --line: #e5e5e5;
+    --control-bg: #ffffff; --control-line: #d9d9d9; --control-hover: #f6f6f6; --control-hover-line: #cccccc;
+    --history-head-bg: color-mix(in srgb, var(--surface) 60%, var(--sunken));
+    --float: 0 12px 26px rgb(0 0 0 / 12%);
+  }
+  &[data-theme="dark"] {
+    --bg: #151412; --surface: #1d1b18; --sunken: #262320; --field: #151412; --line: #3a3530;
+    --ink: #f6f4f1; --muted: #c9c3bb; --faint: #9c958d;
+    --control-bg: #2a2723; --control-line: #4a453f; --control-hover: #2e2a26; --control-hover-line: #5a544d;
+    --history-bg: var(--surface);
+    --success-ink: #6ee7b7; --success-soft: rgb(6 78 59 / 30%);
+    --danger-ink: #f1b0a6; --danger-soft: rgb(198 87 70 / 24%); --danger-soft-hover: rgb(198 87 70 / 34%); --danger-line: rgb(198 87 70 / 50%);
+    --warning-ink: #fcd34d; --warning-soft: rgb(245 158 11 / 14%); --warning-line: rgb(245 158 11 / 38%);
+    --shadow: 0 1px 3px rgb(0 0 0 / 30%); --float: 0 14px 30px rgb(0 0 0 / 40%);
+  }
+  & body::before {
+    content: ""; position: fixed; inset: 0 0 auto; z-index: 2; height: 141px; pointer-events: none;
+    background: linear-gradient(color-mix(in srgb, var(--bg) 88%, #0d0c0a), color-mix(in srgb, var(--bg) 54%, transparent) 36%,
+      color-mix(in srgb, var(--bg) 22%, transparent) 66%, transparent);
+    mask-image: linear-gradient(#000, rgb(0 0 0 / 90%) 24%, rgb(0 0 0 / 58%) 48%, rgb(0 0 0 / 22%) 72%, transparent);
+  }
+  /* The narrow frame clears CPAMC's 74px floating header. */
+  @media (max-width: 768px) {
+    --page-top: calc(90px + env(safe-area-inset-top)); --page-inline: 16px;
+    & body::before { height: 114px; }
+  }
+}
+
+/* CPAMP, which marks the pages it embeds: light and dark themes.
+   Frame from .main-content with its pages' 16px card gaps, glass cards from .card, background and drifting
+   blobs from AppBackground. */
+:root[data-cpamp-plugin-host] {
+  --page-top: 20px; --page-inline: 20px; --section-gap: 16px;
+  --bg: #eff2f7; --bg-image: linear-gradient(120deg, #f0f7ff 0%, #e7f2ff 50%, #edf7ff 100%);
+  --surface: #ffffff; --sunken: #f6faff; --field: rgb(255 255 255 / 62%); --line: rgb(15 23 42 / 8%); --card-line: rgb(255 255 255 / 60%);
+  --ink: #2c3e50; --muted: #5f6c7b; --faint: #8b95a6;
+  --control-bg: #ffffff; --control-line: #d8e5f2; --control-hover: #f1f7fe; --control-hover-line: rgb(59 130 246 / 28%);
+  --history-bg: var(--control-bg); --history-head-bg: #eef6ff;
+  --tag-neutral-bg: #f8fafc; --tag-neutral-ink: #475569; --tag-neutral-line: #cbd5e1;
+  --accent: #3b82f6; --accent-ink: #2563eb; --accent-soft: #dbeafe; --accent-soft-hover: #bfdbfe; --action-line: #bfdbfe;
+  --success: #22c55e; --success-ink: #16a34a; --success-soft: #f0fdf4;
+  --danger: #ef4444; --danger-ink: #dc2626; --danger-soft: #fef2f2; --danger-soft-hover: #fee2e2; --danger-line: #fecaca;
+  --warning-ink: #d97706; --warning-soft: #fffbeb; --warning-line: #fde68a;
+  --radius: 20px; --shadow: none; --float: 0 10px 15px -3px rgb(0 0 0 / 10%); --glass: blur(20px);
+  --blob-1: linear-gradient(135deg, #7aa2ff, #b6d4ff); --blob-1-opacity: .5;
+  --blob-2: linear-gradient(90deg, #6bc5ff, #7debdc); --blob-2-opacity: .5; --blob-blur: 60px;
+
+  &[data-theme="dark"] {
+    --bg: #0a0a0a; --bg-image: linear-gradient(120deg, #0b1324 0%, #0a1426 50%, #091521 100%);
+    --surface: rgb(24 28 40 / 72%); --sunken: rgb(255 255 255 / 6%); --field: #1b1f2a; --line: rgb(255 255 255 / 8%); --card-line: rgb(255 255 255 / 10%);
+    --ink: #e5e5e5; --muted: #a3a3a3; --faint: #7a7a7a;
+    --control-bg: #1b1f2a; --control-line: rgb(255 255 255 / 10%); --control-hover: rgb(96 165 250 / 12%); --control-hover-line: rgb(96 165 250 / 40%);
+    --history-head-bg: rgb(96 165 250 / 16%);
+    --tag-neutral-bg: rgb(148 163 184 / 12%); --tag-neutral-ink: #94a3b8; --tag-neutral-line: rgb(148 163 184 / 20%);
+    --accent: #60a5fa; --accent-ink: #60a5fa; --accent-soft: rgb(96 165 250 / 18%); --accent-soft-hover: rgb(96 165 250 / 24%); --action-line: rgb(96 165 250 / 24%);
+    --success: #4ade80; --success-ink: #4ade80; --success-soft: rgb(74 222 128 / 14%);
+    --danger: #f87171; --danger-ink: #f87171; --danger-soft: rgb(248 113 113 / 14%); --danger-soft-hover: rgb(248 113 113 / 18%); --danger-line: rgb(248 113 113 / 24%);
+    --warning-ink: #fbbf24; --warning-soft: rgb(251 191 36 / 14%); --warning-line: rgb(251 191 36 / 24%);
+    --blob-1: linear-gradient(135deg, #1b2a55, #27325c); --blob-1-opacity: .35;
+    --blob-2: linear-gradient(90deg, #0f3d59, #0c4a4f); --blob-2-opacity: .3; --blob-blur: 70px;
+  }
+  /* CPAMP's top bar already shows the page title. */
+  & header { display: none; }
+  & body::before, & body::after {
+    content: ""; position: fixed; z-index: -1; aspect-ratio: 1; border-radius: 50%; pointer-events: none;
+    filter: blur(var(--blob-blur)); animation: drift 20s infinite ease-in-out alternate;
+  }
+  /* Boxes match AppBackground's; the scale fits the circles to its blob paths. */
+  & body::before { top: -10%; right: -10%; width: 600px; scale: .86; background: var(--blob-1); opacity: var(--blob-1-opacity); }
+  & body::after { bottom: -10%; left: -10%; width: 500px; scale: .78; background: var(--blob-2); opacity: var(--blob-2-opacity); animation-delay: -5s; }
+  @media (max-width: 768px) {
+    --page-inline: 12px;
+    & body::before { width: 420px; }
+    & body::after { width: 360px; }
+  }
+  @media (max-width: 768px), (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
+    --glass: none;
+  }
+  @media (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
+    & body::before, & body::after { content: none; }
+  }
+}
+@keyframes drift { 50% { transform: translate(30px, 20px) rotate(10deg); } }

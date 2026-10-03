@@ -34,6 +34,9 @@ var uiTemplate string
 //go:embed web/style.css
 var uiStyles string
 
+//go:embed web/theme.css
+var uiThemes string
+
 //go:embed web/credentials.js
 var credentialScript string
 
@@ -61,7 +64,7 @@ var uiHTML = func() []byte {
 	traceConfig, _ := json.Marshal(map[string]any{"requests": traceTarget, "default_concurrency": traceDefaultConcurrency, "max_concurrency": traceMaxConcurrency})
 	traceScript := strings.Replace(modelTraceScript, `/*MODELTRACE_CONFIG*/{}`, string(traceConfig), 1)
 	return []byte(strings.NewReplacer(
-		"/*APP_STYLES*/", uiStyles,
+		"/*APP_STYLES*/", uiThemes+"\n"+uiStyles,
 		"<!--PLUGIN_VERSION-->", pluginVersion,
 		"<!--CANDY_PROMPT-->", html.EscapeString(candyPrompt),
 		"<!--MODELTRACE_LICENSE-->", "<!-- ModelTrace\n"+modelTraceLicense+"-->",

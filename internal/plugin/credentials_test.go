@@ -22,7 +22,7 @@ func TestCredentialInventoryAndSync(t *testing.T) {
 			{"id":"configured","provider":"codex","runtime_only":true,"disabled":true,"unavailable":true},
 			{"provider":"codex","name":"missing-id"}]}`), nil
 	}
-	response := syncCredentialsResponse([]byte(`{"credentials":[{"id":"configured","provider":"codex","name":"Configured Codex","disabled":true,"email":"must-not-sync"},{"id":"compat","provider":"openai-compatible-demo","name":"Configured Demo"}]}`))
+	response := syncCredentialsResponse([]byte(`{"credentials":[{"id":"configured","provider":"codex","name":"Configured Codex","base_url":" https://example.test/v1 ","provider_name":" Codex Group ","disabled":true,"email":"must-not-sync"},{"id":"compat","provider":"openai-compatible-demo","name":"Configured Demo"}]}`))
 	if response.StatusCode != 200 {
 		t.Fatal(string(response.Body))
 	}
@@ -31,7 +31,7 @@ func TestCredentialInventoryAndSync(t *testing.T) {
 		t.Fatalf("credentials = %+v, %v", all, err)
 	}
 	for _, auth := range all {
-		if auth.ID == "configured" && (!auth.Disabled || auth.Unavailable || auth.Source != "ai_providers" || auth.Email != "") {
+		if auth.ID == "configured" && (!auth.Disabled || auth.Unavailable || auth.Source != "ai_providers" || auth.Email != "" || auth.BaseURL != "https://example.test/v1" || auth.ProviderName != "Codex Group") {
 			t.Fatalf("config merge: %+v", auth)
 		}
 		if auth.ID == "runtime" && (auth.Name != "synthe…-key" || auth.Email != "") {

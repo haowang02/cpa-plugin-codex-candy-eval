@@ -77,7 +77,11 @@ function compareModels(a, b) {
     const generation = /^gpt-(\d+(?:\.\d+)*)(?:-(astra|sol|terra|luna))?(?=[-(]|$)/;
     const l = left.match(generation), r = right.match(generation);
     if (l && r) {
-      if (l[1] !== r[1]) return lexical(r[1], l[1]);
+      const lv = l[1].split(".").map(Number), rv = r[1].split(".").map(Number);
+      for (let i = 0; i < Math.max(lv.length, rv.length); i++) {
+        const version = (rv[i] || 0) - (lv[i] || 0);
+        if (version) return version;
+      }
       const tiers = ["astra", "sol", "terra", "luna"];
       const rank = (tier) => tier ? tiers.indexOf(tier) : tiers.length;
       const tier = rank(l[2]) - rank(r[2]);
@@ -96,8 +100,15 @@ async function refreshCatalog({ signal, force = false } = {}) {
     signal?.throwIfAborted();
     if (cache !== catalogCache) throw new Error("凭证目录已更新，请重试。");
   };
-  const config = await api("/v0/management/config", { signal });
-  const inventory = await configuredCredentials(config);
+  const [config, providerGroups] = await Promise.all([
+    api("/v0/management/config", { signal }),
+    // Group names come from v8; CPA before v8, or a config without provider keys, answers 404.
+    api("/v8/management/config/api-keys", { signal }).catch((err) => {
+      if (err.status === 404) return null;
+      throw err;
+    }),
+  ]);
+  const inventory = await configuredCredentials(config, providerGroups);
   // Detect routing and alias changes without storing the configuration or keys.
   const revision = await sha256Hex(JSON.stringify(config));
   checkCurrent();

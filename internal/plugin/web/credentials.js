@@ -64,8 +64,10 @@ function previewCredential(value) {
 }
 
 // CPA config identities match internal/watcher/synthesizer (including collisions).
-async function configuredCredentials(config) {
-  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("CPA 凭证配置格式无效");
+async function configuredCredentials(config, providerGroups) {
+  const record = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+  if (!record(config)) throw new Error("CPA 凭证配置格式无效");
+  if (providerGroups != null && !record(providerGroups)) throw new Error("CPA 凭证分组格式无效");
   const credentials = [], counters = new Map();
   const text = (v) => String(v || "").trim();
   // CPA and CPAMC disable a config API key by excluding every model.
@@ -73,23 +75,49 @@ async function configuredCredentials(config) {
   const headers = (entry) => Object.keys(entry.headers || {}).sort().map((key) => key + "\0" + entry.headers[key] + "\0").join("");
   const entries = (field, value = config[field]) => {
     if (value == null) return [];
-    if (!Array.isArray(value) || value.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))) throw new Error("CPA 凭证配置格式无效：" + field);
+    if (!Array.isArray(value) || !value.every(record)) throw new Error("CPA 凭证配置格式无效：" + field);
     return value;
   };
-  async function add(kind, parts, provider, disabled, apiKey) {
+  // v0 lists each provider's effective keys without their v8 group names. Pair keys by CPA's
+  // normalized dedup identity, so keys CPA dropped or deduplicated cannot shift the names.
+  const identity = (entry) => {
+    const prefix = text(entry.prefix).replace(/^\/+|\/+$/g, "");
+    const headerPairs = Object.entries(entry.headers || {}).map(([key, value]) => [text(key), text(value)]).filter(([key, value]) => key && value).sort();
+    return JSON.stringify([text(entry["api-key"]), text(entry["proxy-url"]), prefix.includes("/") ? "" : prefix, headerPairs]);
+  };
+  // v8 keeps each "<family>-api-key" list as named groups under api-keys.<family>.
+  function groupKeys(field) {
+    const family = field.replace(/-api-key$/, "");
+    return entries("api-keys." + family, providerGroups?.[family]).flatMap((group) =>
+      entries(`api-keys.${family}.keys`, group.keys).map((key) => ({
+        // Keys inherit the group's fields unless they set their own.
+        identity: identity({ ...group, ...Object.fromEntries(Object.entries(key).filter(([, value]) => value !== null)) }),
+        baseURL: text(group["base-url"]),
+        name: text(group.name),
+      })));
+  }
+  function groupName(keys, entry) {
+    const id = identity(entry), baseURL = text(entry["base-url"]);
+    let index = keys.findIndex((key) => key.identity === id && key.baseURL === baseURL);
+    // CPA fills in some providers' default URL when a group has none.
+    if (index < 0) index = keys.findIndex((key) => key.identity === id && !key.baseURL);
+    return index < 0 ? "" : keys.splice(index, 1)[0].name;
+  }
+  async function add(kind, parts, provider, disabled, apiKey, baseURL, providerName) {
     const digest = await sha256Hex(kind + parts.map((part) => "\0" + text(part)).join(""));
     const base = kind + ":" + digest.slice(0, 12), collision = counters.get(base) || 0;
     counters.set(base, collision + 1);
     const id = collision ? base + "-" + collision : base;
-    credentials.push({ id, provider, name: previewCredential(apiKey) || provider + " · " + id.slice(kind.length + 1), disabled });
+    credentials.push({ id, provider, name: previewCredential(apiKey) || provider + " · " + id.slice(kind.length + 1), base_url: text(baseURL), provider_name: text(providerName), disabled });
   }
   for (const [field, provider] of [
     ["gemini-api-key", "gemini"], ["interactions-api-key", "gemini-interactions"],
     ["claude-api-key", "claude"], ["codex-api-key", "codex"], ["xai-api-key", "xai"], ["meta-api-key", "meta"],
   ]) {
+    const groups = groupKeys(field);
     for (const entry of entries(field)) {
       if (!text(entry["api-key"]) && !text(entry["base-url"])) continue;
-      await add(provider + ":apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"], entry.prefix, headers(entry)], provider, excludesAll(entry), entry["api-key"]);
+      await add(provider + ":apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"], entry.prefix, headers(entry)], provider, excludesAll(entry), entry["api-key"], entry["base-url"], groupName(groups, entry));
     }
   }
   for (const entry of entries("openai-compatibility")) {
@@ -98,11 +126,12 @@ async function configuredCredentials(config) {
     const name = text(entry.name).toLowerCase() || "openai-compatibility";
     const provider = name === "openai-compatibility" || name.startsWith("openai-compatible-") ? name : "openai-compatible-" + name;
     const keys = entries("api-key-entries", entry["api-key-entries"]);
-    if (!keys.length) await add("openai-compatibility:" + name, [entry["base-url"]], provider, false);
-    for (const entryKey of keys) await add("openai-compatibility:" + name, [entryKey["api-key"], entry["base-url"], entryKey["proxy-url"]], provider, false, entryKey["api-key"]);
+    if (!keys.length) await add("openai-compatibility:" + name, [entry["base-url"]], provider, false, "", entry["base-url"], entry.name);
+    for (const entryKey of keys) await add("openai-compatibility:" + name, [entryKey["api-key"], entry["base-url"], entryKey["proxy-url"]], provider, false, entryKey["api-key"], entry["base-url"], entry.name);
   }
+  const vertexGroups = groupKeys("vertex-api-key");
   for (const entry of entries("vertex-api-key")) {
-    await add("vertex:apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"]], "vertex", excludesAll(entry), entry["api-key"]);
+    await add("vertex:apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"]], "vertex", excludesAll(entry), entry["api-key"], entry["base-url"], groupName(vertexGroups, entry));
   }
   return credentials;
 }

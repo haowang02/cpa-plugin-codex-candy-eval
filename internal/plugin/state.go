@@ -34,9 +34,12 @@ func loadState() {
 	if errors.Is(err, os.ErrNotExist) {
 		return
 	}
-	var state persistedState
+	var state *persistedState
 	if err == nil {
 		err = json.Unmarshal(data, &state)
+		if err == nil && state == nil {
+			err = errors.New("历史记录格式无效")
+		}
 	}
 	if err != nil {
 		stateLoadError = fmt.Errorf("历史记录读取失败，为保护原文件已暂停保存：%w", err)

@@ -51,7 +51,8 @@ class AuthError extends Error {}
 
 async function api(path, { method = "GET", body, apiKey, signal } = {}) {
   const timeout = AbortSignal.timeout(30000);
-  const init = { method, cache: "no-store", signal: signal ? AbortSignal.any([signal, timeout]) : timeout, headers: { Authorization: "Bearer " + (apiKey ?? key) } };
+  const requestKey = apiKey ?? key;
+  const init = { method, cache: "no-store", signal: signal ? AbortSignal.any([signal, timeout]) : timeout, headers: { Authorization: "Bearer " + requestKey } };
   if (body !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(body);
@@ -66,10 +67,11 @@ async function api(path, { method = "GET", body, apiKey, signal } = {}) {
   }
   let data = null;
   try { data = JSON.parse(text); } catch (_) {}
-  if (resp.status === 401 && apiKey === undefined) throw new AuthError("管理密钥无效，请重新输入。");
+  // A 401 for a key replaced by a newer login must not sign that login out.
+  if (resp.status === 401 && apiKey === undefined && requestKey === key) throw new AuthError("管理密钥无效，请重新输入。");
   if (!resp.ok) {
     const err = data?.error;
-    throw new Error(String((typeof err === "string" ? err : err?.message) || text || "HTTP " + resp.status).slice(0, 500));
+    throw Object.assign(new Error(String((typeof err === "string" ? err : err?.message) || text || "HTTP " + resp.status).slice(0, 500)), { status: resp.status });
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("服务器返回了无效数据，请稍后重试。");
   return data;
@@ -359,8 +361,10 @@ function bindCollectionActions({ type, scope, expanded, renderRows, run, showDet
   });
 }
 
-const credentialType = (a) => a.source + ":" + a.provider;
-const credentialTypeLabel = (a) => `${a.source === "ai_providers" ? "AI 提供商" : "认证文件"} · ${a.provider}`;
+// CPA names each OpenAI-compatible provider after its config entry; they share one type.
+const providerType = (a) => a.provider === "openai-compatibility" || a.provider.startsWith("openai-compatible-") ? "openai-compatibility" : a.provider;
+const credentialType = (a) => a.source + ":" + providerType(a);
+const credentialTypeLabel = (a) => `${a.source === "ai_providers" ? "AI 提供商" : "认证文件"} · ${providerType(a)}`;
 const typedCredentials = (prefix) => credentials.filter((a) => $(prefix + "credential-type").value === "all" || credentialType(a) === $(prefix + "credential-type").value);
 const PRO_ALL = "Pro ALL";
 function visibleCredentials(prefix) {

@@ -51,6 +51,14 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').update(kind + parts.map(x => '\0' + (x || '').trim()).join('')).digest('hex').slice(0, 12);
 
 (async () => {
+  let finishAPI;
+  context.fetch = () => new Promise(resolve => { finishAPI = resolve; });
+  run(`key='old-login'`);
+  const previousLogin = run(`api('/test')`);
+  run(`key='new-login'`);
+  finishAPI({status:401,ok:false,text:async () => '{"error":"Expired login"}'});
+  await assert.rejects(previousLogin, error => !(error instanceof run(`AuthError`)) && error.status === 401, 'a stale key must not sign out a newer login');
+  delete context.fetch;
   for (const input of ['', 'abc', '中文配置', 'a'.repeat(1000)]) {
     assert.equal(await run(`sha256Hex(${JSON.stringify(input)})`), crypto.createHash('sha256').update(input).digest('hex'));
   }
@@ -76,7 +84,34 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(credentials.find(x => x.provider === 'openai-compatible-no-key').id, stableID('openai-compatibility:no-key', ['https://example.test']));
   assert.equal(credentials.find(x => x.provider === 'vertex').disabled, true);
   assert(!JSON.stringify(credentials).includes(key));
-  assert(!JSON.stringify(credentials).includes('https://'));
+  assert.equal(credentials.find(x => x.provider === 'claude').base_url, 'https://example.test');
+  assert.equal(credentials.find(x => x.provider === 'openai-compatible-demo').provider_name, 'Demo');
+  for (const [field, family] of [['gemini-api-key','gemini'],['claude-api-key','claude'],['meta-api-key','meta'],['vertex-api-key','vertex']]) {
+    const runtime = {[field]:[{'api-key':key,'base-url':'https://a.test'},{'api-key':key,'base-url':'https://a.test'}]};
+    const groups = {[family]:[{name:' First ','base-url':'https://a.test',keys:[{'api-key':key}]},{name:'Second','base-url':'https://a.test',keys:[{'api-key':key}]}]};
+    const named = plain(await run(`configuredCredentials(${JSON.stringify(runtime)}, ${JSON.stringify(groups)})`));
+    assert.deepEqual(named.map(a => a.id), plain(await run(`configuredCredentials(${JSON.stringify(runtime)})`)).map(a => a.id), 'names must not change CPA identities');
+    assert.deepEqual(named.map(a => a.provider_name), ['First','Second'], family + ' names must follow source order');
+  }
+  const groupNames = (runtime, groups) => run(`configuredCredentials(${JSON.stringify(runtime)}, ${JSON.stringify(groups)})`).then(list => plain(list.map(a => a.provider_name)));
+  assert.deepEqual(await groupNames({'meta-api-key':[{'api-key':'k','base-url':'https://default.test'}]}, {meta:[{name:'Default',keys:[{'api-key':'k'}]}]}), ['Default'], 'URLs CPA fills in must keep the group name');
+  assert.deepEqual(await groupNames({'gemini-api-key':[{'api-key':'k',prefix:'a',headers:{A:'a'}},{'api-key':'k',prefix:'b',headers:{B:'b'}}]}, {gemini:[
+    {name:'First',prefix:'/a/',headers:{' A ':' a ','':'x'},keys:[{'api-key':'k',headers:null}]},
+    {name:'Duplicate',prefix:'a',headers:{A:'a'},keys:[{'api-key':'k'}]},
+    {name:'Override',prefix:'group',keys:[{'api-key':'k',prefix:'b',headers:{B:'b'}}]},
+  ]}), ['First','Override'], 'deduplicated keys and key overrides must not shift names');
+
+  const configuredView = run(`credentialView({id:'c',source:'ai_providers',provider:'claude',provider_name:'DeepSeek',name:'synthe…-key',base_url:'https://api.example.test/anthropic'}, false)`);
+  assert(configuredView.includes('<span class="name">api.example.test/anthropic</span>'));
+  assert(configuredView.includes('<div class="api-key name mono">synthe…-key</div>'));
+  assert(configuredView.includes('<span>DeepSeek</span>'));
+  assert(run(`credentialView({id:'c',source:'ai_providers',provider:'gemini',name:'k'}, false)`).includes('默认地址'));
+  run(`credentials = [{id:'a',source:'ai_providers',provider:'openai-compatible-demo'},{id:'b',source:'ai_providers',provider:'openai-compatibility'}]; fillCredentialTypes()`);
+  assert.equal(element('credential-type').innerHTML.match(/value="ai_providers:openai-compatibility"/g).length, 1, 'OpenAI-compatible providers share one type');
+  element('credential-type').value = 'ai_providers:openai-compatibility';
+  assert.equal(run(`visibleCredentials('').length`), 2);
+  element('credential-type').value = 'auth_files:codex';
+  run(`credentials = []`);
 
   assert.equal(run(`HIDDEN_MODEL('vendor/IMAGE-preview')`), true);
   assert.equal(run(`HIDDEN_MODEL('codex-auto-review')`), true);
@@ -90,6 +125,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('mt-model').innerHTML, element('model').innerHTML);
   const sortedModels = ['gpt-6.1-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6.1-luna','gpt-6-astra','gpt-6-sol','gpt-6-terra','gpt-6-luna','gpt-5.6-sol','claude-sonnet-4.6','claude-opus-4.6','claude-opus-4.5','gemini-pro','qwen'];
   assert.deepEqual(plain(run(`${JSON.stringify([...sortedModels].reverse())}.sort(compareModels)`)), sortedModels);
+  assert.deepEqual(plain(run(`['gpt-6.9-sol','gpt-6.10-sol','gpt-7-sol'].sort(compareModels)`)), ['gpt-7-sol','gpt-6.10-sol','gpt-6.9-sol']);
   assert.deepEqual(plain(run(`['gpt-6-luna','vendor/gpt-6.1-sol','gpt-6-astra','vendor/claude-sonnet','other'].sort(compareModels)`)), ['vendor/gpt-6.1-sol','gpt-6-astra','gpt-6-luna','vendor/claude-sonnet','other']);
   element('model').value = 'gpt-5.6-sol';
   element('effort').value = 'high';
@@ -317,6 +353,14 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   storageBlocked = false;
   assert.equal(run(`lookupCalls`), 6, 'memory cache should work when storage is blocked');
 
+  run(`resetCatalogCache(); api = async path => {
+    if (path.endsWith('/config/api-keys')) throw Object.assign(new Error('Not found'), {status:404});
+    if (path.endsWith('/v1/models')) return {data:[{id:'alias'}]};
+    return {};
+  }`);
+  await run(`refreshCatalog()`);
+  assert.deepEqual(plain(run(`catalogCache.models.ids`)), ['alias'], 'CPA without v8 groups must still load the catalog');
+
   run(`catalogRefreshedAt = 0; let configVersion = 1, modelVersion = 'alias', configCalls = 0, modelCalls = 0;
     api = async path => {
       if (path.endsWith('/config')) { configCalls++; return {version:configVersion,'api-keys':['synthetic-client-key']}; }
@@ -384,7 +428,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     const modelsWaiting = new Promise(resolve => {modelsStarted=resolve});
     const syncWaiting = new Promise(resolve => {syncStarted=resolve});
     api = async path => {
-      if (path.endsWith('/config')) return {};
+      if (path.endsWith('/config') || path.endsWith('/config/api-keys')) return {};
       if (path.endsWith('/v1/models')) return new Promise(resolve => {finishModels=resolve; modelsStarted();});
       if (path.endsWith('/sync')) return new Promise(resolve => {finishSync=resolve; syncStarted();});
       throw new Error('Unexpected endpoint');
