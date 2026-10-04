@@ -153,9 +153,10 @@ func HandleMethod(method string, request []byte) (response []byte) {
 				{"Method": http.MethodPost, "Path": managementBase + "/modeltrace/cancel", "Description": "Stop ModelTrace collection"},
 				{"Method": http.MethodGet, "Path": managementBase + "/modeltrace/record", "Description": "View a ModelTrace record"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/modeltrace/results", "Description": "Clear ModelTrace history"},
+				{"Method": http.MethodDelete, "Path": managementBase + "/all/results", "Description": "Clear all test history"},
 			},
 			"resources": []map[string]string{
-				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果题、指纹测试与 ModelTrace 测试 CPA 凭证"},
+				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果测试、指纹测试和 ModelTrace 检测 CPA 凭证"},
 			},
 		})
 	case "management.handle":
@@ -210,6 +211,8 @@ func handleManagement(req managementRequest) managementResponse {
 		return recordResponse("modeltrace", req.Query)
 	case req.Method == http.MethodDelete && path == managementBase+"/modeltrace/results":
 		return clearHistoryResponse("modeltrace")
+	case req.Method == http.MethodDelete && path == managementBase+"/all/results":
+		return clearHistoryResponse("all")
 	default:
 		return jsonError(http.StatusNotFound, "Route not found: "+req.Method+" "+req.Path)
 	}

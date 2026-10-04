@@ -402,7 +402,7 @@ func attributeFingerprint(model string, valid map[string][]string) fingerprintAt
 		case !significant(r.ReferencePValue):
 			r.Status, r.Message = "ambiguous", "同名基准与最近基准本身无法区分"
 		case significant(same.PValue) && !significant(best.PValue):
-			r.Status, r.Message = "substitution", "支持替换为 "+best.Model+" 的假设"
+			r.Status, r.Message = "substitution", "回答分布更接近 "+best.Model+"，疑似被替换为该模型"
 			for _, candidate := range r.Comparisons[1:] {
 				if candidate.Model != model && candidate.PValue != nil && !significant(candidate.PValue) {
 					r.Status, r.Message = "ambiguous", "与同名基准不同，但多个替代模型均无法排除"
@@ -418,7 +418,7 @@ func attributeFingerprint(model string, valid map[string][]string) fingerprintAt
 		}
 	}
 	if r.SelfJSD != nil && *r.SelfJSD > .25 && (r.Status == "consistent" || r.Status == "substitution") {
-		r.Status, r.Message = "unstable", "样本波动较大，归因不稳定，请复测"
+		r.Status, r.Message = "unstable", "样本波动较大，结论不稳定，建议复测"
 	}
 	return r
 }

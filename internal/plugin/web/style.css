@@ -92,7 +92,8 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .page-navigation button:disabled { opacity: .55; cursor: default; }
 .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: var(--shadow); }
 .tab[aria-selected="true"]:hover { translate: 0 -1px; }
-#refresh { display: inline-flex; align-items: center; justify-content: center; width: 32px; padding: 0; }
+.page-actions { display: flex; gap: 2px; }
+.page-actions button { display: inline-flex; align-items: center; justify-content: center; width: 32px; padding: 0; }
 #refresh[aria-busy="true"] .icon { animation: spin .8s linear infinite; }
 .panel-intro { margin-bottom: var(--section-gap); color: var(--muted); }
 .panel-intro p { margin: 0 0 8px; }
@@ -221,6 +222,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .fp-mode, .test-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .history-title { padding: 0 0 8px; color: var(--muted); font-size: 12px; }
 .result-history { display: grid; gap: 8px; }
+.result-history > .none { padding: 4px 0; text-align: center; }
 .history-card { --outcome-size: 30px; min-width: 0; background: var(--history-bg); border: 1px solid var(--control-line); border-radius: 10px; overflow: clip; }
 .history-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 12px; background: var(--history-head-bg); border-bottom: 1px solid var(--control-line); color: var(--muted); font-size: 12px; }
 .history-card-body { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 13px; }
@@ -319,7 +321,7 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
 }
 @media (max-width: 768px) {
   :root { --list-padding: 16px; }
-  .page-navigation button { padding: 0 12px; }
+  .page-navigation .tab { padding: 0 12px; }
   .list-head { display: none; }
   .list-row {
     --outcome-size: 30px; grid-template-columns: var(--list-checkbox) minmax(0, 1fr) auto; row-gap: 14px; padding-block: 16px;

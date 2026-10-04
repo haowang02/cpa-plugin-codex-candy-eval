@@ -23,7 +23,7 @@ function fpOutcome(r) {
     unstable: ["warn", "circle-alert", "结果不稳定", retry],
     cancelled: ["neutral", "circle-pause", "采集已停止", model],
     failed: ["bad", "circle-x", "采集失败", "请稍后重试"],
-    skipped: ["neutral", "ban", "已跳过", "此凭证不含所选模型"],
+    skipped: ["neutral", "ban", "已跳过", "此凭证不支持所选模型"],
   };
   const [tone, symbol, title, detail] = states[status] || ["idle", "fingerprint", "等待采集", ""];
   return resultOutcome({ tone, symbol, titleHTML: title, detailHTML: detail });
@@ -39,10 +39,10 @@ function showFingerprintDetail(r) {
   const stat = (label, value) => `<div class="fp-stat"><dt>${label}</dt><dd class="mono">${esc(value)}</dd></div>`;
   $("fp-detail-body").innerHTML = `<p class="result-dialog-meta"><span class="mono">${esc(r.model)}</span> · ${esc(fpModeName(r.mode))}模式 · <time class="mono" datetime="${esc(r.time)}">${esc(fmtTime(r.time))}</time></p>
     ${fpOutcome(r)}
-    ${r.status === "cancelled" || r.status === "failed" ? `<p class="detail-note">已有样本仅供参考</p>` : ""}
+    ${r.status === "cancelled" || r.status === "failed" ? `<p class="detail-note">结果基于已采集的部分样本，仅供参考</p>` : ""}
     ${attr.message ? `<p class="detail-note">${esc(attr.message)}</p>` : ""}
     ${r.error ? `<p class="detail-note detail-warning">${esc(r.error)}</p>` : ""}
-    ${r.status === "skipped" ? "" : `<dl class="fp-stats">${stat("采集进度", `${r.done} / ${r.total}`)}${stat("有效回答", r.valid)}${stat("请求失败", r.errors)}${stat("用时", fmtSec(r.duration_ms))}</dl>
+    ${r.status === "skipped" ? "" : `<dl class="fp-stats">${stat("采集进度", `${r.done} / ${r.total}`)}${stat("有效回答", r.valid)}${stat("请求失败", r.errors)}${stat("耗时", fmtSec(r.duration_ms))}</dl>
     <section class="result-dialog-section"><h3>基准比对</h3>
       <div class="fp-detail-scroll"><table class="fp-detail-table"><thead><tr><th>基准模型</th><th>距离 JSD ↓</th><th>p 值</th><th>有效探针</th><th>距离判断</th></tr></thead><tbody>
         ${comparisons.map((c) => `<tr class="${c.model === attr.nearest ? "closest" : ""}"><td class="mono">${esc(c.model)}${c.model === r.model ? " · 所选" : ""}${c.model === attr.nearest ? " · 最近" : ""}</td><td class="mono">${fpMetric(c.mean_jsd)}</td><td class="mono">${fpMetric(c.p_value)}</td><td>${c.cells?.length || 0}</td><td>${esc(fpComparisonNames[c.verdict] || c.verdict)}</td></tr>`).join("") || `<tr><td colspan="5">暂无可比数据</td></tr>`}

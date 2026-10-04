@@ -117,7 +117,7 @@ func traceRunResponse(body []byte) managementResponse {
 		req.Concurrency = traceDefaultConcurrency
 	}
 	if req.Concurrency < 1 || req.Concurrency > traceMaxConcurrency {
-		return jsonError(http.StatusBadRequest, fmt.Sprintf("单凭证并发须为 1–%d", traceMaxConcurrency))
+		return jsonError(http.StatusBadRequest, fmt.Sprintf("每凭证并发须为 1–%d", traceMaxConcurrency))
 	}
 	auths, err := selectedCredentials(req.AuthIDs, req.All)
 	if err != nil {
@@ -254,7 +254,8 @@ func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p 
 
 func collectTraceSample(ctx context.Context, auth credential, model string, challenge traceChallenge) (sample traceSample, out modelResponse, err error) {
 	sample.traceChallenge = challenge
-	out, sample.Attempts, err = executeProbe(ctx, auth, model, "", challenge.Prompt, traceSlots)
+	body, headers := codexTurn(auth.ID, model, "", challenge.Prompt)
+	out, sample.Attempts, err = executeProbe(ctx, auth, model, body, headers, traceSlots)
 	if err != nil {
 		sample.Error = truncate(err.Error(), 500)
 		return

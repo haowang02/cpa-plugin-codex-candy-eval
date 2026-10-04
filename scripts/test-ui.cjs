@@ -160,13 +160,13 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   run(`showFingerprintDetail({id:'skipped',status:'skipped',model:'test',error:'不支持的模型'})`);
   assert.equal(element('fp-detail-body').innerHTML.match(/不支持的模型/g).length, 1);
   assert(!element('fp-detail-body').innerHTML.includes('基准比对'));
-  run(`refreshing = true; renderRefresh()`);
+  run(`refreshing = true; renderPageActions()`);
   assert.equal(element('refresh').disabled, true);
   assert.equal(element('refresh')['aria-busy'], true);
-  run(`refreshing = false; pending = true; renderRefresh()`);
+  run(`refreshing = false; pending = true; renderPageActions()`);
   assert.equal(element('refresh').disabled, true);
   assert.equal(element('refresh')['aria-busy'], false);
-  run(`pending = false; renderRefresh()`);
+  run(`pending = false; renderPageActions()`);
   assert.equal(element('refresh').disabled, false);
   run(`var detailPaths = []; api = async (path) => { detailPaths.push(path); return {id:'failed',time:'2026-09-28T00:00:00Z',status:'failed',model:'<model>',error:'<request failed>',duration_ms:0}; }`);
   await run(`openResultDetail('mt', 'modeltrace', 'cred/1', 'failed', showModelTraceDetail)`);
@@ -187,8 +187,8 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     assert.equal((markup.match(/class="history-card-head"/g) || []).length, 2);
     assert(markup.includes('data-row="history"'));
     for (const head of markup.matchAll(/class="history-card-head">(.*?)<div class="history-card-body">/gs)) {
-      const labels = [...head[1].matchAll(/aria-label="(耗时|输入 tokens|输出 tokens|推理 tokens) ([^"]+)"/g)].map(match => match[1] + ' ' + match[2]);
-      assert.deepEqual(labels, ['耗时 1.2s', '输入 tokens 1,234', '输出 tokens 567', '推理 tokens 89']);
+      const labels = [...head[1].matchAll(/aria-label="(耗时|输入 Token|输出 Token|推理 Token) ([^"]+)"/g)].map(match => match[1] + ' ' + match[2]);
+      assert.deepEqual(labels, ['耗时 1.2s', '输入 Token 1,234', '输出 Token 567', '推理 Token 89']);
       assert(head[1].includes(run(`ICONS['square-arrow-right-enter']`)));
       assert(head[1].includes(run(`ICONS['square-arrow-right-exit']`)));
     }
@@ -197,22 +197,22 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     assert(empty.includes('<div class="none">暂无记录</div>'));
   }
   const unknownCard = run(`historyCard({duration_ms:1200,input_tokens:null,output_tokens:null}, '')`);
-  assert(unknownCard.includes('输入 tokens —'));
-  assert(unknownCard.includes('输出 tokens —'));
-  assert(!unknownCard.includes('推理 tokens'));
+  assert(unknownCard.includes('输入 Token —'));
+  assert(unknownCard.includes('输出 Token —'));
+  assert(!unknownCard.includes('推理 Token'));
   const zeroCard = run(`historyCard({duration_ms:0,input_tokens:0,output_tokens:0,reasoning_tokens:0,status:'skipped'}, '')`);
   assert(zeroCard.includes('耗时 0.0s'));
-  assert(zeroCard.includes('输入 tokens 0'));
-  assert(zeroCard.includes('输出 tokens 0'));
-  assert(!zeroCard.includes('推理 tokens'));
+  assert(zeroCard.includes('输入 Token 0'));
+  assert(zeroCard.includes('输出 Token 0'));
+  assert(!zeroCard.includes('推理 Token'));
   for (const [renderer, runningKey, type] of [['renderFingerprintRow','fingerprint_running','fp'],['renderModelTraceRow','modeltrace_running','mt']]) {
     const markup = run(`${renderer}(${JSON.stringify({...historyCredential,[runningKey]:{phase:'cancelling',model:'test',done:2,total:3}})})`);
-    assert(markup.includes('等待当前请求结束'));
-    assert(markup.includes('已停止后续请求，当前请求返回后保存结果'));
+    assert(markup.includes('正在停止'));
+    assert(markup.includes('已停止发送新请求，进行中的请求返回后保存结果'));
     assert(new RegExp(`data-${type}-cancel="history"[^>]*disabled`).test(markup));
   }
   const skippedLatest = run(`renderCandyRow(${JSON.stringify({...historyCredential,id:'skipped',results:[{...historyRecord,skipped:true}]})})`);
-  assert(!skippedLatest.includes('输入 tokens'));
+  assert(!skippedLatest.includes('输入 Token'));
   run(`switchTab('modeltrace')`);
   assert.equal(element('modeltrace-panel').hidden, false);
   assert.equal(element('candy-panel').hidden, true);
@@ -401,7 +401,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   const staleRefresh = run(`refreshCatalog({force:true})`);
   await run(`catalogWaiting`);
   run(`resetCatalogCache(); finishCatalog({data:[{id:'outdated-model'}]})`);
-  await assert.rejects(staleRefresh, /目录已更新/);
+  await assert.rejects(staleRefresh, /列表已更新/);
   assert.equal(run(`catalogCache.models`), null, 'a late response must not overwrite a reset catalog');
   run(`setNotice('flash', 'Read failed')`);
   assert.equal(element('flash').hidden, false);

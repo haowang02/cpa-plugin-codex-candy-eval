@@ -132,8 +132,9 @@ func evaluateCandy(auth credential, model, effort string) candyResult {
 	if effort == "none" {
 		effort = ""
 	}
+	body, headers := codexTurn(auth.ID, model, effort, candyPrompt)
 	start := time.Now()
-	out, _, err := executeModel(auth, model, effort, candyPrompt)
+	out, _, err := executeModel(auth, model, body, headers)
 	r.DurationMS = time.Since(start).Milliseconds()
 	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if err != nil {

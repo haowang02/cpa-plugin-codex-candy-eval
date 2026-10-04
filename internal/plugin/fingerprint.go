@@ -111,7 +111,7 @@ func fingerprintRunResponse(body []byte) managementResponse {
 		req.Concurrency = fingerprintDefaultConcurrency
 	}
 	if req.Concurrency < 1 || req.Concurrency > fingerprintMaxConcurrency {
-		return jsonError(http.StatusBadRequest, fmt.Sprintf("单凭证并发须为 1–%d", fingerprintMaxConcurrency))
+		return jsonError(http.StatusBadRequest, fmt.Sprintf("每凭证并发须为 1–%d", fingerprintMaxConcurrency))
 	}
 	auths, err := selectedCredentials(req.AuthIDs, req.All)
 	if err != nil {
@@ -243,7 +243,12 @@ func runFingerprint(ctx context.Context, auth credential, model string, mode fin
 func collectFingerprintSample(ctx context.Context, auth credential, model string, probe fingerprintProbe) (sample fingerprintSample) {
 	sample.Cell = probe.ID
 	prompt := probe.Prompts[rand.Intn(len(probe.Prompts))]
-	out, _, err := executeProbe(ctx, auth, model, "low", probe.Instructions+"\n\n"+prompt, fingerprintSlots)
+	out, _, err := executeProbe(ctx, auth, model, map[string]any{
+		"model": model, "stream": true,
+		"instructions": probe.Instructions, "input": prompt,
+		"temperature": 1.0, "reasoning": map[string]string{"effort": "low"},
+		"store": false,
+	}, nil, fingerprintSlots)
 	sample.Output = out
 	if err != nil {
 		if errors.Is(err, context.Canceled) {

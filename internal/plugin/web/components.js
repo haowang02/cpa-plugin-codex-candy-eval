@@ -63,9 +63,9 @@ const metric = (name, label, value, cls = "") => `<span class="metric ${cls}" ti
 const modelMeta = (r) => metric("astroid", "模型", modelName(r), "model-meta");
 const metrics = (r) =>
   metric("clock", "耗时", r.duration_ms != null ? fmtSec(r.duration_ms) : "—") +
-  metric("square-arrow-right-enter", "输入 tokens", r.input_tokens != null ? fmtNum(r.input_tokens) : "—") +
-  metric("square-arrow-right-exit", "输出 tokens", r.output_tokens != null ? fmtNum(r.output_tokens) : "—") +
-  (r.reasoning_tokens > 0 ? metric("brain", "推理 tokens", fmtNum(r.reasoning_tokens)) : "");
+  metric("square-arrow-right-enter", "输入 Token", r.input_tokens != null ? fmtNum(r.input_tokens) : "—") +
+  metric("square-arrow-right-exit", "输出 Token", r.output_tokens != null ? fmtNum(r.output_tokens) : "—") +
+  (r.reasoning_tokens > 0 ? metric("brain", "推理 Token", fmtNum(r.reasoning_tokens)) : "");
 
 // Codex plans in sort order, labelled like the official Codex client.
 // Badges follow CPAMC: platinum for top Pro plans, gold for Pro 100 and Business Premium.
@@ -126,16 +126,16 @@ function resultOutcome({ tone = "", symbol, titleHTML, detailHTML = "", progress
 }
 function collectionOutcome(p, total, showModel = false) {
   const stopping = p.phase === "cancelling";
-  const phase = stopping ? "等待当前请求结束" : p.phase === "comparing" ? "正在分析指纹" : "正在采集";
+  const phase = stopping ? "正在停止" : p.phase === "comparing" ? "正在分析指纹" : "正在采集";
   return resultOutcome({
     symbol: "loader-circle",
     titleHTML: `${phase} <span class="meta mono">${p.done}/${total}</span>`,
-    detailHTML: stopping ? "已停止后续请求，当前请求返回后保存结果" : showModel ? `<span class="mono">${esc(p.model)}</span>` : "",
+    detailHTML: stopping ? "已停止发送新请求，进行中的请求返回后保存结果" : showModel ? `<span class="mono">${esc(p.model)}</span>` : "",
     progressHTML: `<progress class="collection-progress" value="${p.done}" max="${total}" aria-label="采集进度"></progress>`,
   });
 }
 function collectionButton(type, credential, progress, label) {
-  if (progress) return `<button class="btn ghost" type="button" data-${type}-cancel="${esc(credential.id)}" title="停止后续请求；已发出的请求需等待返回" ${pending || progress.phase === "cancelling" ? "disabled" : ""}>停止</button>`;
+  if (progress) return `<button class="btn ghost" type="button" data-${type}-cancel="${esc(credential.id)}" title="停止发送新请求，已发出的请求会继续完成" ${pending || progress.phase === "cancelling" ? "disabled" : ""}>停止</button>`;
   return `<button class="btn" type="button" data-${type}-run="${esc(credential.id)}" ${runnable(type + "-", credential) ? "" : "disabled"}>${icon("play")}${esc(label)}</button>`;
 }
 function historyCard(r, contentHTML, extraMetaHTML = "") {
@@ -192,9 +192,9 @@ function setNotice(id, message, tone = "error") {
 }
 
 function credentialCard(prefix, columns) {
-  const label = prefix === "mt-" ? "ModelTrace" : prefix ? "指纹" : "糖果";
+  const clearLabel = prefix === "mt-" ? "清空 ModelTrace 测试记录" : prefix ? "清空指纹测试记录" : "清空糖果测试记录";
   return `<div class="section-head credential-head"><h2>凭证</h2><div class="credential-filters"><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span><span id="${prefix}plan-filter" class="native-select credential-filter" hidden><select id="${prefix}credential-plan" aria-label="订阅类型"><option value="all">所有订阅类型</option></select></span></div>
-    <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" title="清空${label}历史" aria-label="清空${label}历史" disabled>${icon("trash-2")}</button></div></div>
+    <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" title="${clearLabel}" aria-label="${clearLabel}" disabled>${icon("trash-2")}</button></div></div>
     <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${[...columns, "启用", ""].map((label) => `<div>${label}</div>`).join("")}</div>
     <div id="${prefix}rows"><div class="empty">正在加载…</div></div>`;
 }

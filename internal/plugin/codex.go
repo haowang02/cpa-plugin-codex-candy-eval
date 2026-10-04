@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Every test request is the first turn of a new codex-tui 0.160.0 thread on Responses Lite.
+// A Codex turn is the first request of a new codex-tui 0.160.0 thread on Responses Lite.
 // data/codex_context.json holds that client's tools, base instructions and turn context, taken
 // from a captured request with the machine's paths replaced by /home/user/workspace.
 const (
@@ -127,9 +127,9 @@ type codexTurnMetadata struct {
 	ReasoningEffort            string `json:"reasoning_effort,omitempty"`
 }
 
-// codexTurn returns the body and headers of a new Codex thread whose first user message is prompt.
+// codexTurn returns the request and headers of a new Codex thread whose first user message is prompt.
 // An empty effort leaves the reasoning effort to CPA and the upstream default.
-func codexTurn(authID, model, effort, prompt string) ([]byte, http.Header, error) {
+func codexTurn(authID, model, effort, prompt string) (codexRequest, http.Header) {
 	now := time.Now()
 	thread, turnID := uuidV7(), uuidV7().String()
 	threadID := thread.String()
@@ -137,16 +137,13 @@ func codexTurn(authID, model, effort, prompt string) ([]byte, http.Header, error
 	// Each credential acts as its own Codex installation, stable across restarts.
 	installation := sha256.Sum256([]byte("codex-installation:" + authID))
 	installationID := newUUID(installation[:], 4).String()
-	metadata, err := json.Marshal(codexTurnMetadata{
+	metadata, _ := json.Marshal(codexTurnMetadata{
 		InstallationID: installationID, SessionID: threadID, ThreadID: threadID, AgentName: "/root",
 		TurnID: turnID, WindowID: windowID, ContextWindowID: uuidV7().String(), RequestKind: "turn",
 		RootTurnID: turnID, ThreadSource: "user", TurnTrigger: "user", Sandbox: "seccomp", SandboxMode: "workspace-write",
 		AutoReviewEnabled: true, NodeReplAutoReviewRequired: true, TurnStartedAtUnixMS: now.UnixMilli(),
 		AnalyticsEnabled: true, Model: model, ReasoningEffort: effort,
 	})
-	if err != nil {
-		return nil, nil, err
-	}
 	created := float64(now.UnixMicro()) / 1e6
 	input := codexPrefix(thread)
 	for _, message := range codexContext.Messages {
@@ -157,10 +154,7 @@ func codexTurn(authID, model, effort, prompt string) ([]byte, http.Header, error
 			codexText{"environments.environment_context", fmt.Sprintf(codexEnvironment, now.UTC().Format(time.DateOnly))}),
 		codexMessage("msg_"+uuidV7().String(), "user", turnID, created, codexText{"user.text", prompt}),
 	)
-	var body bytes.Buffer
-	encoder := json.NewEncoder(&body)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(codexRequest{
+	request := codexRequest{
 		Model: model, Input: input, ToolChoice: "auto", Reasoning: codexReasoning{effort, "all_turns"},
 		Stream: true, Include: []string{"reasoning.encrypted_content"}, PromptCacheKey: threadID,
 		Text: map[string]string{"verbosity": "low"},
@@ -168,8 +162,6 @@ func codexTurn(authID, model, effort, prompt string) ([]byte, http.Header, error
 			ThreadID: threadID, WindowID: windowID, TurnID: turnID, RootTurnID: turnID,
 			TurnMetadata: string(metadata), InstallationID: installationID, SessionID: threadID,
 		},
-	}); err != nil {
-		return nil, nil, err
 	}
 	headers := http.Header{
 		"Accept":                                 {"text/event-stream"},
@@ -184,7 +176,7 @@ func codexTurn(authID, model, effort, prompt string) ([]byte, http.Header, error
 		"X-Codex-Beta-Features":                  {"remote_compaction_v2"},
 		"X-Openai-Internal-Codex-Responses-Lite": {"true"},
 	}
-	return bytes.TrimSuffix(body.Bytes(), []byte("\n")), headers, nil
+	return request, headers
 }
 
 // codexPrefix builds the tools and base instructions items Codex puts first in every request, with

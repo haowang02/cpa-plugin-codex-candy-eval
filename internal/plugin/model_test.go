@@ -111,20 +111,21 @@ func TestProbeRetryLimitAndCancellation(t *testing.T) {
 	var calls atomic.Int32
 	traceTestHost(t, func() (string, int) { calls.Add(1); return "busy", 429 })
 	auth := credential{ID: "a", Provider: "codex"}
+	body, headers := codexTurn(auth.ID, "test-model", "", "禁止调用工具")
 	slots := make(chan struct{}, 1)
-	_, attempts, err := executeProbe(context.Background(), auth, "test-model", "", "禁止调用工具", slots)
+	_, attempts, err := executeProbe(context.Background(), auth, "test-model", body, headers, slots)
 	if err == nil || attempts != 3 || calls.Load() != 3 || len(slots) != 0 {
 		t.Fatalf("retry limit: attempts=%d calls=%d err=%v", attempts, calls.Load(), err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	traceTestHost(t, func() (string, int) { cancel(); return "busy", 429 })
-	_, attempts, err = executeProbe(ctx, auth, "test-model", "", "禁止调用工具", slots)
+	_, attempts, err = executeProbe(ctx, auth, "test-model", body, headers, slots)
 	if err != context.Canceled || attempts != 1 || len(slots) != 0 {
 		t.Fatalf("cancelled retry: attempts=%d err=%v", attempts, err)
 	}
 	// A cancelled request must not wait for or consume a collection slot.
 	slots <- struct{}{}
-	_, attempts, err = executeProbe(ctx, auth, "test-model", "", "禁止调用工具", slots)
+	_, attempts, err = executeProbe(ctx, auth, "test-model", body, headers, slots)
 	if err != context.Canceled || attempts != 0 || len(slots) != 1 {
 		t.Fatalf("cancelled queue: attempts=%d err=%v", attempts, err)
 	}
@@ -165,10 +166,10 @@ func TestExecuteModel(t *testing.T) {
 				switch method {
 				case "host.model.execute_stream":
 					p := payload.(map[string]any)
-					body, prompt := sentTurn(payload)
 					if p["entry_protocol"] != "openai-response" || p["exit_protocol"] != "openai-response" || p["stream"] != true ||
-						p["auth_id"] != "a" || p["forced_provider"] != "claude" || body["model"] != "m" || body["stream"] != true || prompt != "q" {
-						t.Errorf("request = %v, body = %v", p, body)
+						p["auth_id"] != "a" || p["forced_provider"] != "claude" || string(p["body"].([]byte)) != `{"input":"<q>"}` ||
+						p["headers"].(http.Header).Get("Originator") != "codex-tui" {
+						t.Errorf("request = %v, body = %s", p, p["body"])
 					}
 					return json.RawMessage(`{"stream_id":"s"}`), nil
 				case "host.model.stream_close":
@@ -182,7 +183,7 @@ func TestExecuteModel(t *testing.T) {
 				chunks = chunks[1:]
 				return json.Marshal(map[string]any{"payload": []byte(chunk)})
 			}
-			out, status, err := executeModel(credential{ID: "a", Provider: "claude"}, "m", "", "q")
+			out, status, err := executeModel(credential{ID: "a", Provider: "claude"}, "m", map[string]string{"input": "<q>"}, http.Header{"Originator": {"codex-tui"}})
 			if (err == nil) != (tc.answer != "") || (err == nil && out.Answer != tc.answer) || status != tc.status || closed != 1 {
 				t.Fatalf("answer=%q status=%d err=%v closed=%d", out.Answer, status, err, closed)
 			}
@@ -198,11 +199,11 @@ func TestExecuteModel(t *testing.T) {
 	hostCall = func(string, any) (json.RawMessage, error) {
 		return nil, &EnvelopeError{Code: "upstream", Message: "busy", HTTPStatus: 429}
 	}
-	if _, status, err := executeModel(auth, "m", "", "q"); err == nil || status != 429 {
+	if _, status, err := executeModel(auth, "m", nil, nil); err == nil || status != 429 {
 		t.Fatalf("rejected request: status=%d err=%v", status, err)
 	}
 	hostCall = func(string, any) (json.RawMessage, error) { panic("host down") }
-	if _, _, err := executeModel(auth, "m", "", "q"); err == nil {
+	if _, _, err := executeModel(auth, "m", nil, nil); err == nil {
 		t.Fatal("host panic was not reported")
 	}
 	hostCall = func(string, any) (json.RawMessage, error) {
@@ -210,7 +211,7 @@ func TestExecuteModel(t *testing.T) {
 		return nil, nil
 	}
 	for _, unpinned := range []credential{{ID: "a"}, {Provider: "claude"}} {
-		if _, _, err := executeModel(unpinned, "m", "", "q"); err == nil {
+		if _, _, err := executeModel(unpinned, "m", nil, nil); err == nil {
 			t.Fatal("unpinned request accepted")
 		}
 	}

@@ -30,7 +30,7 @@ func retryableModelStatus(status int) bool {
 
 // Collection probes retry the same request at most twice, after 2s and 4s.
 // Invalid model answers are evaluated by the caller and do not trigger retries.
-func executeProbe(ctx context.Context, auth credential, model, effort, prompt string, slots chan struct{}) (out modelResponse, attempts int, err error) {
+func executeProbe(ctx context.Context, auth credential, model string, body any, headers http.Header, slots chan struct{}) (out modelResponse, attempts int, err error) {
 	for attempt := 0; attempt < 3; attempt++ {
 		if ctx.Err() != nil {
 			return out, attempts, ctx.Err()
@@ -49,7 +49,7 @@ func executeProbe(ctx context.Context, auth credential, model, effort, prompt st
 			}
 			attempts++
 			var response modelResponse
-			response, status, err = executeModel(auth, model, effort, prompt)
+			response, status, err = executeModel(auth, model, body, headers)
 			out.Answer = response.Answer
 			out.InputTokens += response.InputTokens
 			out.OutputTokens += response.OutputTokens
@@ -69,25 +69,28 @@ func executeProbe(ctx context.Context, auth credential, model, effort, prompt st
 	return
 }
 
-// executeModel asks prompt as a new Codex thread on auth's provider; CPA translates the Responses request
-// to the provider's own protocol. On failure, status is the upstream HTTP status, or 0 when no complete
+// executeModel sends a streaming Responses request body with headers on auth's provider; CPA translates
+// it to the provider's own protocol. On failure, status is the upstream HTTP status, or 0 when no complete
 // response arrived.
-func executeModel(auth credential, model, effort, prompt string) (result modelResponse, status int, err error) {
+func executeModel(auth credential, model string, body any, headers http.Header) (result modelResponse, status int, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("模型请求异常：%v", recovered)
 		}
 	}()
 	if strings.TrimSpace(auth.ID) == "" || strings.TrimSpace(auth.Provider) == "" {
-		return result, 0, fmt.Errorf("缺少凭证标识或提供商，无法固定路由")
+		return result, 0, fmt.Errorf("缺少凭证 ID 或提供商，无法指定凭证")
 	}
-	body, headers, err := codexTurn(auth.ID, model, effort, prompt)
-	if err != nil {
+	// Keep <, > and & literal, as Codex sends them.
+	var request bytes.Buffer
+	encoder := json.NewEncoder(&request)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(body); err != nil {
 		return result, 0, err
 	}
 	raw, err := hostCall("host.model.execute_stream", map[string]any{
 		"entry_protocol": "openai-response", "exit_protocol": "openai-response",
-		"model": model, "stream": true, "body": body, "headers": headers,
+		"model": model, "stream": true, "body": bytes.TrimSuffix(request.Bytes(), []byte("\n")), "headers": headers,
 		"forced_provider": auth.Provider, "auth_id": auth.ID,
 	})
 	if err != nil {
@@ -101,7 +104,7 @@ func executeModel(auth credential, model, effort, prompt string) (result modelRe
 		ID string `json:"stream_id"`
 	}
 	if err := json.Unmarshal(raw, &stream); err != nil || stream.ID == "" {
-		return result, 0, fmt.Errorf("解析宿主响应失败：%s", raw)
+		return result, 0, fmt.Errorf("解析 CPA 响应失败：%s", raw)
 	}
 	// The host closes a stream by itself only once it is read to the end.
 	defer hostCall("host.model.stream_close", map[string]any{"stream_id": stream.ID})
@@ -128,7 +131,7 @@ func executeModel(auth credential, model, effort, prompt string) (result modelRe
 	}
 	result.Answer = answer.String()
 	if strings.TrimSpace(result.Answer) == "" {
-		return result, http.StatusOK, fmt.Errorf("模型没有返回文本")
+		return result, http.StatusOK, fmt.Errorf("模型未返回文本")
 	}
 	return result, http.StatusOK, nil
 }
@@ -168,10 +171,10 @@ func readResponseStream(id string) (out responseBody, err error) {
 			Done    bool   `json:"done"`
 		}
 		if err := json.Unmarshal(raw, &chunk); err != nil {
-			return out, fmt.Errorf("解析模型流失败：%w", err)
+			return out, fmt.Errorf("解析模型响应流失败：%w", err)
 		}
 		if chunk.Error != "" {
-			return out, fmt.Errorf("模型流中断：%s", chunk.Error)
+			return out, fmt.Errorf("模型响应流中断：%s", chunk.Error)
 		}
 		// A chunk may end mid-line, or start the next field without a line break.
 		if len(events) > 0 && !bytes.HasSuffix(events, []byte("\n")) && startsSSEField(chunk.Payload) {
@@ -211,7 +214,7 @@ func readResponseStream(id string) (out responseBody, err error) {
 		}
 	}
 	if !final {
-		return out, fmt.Errorf("模型流在响应完成前结束")
+		return out, fmt.Errorf("模型响应流在完成前中断")
 	}
 	// Codex streams the output items but may leave the final response's output empty.
 	if len(out.Output) == 0 {

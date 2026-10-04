@@ -17,7 +17,7 @@ function mtComparison(r) {
 function mtOutcome(r) {
   const a = r?.attribution;
   const comparison = mtComparison(r);
-  const state = { failed: ["bad", "circle-x", "测试失败", "查看详情了解原因"], cancelled: ["neutral", "circle-pause", "测试已停止", ""], skipped: ["neutral", "ban", "已跳过", "此凭证不含所选模型"] }[r?.status];
+  const state = { failed: ["bad", "circle-x", "测试失败", "查看详情了解原因"], cancelled: ["neutral", "circle-pause", "测试已停止", ""], skipped: ["neutral", "ban", "已跳过", "此凭证不支持所选模型"] }[r?.status];
   const [tone, symbol, title] = state || (a ? [comparison.tone, comparison.symbol, a.prediction] : ["idle", "fingerprint", "等待测试"]);
   const detail = state ? state[3] : a ? `${comparison.label}${r.status === "partial" ? " · 部分结果" : ""}` : "";
   return resultOutcome({

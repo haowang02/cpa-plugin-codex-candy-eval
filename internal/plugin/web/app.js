@@ -96,7 +96,7 @@ function renderList(prefix, renderRow) {
   const list = $(prefix + "rows"), previous = renderedLists.get(list) || { rows: new Map(), empty: "" };
   const visible = visibleCredentials(prefix);
   if (!visible.length) {
-    const message = loadController && !credentials.length ? "正在读取凭证与历史记录…" : "没有符合筛选条件的凭证，请调整筛选或在 CPA 中添加凭证。";
+    const message = loadController && !credentials.length ? "正在读取凭证和测试记录…" : "没有符合筛选条件的凭证，请调整筛选或在 CPA 中添加凭证。";
     const empty = `<div class="empty">${esc(loadError || message)}</div>`;
     if (previous.empty !== empty) list.innerHTML = empty;
     renderedLists.set(list, { rows: new Map(), empty });
@@ -135,13 +135,14 @@ function rowNode(html) {
   return template.content.firstElementChild;
 }
 
-function renderRefresh() {
+function renderPageActions() {
+  $("clear-all").disabled = pending || credentials.every((a) => !a.results.length && !a.fingerprints?.length && !a.modeltraces?.length);
   $("refresh").disabled = pending || refreshing;
   $("refresh").setAttribute("aria-busy", refreshing);
 }
 
 function render() {
-  renderRefresh();
+  renderPageActions();
   setNotice("storage-error", storageError);
   for (const prefix of ["", "fp-", "mt-"]) fillPlanFilter(prefix);
   renderCandy();
@@ -178,7 +179,7 @@ async function load({ refresh = false } = {}) {
     } catch (err) {
       if (controller.signal.aborted) return;
       if (err instanceof AuthError) return showLogin(err.message);
-      setNotice("catalog-error", "读取凭证与模型目录失败：" + err.message);
+      setNotice("catalog-error", "读取凭证和模型列表失败：" + err.message);
     }
     const data = await api(BASE + "/state", { signal: controller.signal });
     if (controller.signal.aborted) return;
@@ -202,7 +203,7 @@ async function load({ refresh = false } = {}) {
   } catch (err) {
     if (controller.signal.aborted) return;
     if (err instanceof AuthError) return showLogin(err.message);
-    loadError = "读取测试结果失败：" + err.message;
+    loadError = "读取测试记录失败：" + err.message;
     setNotice("load-error", loadError);
   } finally {
     if (loadController === controller) {
@@ -224,15 +225,15 @@ async function update(path, options, errorPrefix) {
       await refreshCatalog();
       fillModels();
       setNotice("catalog-error", "");
-      if (!catalogCache.models?.ids.includes(options.body.model)) throw new Error("所选模型已不在模型目录中，请重新选择。");
+      if (!catalogCache.models?.ids.includes(options.body.model)) throw new Error("所选模型已不在模型列表中，请重新选择。");
       options.body.model_catalog = await modelCatalog(options.body.auth_ids || []);
     }
     const response = await api(BASE + path, options);
     if (path.endsWith("/run")) {
-      const messages = [`已启动 ${response.started || 0} 个凭证`];
-      if (response.skipped) messages.push(`${response.skipped} 个凭证不含所选模型，已跳过`);
-      if (response.unchecked) messages.push(`${response.unchecked} 个凭证未能检查模型目录，已交由 CPA 处理`);
-      if (response.busy) messages.push(`${response.busy} 个凭证正在测试`);
+      const messages = [`已为 ${response.started || 0} 个凭证开始测试`];
+      if (response.skipped) messages.push(`${response.skipped} 个凭证不支持所选模型，已跳过`);
+      if (response.unchecked) messages.push(`${response.unchecked} 个凭证无法读取模型列表，仍会尝试测试`);
+      if (response.busy) messages.push(`${response.busy} 个凭证正在测试，已跳过`);
       setNotice("flash", messages.join("；"), response.unchecked ? "warning" : "info");
     }
   } catch (err) {
@@ -253,7 +254,6 @@ function showLogin(message) {
   loadError = storageError = "";
   for (const selection of [candySelected, fpSelected, mtSelected, candyExpanded, fpExpanded, mtExpanded, candyAnswersExpanded]) selection.clear();
   for (const id of notices.keys()) setNotice(id, "");
-  $("refresh").hidden = true;
   hideTip();
   document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
   render();
@@ -268,7 +268,6 @@ async function start() {
   setNotice("flash", "");
   $("login").hidden = true;
   $("app").hidden = false;
-  $("refresh").hidden = false;
   const managementKey = key;
   await openCatalogCache(managementKey);
   if (managementKey !== key) return;
@@ -413,7 +412,7 @@ $("refresh").addEventListener("click", async () => {
     await load({ refresh: true });
   } finally {
     refreshing = false;
-    renderRefresh();
+    renderPageActions();
   }
 });
 
@@ -429,17 +428,17 @@ $("mask").addEventListener("click", () => {
 });
 for (const id of ["fp-mask", "mt-mask"]) $(id).addEventListener("click", () => $("mask").click());
 
-for (const [id, scope, label] of [["clear", "candy", "糖果"], ["fp-clear", "fingerprint", "指纹"], ["mt-clear", "modeltrace", "ModelTrace"]]) {
+for (const [id, scope] of [["clear", "candy"], ["fp-clear", "fingerprint"], ["mt-clear", "modeltrace"], ["clear-all", "all"]]) {
   $(id).addEventListener("click", () => {
     clearScope = scope;
-    $("clear-title").textContent = `清空${label}测试记录？`;
+    $("clear-title").textContent = `${$(id).title}？`;
     $("confirm-clear").returnValue = ""; // Esc keeps the previous returnValue.
     $("confirm-clear").showModal();
   });
 }
 $("confirm-clear").addEventListener("close", () => {
   if ($("confirm-clear").returnValue !== "confirm") return;
-  update(clearScope === "candy" ? "/results" : `/${clearScope}/results`, { method: "DELETE" }, "清空历史失败");
+  update(clearScope === "candy" ? "/results" : `/${clearScope}/results`, { method: "DELETE" }, "清空测试记录失败");
 });
 
 $("login-form").addEventListener("submit", (e) => {

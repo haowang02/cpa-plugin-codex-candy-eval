@@ -103,7 +103,7 @@ function renderCandy() {
 function initializeCandy() {
   const saved = candyPrefs();
   fillSelect("effort", DEFAULT_EFFORTS, saved.effort, DEFAULT_EFFORT);
-  $("effort").title = "none：不发送推理参数，由 CPA 处理；其他强度由 CPA 或上游验证";
+  $("effort").title = "none：不指定推理强度，由 CPA 决定；其他强度由 CPA 或上游校验";
   $("runs").value = saved.runs || 1;
   $("runs").value = candyRuns();
 
@@ -125,8 +125,8 @@ function initializeCandy() {
         }
       }
     } catch (_) {
-      $("copy").setAttribute("aria-label", "复制失败，请手动选择题目复制");
-      $("copy").title = "复制失败，请手动选择题目复制";
+      $("copy").setAttribute("aria-label", "复制失败，请手动复制题目");
+      $("copy").title = "复制失败，请手动复制题目";
       return;
     }
     clearTimeout(copyTimer);

@@ -70,7 +70,7 @@ func syncCredentialsResponse(body []byte) managementResponse {
 		Credentials []credential `json:"credentials"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil || req.Credentials == nil || len(req.Credentials) > 10000 {
-		return jsonError(http.StatusBadRequest, "无效的配置型凭证列表")
+		return jsonError(http.StatusBadRequest, "AI 提供商凭证列表无效")
 	}
 	next := make(map[string]credential, len(req.Credentials))
 	for _, auth := range req.Credentials {
@@ -79,10 +79,10 @@ func syncCredentialsResponse(body []byte) managementResponse {
 		auth.Name = strings.TrimSpace(auth.Name)
 		if auth.ID == "" || auth.Provider == "" || strings.ContainsAny(auth.ID+auth.Provider, "\x00\r\n") || len(auth.ID) > 512 || len(auth.Provider) > 128 ||
 			len(auth.Name) > 512 || len(auth.BaseURL) > 4096 || len(auth.ProviderName) > 512 {
-			return jsonError(http.StatusBadRequest, "无效的配置型凭证标识")
+			return jsonError(http.StatusBadRequest, "AI 提供商凭证标识无效")
 		}
 		if _, exists := next[auth.ID]; exists {
-			return jsonError(http.StatusBadRequest, "配置型凭证标识重复")
+			return jsonError(http.StatusBadRequest, "AI 提供商凭证标识重复")
 		}
 		if auth.Name == "" {
 			auth.Name = auth.ID
@@ -110,7 +110,7 @@ func credentials() ([]credential, error) {
 		return nil, fmt.Errorf("解析凭证列表失败：%w", err)
 	}
 	if list.Files == nil {
-		return nil, fmt.Errorf("凭证响应缺少有效的 files 列表")
+		return nil, fmt.Errorf("CPA 返回的凭证列表无效")
 	}
 	byID, now := make(map[string]credential, len(list.Files)), time.Now()
 	for _, file := range list.Files {
@@ -191,7 +191,7 @@ func selectedCredentials(ids []string, all bool) ([]credential, error) {
 	return selected, nil
 }
 
-const unsupportedModelMessage = "已跳过：此凭证的 CPA 模型目录不包含所选模型"
+const unsupportedModelMessage = "已跳过：此凭证不支持所选模型"
 
 type runSummary struct {
 	Started   int `json:"started"`

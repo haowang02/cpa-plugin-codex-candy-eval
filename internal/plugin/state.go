@@ -38,11 +38,11 @@ func loadState() {
 	if err == nil {
 		err = json.Unmarshal(data, &state)
 		if err == nil && state == nil {
-			err = errors.New("历史记录格式无效")
+			err = errors.New("测试记录格式无效")
 		}
 	}
 	if err != nil {
-		stateLoadError = fmt.Errorf("历史记录读取失败，为保护原文件已暂停保存：%w", err)
+		stateLoadError = fmt.Errorf("测试记录读取失败，为保护原文件已暂停保存：%w", err)
 		storageError = stateLoadError.Error()
 		return
 	}
@@ -71,7 +71,7 @@ func saveStateLocked() (err error) {
 	defer func() {
 		storageError = ""
 		if err != nil {
-			storageError = "历史记录未保存：" + err.Error()
+			storageError = "测试记录保存失败：" + err.Error()
 		}
 	}()
 	if stateLoadError != nil {
@@ -121,13 +121,15 @@ func clearHistoryResponse(scope string) managementResponse {
 		traceResults = map[string][]traceResult{}
 	case "candy":
 		candyResults = map[string][]candyResult{}
+	case "all":
+		candyResults, fingerprintResults, traceResults = map[string][]candyResult{}, map[string][]fingerprintResult{}, map[string][]traceResult{}
 	default:
 		return jsonError(http.StatusBadRequest, "未知测试类型")
 	}
 	if err := saveStateLocked(); err != nil {
 		candyResults, fingerprintResults = previous.Results, previous.Fingerprints
 		traceResults = previous.ModelTraces
-		return jsonError(http.StatusInternalServerError, "清空记录失败："+err.Error())
+		return jsonError(http.StatusInternalServerError, "清空测试记录失败："+err.Error())
 	}
 	return jsonResponse(http.StatusOK, map[string]bool{"cleared": true})
 }
