@@ -61,13 +61,14 @@ func TestFooterVersion(t *testing.T) {
 func TestEvaluate(t *testing.T) {
 	setupTest(t)
 	var body map[string]any
+	var prompt string
 	hostCall = streamHost(func(_ string, payload any) (json.RawMessage, error) {
-		_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
+		body, prompt = sentTurn(payload)
 		return mockModelResponse("答案是 21"), nil
 	})
 	r := evaluateCandy(credential{ID: "a", Provider: "claude"}, "m", "xhigh")
 	if !r.OK || r.Answer != "答案是 21" || r.InputTokens != 12 || r.OutputTokens != 3 || r.ReasoningTokens != 1 ||
-		body["input"] != candyPrompt || body["reasoning"].(map[string]any)["effort"] != "xhigh" {
+		prompt != candyPrompt || body["reasoning"].(map[string]any)["effort"] != "xhigh" {
 		t.Fatalf("result = %+v, body = %v", r, body)
 	}
 	// Unsupported efforts stay as sent and fail the request; a failed request is never graded.

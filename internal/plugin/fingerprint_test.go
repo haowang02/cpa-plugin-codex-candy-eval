@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -125,9 +126,8 @@ func TestFingerprintBaselineCoverage(t *testing.T) {
 func TestFingerprintExecutionContract(t *testing.T) {
 	setupTest(t)
 	hostCall = streamHost(func(_ string, payload any) (json.RawMessage, error) {
-		var body map[string]any
-		_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
-		if body["reasoning"].(map[string]any)["effort"] != "low" || body["temperature"] != 1.0 || body["store"] != false || body["instructions"] != fingerprintProbes[0].Instructions {
+		body, prompt := sentTurn(payload)
+		if body["reasoning"].(map[string]any)["effort"] != "low" || !strings.HasPrefix(prompt, fingerprintProbes[0].Instructions+"\n\n") {
 			t.Fatalf("wrong probe body: %v", body)
 		}
 		return mockModelResponse("47"), nil

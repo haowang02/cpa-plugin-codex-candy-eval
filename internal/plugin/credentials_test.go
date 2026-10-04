@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -122,15 +121,14 @@ func TestCandyPreflightPinnedProvidersAndNone(t *testing.T) {
 		var req struct {
 			ID       string `json:"auth_id"`
 			Provider string `json:"forced_provider"`
-			Body     []byte `json:"body"`
 		}
 		raw, _ := json.Marshal(payload)
 		_ = json.Unmarshal(raw, &req)
 		if (req.ID != "config" || req.Provider != "openai-compatible-demo") && (req.ID != "unknown" || req.Provider != "gemini") {
 			t.Errorf("unpinned or skipped request: %+v", req)
 		}
-		if bytes.Contains(req.Body, []byte(`"reasoning"`)) {
-			t.Error("none sent a reasoning parameter")
+		if body, _ := sentTurn(payload); body["reasoning"].(map[string]any)["effort"] != nil {
+			t.Error("none sent a reasoning effort")
 		}
 		return mockModelResponse("21"), nil
 	})

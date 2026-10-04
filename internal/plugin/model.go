@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -31,7 +30,7 @@ func retryableModelStatus(status int) bool {
 
 // Collection probes retry the same request at most twice, after 2s and 4s.
 // Invalid model answers are evaluated by the caller and do not trigger retries.
-func executeProbe(ctx context.Context, auth credential, model string, params map[string]any, slots chan struct{}) (out modelResponse, attempts int, err error) {
+func executeProbe(ctx context.Context, auth credential, model, effort, prompt string, slots chan struct{}) (out modelResponse, attempts int, err error) {
 	for attempt := 0; attempt < 3; attempt++ {
 		if ctx.Err() != nil {
 			return out, attempts, ctx.Err()
@@ -50,7 +49,7 @@ func executeProbe(ctx context.Context, auth credential, model string, params map
 			}
 			attempts++
 			var response modelResponse
-			response, status, err = executeModel(auth, model, params)
+			response, status, err = executeModel(auth, model, effort, prompt)
 			out.Answer = response.Answer
 			out.InputTokens += response.InputTokens
 			out.OutputTokens += response.OutputTokens
@@ -70,10 +69,10 @@ func executeProbe(ctx context.Context, auth credential, model string, params map
 	return
 }
 
-// executeModel runs one Responses request on auth's provider; CPA translates it to the provider's own
-// protocol. params holds the request fields besides model and stream. On failure, status is the upstream
-// HTTP status, or 0 when no complete response arrived.
-func executeModel(auth credential, model string, params map[string]any) (result modelResponse, status int, err error) {
+// executeModel asks prompt as a new Codex thread on auth's provider; CPA translates the Responses request
+// to the provider's own protocol. On failure, status is the upstream HTTP status, or 0 when no complete
+// response arrived.
+func executeModel(auth credential, model, effort, prompt string) (result modelResponse, status int, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("模型请求异常：%v", recovered)
@@ -82,15 +81,13 @@ func executeModel(auth credential, model string, params map[string]any) (result 
 	if strings.TrimSpace(auth.ID) == "" || strings.TrimSpace(auth.Provider) == "" {
 		return result, 0, fmt.Errorf("缺少凭证标识或提供商，无法固定路由")
 	}
-	request := map[string]any{"model": model, "stream": true}
-	maps.Copy(request, params)
-	body, err := json.Marshal(request)
+	body, headers, err := codexTurn(auth.ID, model, effort, prompt)
 	if err != nil {
 		return result, 0, err
 	}
 	raw, err := hostCall("host.model.execute_stream", map[string]any{
 		"entry_protocol": "openai-response", "exit_protocol": "openai-response",
-		"model": model, "stream": true, "body": body,
+		"model": model, "stream": true, "body": body, "headers": headers,
 		"forced_provider": auth.Provider, "auth_id": auth.ID,
 	})
 	if err != nil {

@@ -17,7 +17,9 @@ var (
 	candyRunning = map[string]*candyProgress{}
 )
 
-const candyPrompt = `在一个黑色的袋子里放有三种口味的糖果，每种糖果有两种不同的形状（圆形和五角星形，不同的形状靠手感可以分辨）。现已知不同口味的糖和不同形状的数量统计如下表。参赛者需要在活动前决定摸出的糖果数目，那么，最少取出多少个糖果才能保证手中同时拥有不同形状的苹果味和桃子味的糖？（同时手中有圆形苹果味匹配五角星桃子味糖果，或者有圆形桃子味匹配五角星苹果味糖果都满足要求）
+const candyPrompt = `不使用任何外部工具回答以下问题：
+
+在一个黑色的袋子里放有三种口味的糖果，每种糖果有两种不同的形状（圆形和五角星形，不同的形状靠手感可以分辨）。现已知不同口味的糖和不同形状的数量统计如下表。参赛者需要在活动前决定摸出的糖果数目，那么，最少取出多少个糖果才能保证手中同时拥有不同形状的苹果味和桃子味的糖？（同时手中有圆形苹果味匹配五角星桃子味糖果，或者有圆形桃子味匹配五角星苹果味糖果都满足要求）
 
         苹果味  桃子味  西瓜味
 圆形       7      9      8
@@ -127,12 +129,11 @@ func runCandy(auth credential, model, effort string, runs int) {
 
 func evaluateCandy(auth credential, model, effort string) candyResult {
 	r := candyResult{Time: time.Now().UTC(), Model: model, Effort: effort}
-	params := map[string]any{"input": candyPrompt}
-	if effort != "" && effort != "none" {
-		params["reasoning"] = map[string]string{"effort": effort}
+	if effort == "none" {
+		effort = ""
 	}
 	start := time.Now()
-	out, _, err := executeModel(auth, model, params)
+	out, _, err := executeModel(auth, model, effort, candyPrompt)
 	r.DurationMS = time.Since(start).Milliseconds()
 	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if err != nil {

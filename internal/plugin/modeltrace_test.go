@@ -98,9 +98,8 @@ func traceTestHost(t *testing.T, answer func() (string, int)) {
 		if method != "host.model.execute_stream" {
 			return nil, fmt.Errorf("unexpected %s", method)
 		}
-		var body map[string]any
-		_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
-		if body["tools"] != nil || body["reasoning"] != nil || body["temperature"] != nil || !strings.Contains(body["input"].(string), "禁止调用") {
+		body, prompt := sentTurn(payload)
+		if body["reasoning"].(map[string]any)["effort"] != nil || !strings.Contains(prompt, "禁止调用") {
 			t.Error("unexpected probe parameters")
 		}
 		text, status := answer()

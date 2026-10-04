@@ -43,6 +43,15 @@ func streamHost(host func(method string, payload any) (json.RawMessage, error)) 
 	}
 }
 
+// sentTurn decodes the Codex request in a host.model.execute_stream payload and returns it with the
+// user's prompt, the text of its last input item.
+func sentTurn(payload any) (body map[string]any, prompt string) {
+	_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
+	input := body["input"].([]any)
+	content := input[len(input)-1].(map[string]any)["content"].([]any)
+	return body, content[0].(map[string]any)["text"].(string)
+}
+
 func mockModelResponse(text string) json.RawMessage {
 	raw, _ := json.Marshal(map[string]any{"model": "echo-model", "status": "completed", "output": []any{map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": text}}}}, "usage": map[string]any{"input_tokens": 12, "output_tokens": 3, "output_tokens_details": map[string]int{"reasoning_tokens": 1}}})
 	return raw
@@ -81,9 +90,8 @@ func TestModelTraceRetriesSameProbe(t *testing.T) {
 	var prompts []string
 	hostCall = func(method string, payload any) (json.RawMessage, error) {
 		if method == "host.model.execute_stream" {
-			var body map[string]any
-			_ = json.Unmarshal(payload.(map[string]any)["body"].([]byte), &body)
-			prompts = append(prompts, body["input"].(string))
+			_, prompt := sentTurn(payload)
+			prompts = append(prompts, prompt)
 		}
 		return call(method, payload)
 	}
@@ -103,21 +111,20 @@ func TestProbeRetryLimitAndCancellation(t *testing.T) {
 	var calls atomic.Int32
 	traceTestHost(t, func() (string, int) { calls.Add(1); return "busy", 429 })
 	auth := credential{ID: "a", Provider: "codex"}
-	payload := map[string]any{"input": "禁止调用工具"}
 	slots := make(chan struct{}, 1)
-	_, attempts, err := executeProbe(context.Background(), auth, "test-model", payload, slots)
+	_, attempts, err := executeProbe(context.Background(), auth, "test-model", "", "禁止调用工具", slots)
 	if err == nil || attempts != 3 || calls.Load() != 3 || len(slots) != 0 {
 		t.Fatalf("retry limit: attempts=%d calls=%d err=%v", attempts, calls.Load(), err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	traceTestHost(t, func() (string, int) { cancel(); return "busy", 429 })
-	_, attempts, err = executeProbe(ctx, auth, "test-model", payload, slots)
+	_, attempts, err = executeProbe(ctx, auth, "test-model", "", "禁止调用工具", slots)
 	if err != context.Canceled || attempts != 1 || len(slots) != 0 {
 		t.Fatalf("cancelled retry: attempts=%d err=%v", attempts, err)
 	}
 	// A cancelled request must not wait for or consume a collection slot.
 	slots <- struct{}{}
-	_, attempts, err = executeProbe(ctx, auth, "test-model", payload, slots)
+	_, attempts, err = executeProbe(ctx, auth, "test-model", "", "禁止调用工具", slots)
 	if err != context.Canceled || attempts != 0 || len(slots) != 1 {
 		t.Fatalf("cancelled queue: attempts=%d err=%v", attempts, err)
 	}
@@ -158,10 +165,9 @@ func TestExecuteModel(t *testing.T) {
 				switch method {
 				case "host.model.execute_stream":
 					p := payload.(map[string]any)
-					var body map[string]any
-					_ = json.Unmarshal(p["body"].([]byte), &body)
+					body, prompt := sentTurn(payload)
 					if p["entry_protocol"] != "openai-response" || p["exit_protocol"] != "openai-response" || p["stream"] != true ||
-						p["auth_id"] != "a" || p["forced_provider"] != "claude" || body["model"] != "m" || body["stream"] != true || body["input"] != "q" {
+						p["auth_id"] != "a" || p["forced_provider"] != "claude" || body["model"] != "m" || body["stream"] != true || prompt != "q" {
 						t.Errorf("request = %v, body = %v", p, body)
 					}
 					return json.RawMessage(`{"stream_id":"s"}`), nil
@@ -176,7 +182,7 @@ func TestExecuteModel(t *testing.T) {
 				chunks = chunks[1:]
 				return json.Marshal(map[string]any{"payload": []byte(chunk)})
 			}
-			out, status, err := executeModel(credential{ID: "a", Provider: "claude"}, "m", map[string]any{"input": "q"})
+			out, status, err := executeModel(credential{ID: "a", Provider: "claude"}, "m", "", "q")
 			if (err == nil) != (tc.answer != "") || (err == nil && out.Answer != tc.answer) || status != tc.status || closed != 1 {
 				t.Fatalf("answer=%q status=%d err=%v closed=%d", out.Answer, status, err, closed)
 			}
@@ -192,11 +198,11 @@ func TestExecuteModel(t *testing.T) {
 	hostCall = func(string, any) (json.RawMessage, error) {
 		return nil, &EnvelopeError{Code: "upstream", Message: "busy", HTTPStatus: 429}
 	}
-	if _, status, err := executeModel(auth, "m", nil); err == nil || status != 429 {
+	if _, status, err := executeModel(auth, "m", "", "q"); err == nil || status != 429 {
 		t.Fatalf("rejected request: status=%d err=%v", status, err)
 	}
 	hostCall = func(string, any) (json.RawMessage, error) { panic("host down") }
-	if _, _, err := executeModel(auth, "m", nil); err == nil {
+	if _, _, err := executeModel(auth, "m", "", "q"); err == nil {
 		t.Fatal("host panic was not reported")
 	}
 	hostCall = func(string, any) (json.RawMessage, error) {
@@ -204,7 +210,7 @@ func TestExecuteModel(t *testing.T) {
 		return nil, nil
 	}
 	for _, unpinned := range []credential{{ID: "a"}, {Provider: "claude"}} {
-		if _, _, err := executeModel(unpinned, "m", nil); err == nil {
+		if _, _, err := executeModel(unpinned, "m", "", "q"); err == nil {
 			t.Fatal("unpinned request accepted")
 		}
 	}
