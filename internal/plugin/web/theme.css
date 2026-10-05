@@ -35,12 +35,15 @@
   --danger: #c65746; --danger-ink: #8a3a30; --danger-soft: rgb(198 87 70 / 14%); --danger-soft-hover: rgb(198 87 70 / 24%); --danger-line: rgb(198 87 70 / 35%);
   --warning-ink: #92400e; --warning-soft: rgb(217 119 6 / 10%); --warning-line: rgb(217 119 6 / 30%);
   --radius: 12px; --shadow: 0 1px 2px rgb(0 0 0 / 8%); --float: 0 12px 26px rgb(0 0 0 / 14%); --glass: none;
+  /* Label tips copy .nav-tooltip, data tips .statusTooltip on --floating-surface. */
+  --tip-bg: #24211c; --tip-ink: #f6f4f1; --tip-line: transparent; --tip-shadow: 0 14px 36px rgb(0 0 0 / 32%); --tip-radius: 10px; --tip-padding: 9px 12px;
+  --popover-bg: #fffdf9; --popover-line: var(--line); --popover-shadow: var(--float);
 
   &[data-theme="white"] {
     --bg: #ffffff; --surface: #ffffff; --sunken: #f6f6f6; --field: #ffffff; --line: #e5e5e5;
     --control-bg: #ffffff; --control-line: #d9d9d9; --control-hover: #f6f6f6; --control-hover-line: #cccccc;
     --history-head-bg: color-mix(in srgb, var(--surface) 60%, var(--sunken));
-    --float: 0 12px 26px rgb(0 0 0 / 12%);
+    --float: 0 12px 26px rgb(0 0 0 / 12%); --popover-bg: #ffffff;
   }
   &[data-theme="dark"] {
     --bg: #151412; --surface: #1d1b18; --sunken: #262320; --field: #151412; --line: #3a3530;
@@ -50,7 +53,7 @@
     --success-ink: #6ee7b7; --success-soft: rgb(6 78 59 / 30%);
     --danger-ink: #f1b0a6; --danger-soft: rgb(198 87 70 / 24%); --danger-soft-hover: rgb(198 87 70 / 34%); --danger-line: rgb(198 87 70 / 50%);
     --warning-ink: #fcd34d; --warning-soft: rgb(245 158 11 / 14%); --warning-line: rgb(245 158 11 / 38%);
-    --shadow: 0 1px 3px rgb(0 0 0 / 30%); --float: 0 14px 30px rgb(0 0 0 / 40%);
+    --shadow: 0 1px 3px rgb(0 0 0 / 30%); --float: 0 14px 30px rgb(0 0 0 / 40%); --popover-bg: #2a2723;
   }
   & body::before {
     content: ""; position: fixed; inset: 0 0 auto; z-index: 2; height: 141px; pointer-events: none;
@@ -81,6 +84,9 @@
   --danger: #ef4444; --danger-ink: #dc2626; --danger-soft: #fef2f2; --danger-soft-hover: #fee2e2; --danger-line: #fecaca;
   --warning-ink: #d97706; --warning-soft: #fffbeb; --warning-line: #fde68a;
   --radius: 20px; --shadow: none; --float: 0 10px 15px -3px rgb(0 0 0 / 10%); --glass: blur(20px);
+  /* Tips copy InfoTooltip, lifted by DropdownMenu's floating shadow. */
+  --tip-bg: rgb(255 255 255 / 90%); --tip-ink: var(--muted); --tip-line: var(--control-line); --tip-shadow: 0 16px 32px rgb(15 23 42 / 14%); --tip-radius: 8px; --tip-padding: 8px 10px;
+  --popover-bg: var(--tip-bg); --popover-line: var(--tip-line); --popover-shadow: var(--tip-shadow);
   --blob-1: linear-gradient(135deg, #7aa2ff, #b6d4ff); --blob-1-opacity: .5;
   --blob-2: linear-gradient(90deg, #6bc5ff, #7debdc); --blob-2-opacity: .5; --blob-blur: 60px;
 
@@ -88,6 +94,7 @@
     --bg: #0a0a0a; --bg-image: linear-gradient(120deg, #0b1324 0%, #0a1426 50%, #091521 100%);
     --surface: rgb(24 28 40 / 72%); --sunken: rgb(255 255 255 / 6%); --field: #1b1f2a; --line: rgb(255 255 255 / 8%); --card-line: rgb(255 255 255 / 10%);
     --ink: #e5e5e5; --muted: #a3a3a3; --faint: #7a7a7a;
+    --tip-bg: rgb(24 28 40 / 90%); --tip-shadow: 0 16px 32px rgb(0 0 0 / 42%);
     --control-bg: #1b1f2a; --control-line: rgb(255 255 255 / 10%); --control-hover: rgb(96 165 250 / 12%); --control-hover-line: rgb(96 165 250 / 40%);
     --history-head-bg: rgb(96 165 250 / 16%);
     --tag-neutral-bg: rgb(148 163 184 / 12%); --tag-neutral-ink: #94a3b8; --tag-neutral-line: rgb(148 163 184 / 20%);

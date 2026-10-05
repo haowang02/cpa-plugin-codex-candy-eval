@@ -31,8 +31,8 @@
           <button id="tab-modeltrace" class="tab" role="tab" aria-selected="false" aria-controls="modeltrace-panel" tabindex="-1" type="button">ModelTrace</button>
         </div>
         <div class="page-actions">
-          <button id="clear-all" type="button" title="清空全部测试记录" aria-label="清空全部测试记录" disabled><i data-icon="trash-2"></i></button>
-          <button id="refresh" type="button" title="刷新凭证和模型" aria-label="刷新凭证和模型" aria-busy="false"><i data-icon="rotate-cw"></i></button>
+          <button id="clear-all" type="button" aria-label="清空全部测试记录" data-tip disabled><i data-icon="trash-2"></i></button>
+          <button id="refresh" type="button" aria-label="刷新凭证和模型" data-tip aria-busy="false"><i data-icon="rotate-cw"></i></button>
         </div>
       </div>
       <div id="notifications"></div>
@@ -42,13 +42,13 @@
           <details class="problem">
             <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
             <div class="problem-body"><pre class="mono"><code id="question"><!--CANDY_PROMPT--></code></pre>
-              <button id="copy" class="copy-btn" type="button" aria-label="复制题目" title="复制题目"></button>
+              <button id="copy" class="copy-btn" type="button" aria-label="复制题目" data-tip></button>
             </div>
           </details>
         </div>
         <form id="toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="model"></select></span></label>
-          <label class="field"><span class="field-label">推理强度</span><span class="native-select"><select id="effort"></select></span></label>
+          <label class="field"><span class="field-label">推理强度</span><span class="native-select"><select id="effort" data-tip="none：不指定推理强度，由 CPA 决定；其他强度是否可用由 CPA 或上游判断"></select></span></label>
           <label class="field"><span class="field-label">每凭证次数</span><input id="runs" class="mono" type="number" min="1" max="10" step="1" value="1" required></label>
           <button id="run-batch" class="btn" type="submit" disabled>测试全部</button>
         </form>
@@ -72,7 +72,7 @@
             <div class="problem-body principle-body">
               <p>即使让模型“随便说一个数字或颜色”，不同模型也会呈现不同的回答偏好。重复提问后，这些偏好就形成了可比较的行为“指纹”。</p>
               <p>本测试采集多组简短回答，与正常模型的指纹对比，判断是否一致、是否更像其他模型。结果基于统计特征，不能单独证明模型身份或能力。</p>
-              <p>来源论文：Tomas Bruckner，<a href="https://arxiv.org/abs/2607.10252" target="_blank" rel="noopener noreferrer" title="One Token Is Enough: Fingerprinting and Verifying Large Language Models from Single-Token Output Distributions">《One Token Is Enough》</a>（2026）。</p>
+              <p>来源论文：Tomas Bruckner，<a href="https://arxiv.org/abs/2607.10252" target="_blank" rel="noopener noreferrer" data-tip="One Token Is Enough: Fingerprinting and Verifying Large Language Models from Single-Token Output Distributions">《One Token Is Enough》</a>（2026）。</p>
             </div>
           </details>
         </div>
@@ -133,6 +133,9 @@
     <span>&thinsp;·&thinsp;版本 v<!--PLUGIN_VERSION--></span>
   </footer>
 
+  <script>/*MARKDOWN_SCRIPT*/</script>
+  <script>/*TEXMATH_SCRIPT*/</script>
+  <script>/*TEMML_SCRIPT*/</script>
   <script>/*CREDENTIALS_SCRIPT*/</script>
   <script>/*CATALOG_SCRIPT*/</script>
   <script>/*COMPONENTS_SCRIPT*/</script>

@@ -3,7 +3,6 @@
 const DEFAULT_EFFORT = "low";
 const DEFAULT_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"];
 
-let tipTarget = null;
 let copyTimer = 0;
 const COPY_LABEL = icon("copy");
 const candyExpanded = new Set();
@@ -20,7 +19,11 @@ const VERDICT = { ok: "答对", bad: "答错", err: "出错", skip: "已跳过" 
 const MARK = { ok: "circle-check", bad: "circle-x", err: "circle-alert", skip: "ban" };
 const verdict = (r) => `<span class="verdict ${kind(r)}">${icon(MARK[kind(r)])}${VERDICT[kind(r)]}</span>`;
 const resultMeta = (r) => `<div class="result-meta">${verdict(r)}${metric("calendar", "测试时间", fmtTime(r.time))}${modelMeta(r)}</div>`;
-const oneLine = (s) => String(s || "").replace(/\s+/g, " ").trim();
+// Answers come from untrusted upstreams: raw HTML is escaped, links and images stay text, and Temml
+// refuses commands that need trust, such as \href.
+const markdown = markdownit({ breaks: true }).disable(["link", "image", "autolink"])
+  .use(texmath, { engine: temml, delimiters: ["dollars", "brackets"] });
+const answerHTML = (r) => r.error ? esc(r.error) : markdown.render(r.answer || "");
 const answerKey = (id, r) => JSON.stringify([id, r.time, r.model, r.effort]);
 const answerToggle = (open) => `${icon("chevron-right", "chev")}${open ? "收起" : "展开"}`;
 
@@ -31,7 +34,7 @@ function candyHistory(a, r, i) {
   return historyCard(r, `${verdict(r)}
     <div class="answer-preview ${answerOpen ? "expanded" : ""}">
       <button class="answer-toggle" type="button" data-answer="${esc(key)}" aria-expanded="${answerOpen}" aria-controls="${esc(bodyID)}" aria-label="${answerOpen ? "收起文本" : "展开文本"}">${answerToggle(answerOpen)}</button>
-      <pre id="${esc(bodyID)}" class="answer-content ${r.error ? "error" : ""}">${esc(r.error || r.answer)}</pre>
+      <div id="${esc(bodyID)}" class="answer-content ${r.error ? "error" : "markdown"}">${answerHTML(r)}</div>
     </div>`);
 }
 
@@ -51,13 +54,13 @@ function renderCandyRow(a) {
     : `<span class="none">—</span>`;
   const marks = results.map((r, i) => `<button class="mark-hit" type="button" data-auth="${esc(a.id)}" data-i="${i}" aria-label="${esc(`${fmtTime(r.time)} ${modelName(r)} ${VERDICT[kind(r)]}`)}">${icon(MARK[kind(r)], `mark ${kind(r)} ${scopeMatch(r) ? "" : "dim"}`)}</button>`).join("");
   const progress = a.running && `${a.running.done}/${a.running.total}`;
-  const canRun = runnable("", a);
+  const blocker = runBlocker("", a);
   const button = progress
-    ? `<button class="btn ghost" type="button" title="测试中" aria-label="测试中 ${progress}" disabled>${icon("loader-circle", "spin")}<span class="mono">${progress}</span></button>`
-    : `<button class="btn" type="button" data-candy-run="${esc(a.id)}" ${canRun ? "" : "disabled"}>${icon("play")}测试</button>`;
+    ? `<button class="btn ghost" type="button" aria-label="测试中 ${progress}" data-tip disabled>${icon("loader-circle", "spin")}<span class="mono">${progress}</span></button>`
+    : `<button class="btn" type="button" data-candy-run="${esc(a.id)}" ${disabledFor(blocker)}>${icon("play")}测试</button>`;
 
   return credentialRow({
-    type: "candy", credential: a, selected: candySelected.has(a.id), open: candyExpanded.has(a.id), selectable: canRun, button,
+    type: "candy", credential: a, selected: candySelected.has(a.id), open: candyExpanded.has(a.id), selectable: !blocker, button,
     result: latest, meta: `<div class="rate">${rate}</div><div class="marks">${marks}</div>`, tested: results.length > 0,
     history: () => [...results].reverse().map((r, i) => candyHistory(a, r, i)).join(""),
   });
@@ -69,28 +72,11 @@ function runCandy(body) {
   return update("/run", { method: "POST", body: { ...body, model: $("model").value, effort: $("effort").value, runs: candyRuns() } }, "开始测试失败");
 }
 
-function showTip(target) {
+function candyTip(target) {
   const r = credentials.find((a) => a.id === target.dataset.auth)?.results[target.dataset.i];
-  if (!r) return;
-  hideTip();
-  const tip = $("tip");
-  tip.innerHTML = `${resultMeta(r)}
+  return r ? `${resultMeta(r)}
     <div class="metrics">${r.skipped ? "" : metrics(r)}</div>
-    <div class="tip-text ${r.error ? "error" : ""}">${esc(oneLine(r.error || r.answer))}</div>`;
-  tip.hidden = false;
-  const box = target.getBoundingClientRect();
-  const { width, height } = tip.getBoundingClientRect();
-  const left = Math.min(Math.max(box.left + box.width / 2 - width / 2, 8), innerWidth - width - 8);
-  const top = box.top - height - 8 >= 8 ? box.top - height - 8 : Math.max(8, Math.min(box.bottom + 8, innerHeight - height - 8));
-  tip.style.left = left + "px";
-  tip.style.top = top + "px";
-  target.setAttribute("aria-describedby", "tip");
-  tipTarget = target;
-}
-function hideTip() {
-  $("tip").hidden = true;
-  tipTarget?.removeAttribute("aria-describedby");
-  tipTarget = null;
+    <div class="tip-text ${r.error ? "error" : "markdown"}">${answerHTML(r)}</div>` : "";
 }
 
 function renderCandy() {
@@ -103,7 +89,6 @@ function renderCandy() {
 function initializeCandy() {
   const saved = candyPrefs();
   fillSelect("effort", DEFAULT_EFFORTS, saved.effort, DEFAULT_EFFORT);
-  $("effort").title = "none：不指定推理强度，由 CPA 决定；其他强度由 CPA 或上游校验";
   $("runs").value = saved.runs || 1;
   $("runs").value = candyRuns();
 
@@ -125,37 +110,19 @@ function initializeCandy() {
         }
       }
     } catch (_) {
-      $("copy").setAttribute("aria-label", "复制失败，请手动复制题目");
-      $("copy").title = "复制失败，请手动复制题目";
+      setLabel($("copy"), "复制失败，请手动复制题目");
       return;
     }
     clearTimeout(copyTimer);
     $("copy").innerHTML = icon("check");
     $("copy").classList.add("copied");
-    $("copy").setAttribute("aria-label", "已复制");
-    $("copy").title = "已复制";
+    setLabel($("copy"), "已复制");
     copyTimer = setTimeout(() => {
       $("copy").innerHTML = COPY_LABEL;
       $("copy").classList.remove("copied");
-      $("copy").setAttribute("aria-label", "复制题目");
-      $("copy").title = "复制题目";
+      setLabel($("copy"), "复制题目");
     }, 1600);
   });
-
-  $("rows").addEventListener("mouseover", (e) => {
-    const target = e.target.closest("[data-auth]");
-    if (target?.contains(e.relatedTarget)) return;
-    target ? showTip(target) : hideTip();
-  });
-  $("rows").addEventListener("mouseleave", hideTip);
-  $("rows").addEventListener("focusin", (e) => {
-    const target = e.target.closest("[data-auth]");
-    target ? showTip(target) : hideTip();
-  });
-  $("rows").addEventListener("focusout", hideTip);
-  $("rows").addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
-  addEventListener("scroll", hideTip, true);
-  addEventListener("resize", hideTip);
 
   $("model").addEventListener("change", () => { candySavePrefs(); render(); });
   $("effort").addEventListener("change", () => { candySavePrefs(); render(); });

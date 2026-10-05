@@ -37,6 +37,18 @@ var uiStyles string
 //go:embed web/theme.css
 var uiThemes string
 
+//go:embed web/vendor/markdown-it.min.js
+var markdownScript string
+
+//go:embed web/vendor/texmath.js
+var texmathScript string
+
+//go:embed web/vendor/temml.min.js
+var temmlScript string
+
+//go:embed web/vendor/temml.css
+var temmlStyles string
+
 //go:embed web/credentials.js
 var credentialScript string
 
@@ -64,10 +76,13 @@ var uiHTML = func() []byte {
 	traceConfig, _ := json.Marshal(map[string]any{"requests": traceTarget, "default_concurrency": traceDefaultConcurrency, "max_concurrency": traceMaxConcurrency})
 	traceScript := strings.Replace(modelTraceScript, `/*MODELTRACE_CONFIG*/{}`, string(traceConfig), 1)
 	return []byte(strings.NewReplacer(
-		"/*APP_STYLES*/", uiThemes+"\n"+uiStyles,
+		"/*APP_STYLES*/", temmlStyles+"\n"+uiThemes+"\n"+uiStyles,
 		"<!--PLUGIN_VERSION-->", pluginVersion,
 		"<!--CANDY_PROMPT-->", html.EscapeString(candyPrompt),
 		"<!--MODELTRACE_LICENSE-->", "<!-- ModelTrace\n"+modelTraceLicense+"-->",
+		"/*MARKDOWN_SCRIPT*/", markdownScript,
+		"/*TEXMATH_SCRIPT*/", texmathScript,
+		"/*TEMML_SCRIPT*/", temmlScript,
 		"/*CREDENTIALS_SCRIPT*/", credentialScript,
 		"/*CATALOG_SCRIPT*/", catalogScript,
 		"/*COMPONENTS_SCRIPT*/", componentsScript,

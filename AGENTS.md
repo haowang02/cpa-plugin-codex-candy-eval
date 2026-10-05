@@ -13,6 +13,8 @@
 - `cmd/cpa-codex-candy-eval/`: shared-library entry point and C ABI bridge.
 - `internal/plugin/`: plugin handlers, test runners, persistence, and Go tests.
 - `internal/plugin/web/`: embedded management page.
+- `internal/plugin/web/vendor/`: vendored Markdown (markdown-it) and math
+  (markdown-it-texmath, Temml) renderers for candy answers.
 - `internal/plugin/data/`: embedded fingerprint probes and baselines.
 - `docs/images/`: README screenshots.
 - Root `install.sh` and `install.ps1`: public installation entry points.

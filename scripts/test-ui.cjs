@@ -28,20 +28,20 @@ function element(id) {
   return elements.get(id);
 }
 const context = vm.createContext({
-  TextEncoder, Uint8Array, Uint32Array, DataView, console, AbortController, AbortSignal, URLSearchParams,
+  TextEncoder, Uint8Array, Uint32Array, DataView, atob, console, AbortController, AbortSignal, URLSearchParams,
   addEventListener() {},
   Date: class extends Date { static now() { return now; } },
   setTimeout(callback, delay) { const id = ++timerID; noticeTimers.set(id, { callback, delay }); return id; },
   clearTimeout(id) { noticeTimers.delete(id); },
   window: { crypto: {} }, // Verify the HTTP fallback, not just SubtleCrypto.
-  document: { getElementById: element, querySelectorAll: () => [], createElement: () => ({ set innerHTML(html) { this.content = { firstElementChild: fakeNode(html) }; } }) },
+  document: { compatMode: 'CSS1Compat', getElementById: element, querySelectorAll: () => [], createElement: () => ({ set innerHTML(html) { this.content = { firstElementChild: fakeNode(html) }; } }) },
   sessionStorage: { getItem: () => null },
   localStorage: {
     getItem: key => browserStorage.get(key) || null,
     setItem(key, value) { if (storageBlocked) throw new Error('Storage unavailable'); storageWrites++; browserStorage.set(key, value); },
   },
 });
-let source = ['credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'modeltrace.js', 'app.js']
+let source = ['vendor/markdown-it.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'modeltrace.js', 'app.js']
   .map(file => webFile(file).split('// Events and initialization.')[0]).join('\n');
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({ modes: [{ id: 'quick', name: '快速', cells: 4, samples_per_cell: 15 }], default_concurrency: 2, max_concurrency: 6 }));
 source = source.replace('/*MODELTRACE_CONFIG*/{}', JSON.stringify({requests:3,default_concurrency:3,max_concurrency:3}));
@@ -176,6 +176,8 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert(progress.includes('2/3'));
   assert(!progress.includes('份回答'));
   const historyRecord = {id:'record',time:'2026-09-28T00:00:00Z',model:'<model>',effort:'low',mode:'quick',status:'completed',ok:true,answer:'21',duration_ms:1200,input_tokens:1234,output_tokens:567,reasoning_tokens:89,attribution:{status:'consistent',prediction:'<model>',probability:0.9}};
+  const answer = run(`answerHTML({answer:String.raw\`**21** <img src=x onerror=alert(1)> [a](javascript:alert(1)) ![b](https://example.com/b.png) \\(r\\le8\\) \\(\\href{javascript:alert(1)}{x}\\)\`})`);
+  assert(answer.includes('<strong>21</strong> &lt;img') && answer.includes('<math') && !/<(img|a)\b|\shref=/.test(answer), 'answers render Markdown and TeX, never HTML, links or images');
   const historyCredential = {id:'history',name:'Test',source:'auth_files',provider:'codex',results:[historyRecord,historyRecord],fingerprints:[historyRecord,historyRecord],modeltraces:[historyRecord,historyRecord]};
   run(`candyExpanded.add('history'); fpExpanded.add('history'); mtExpanded.add('history')`);
   for (const renderer of ['renderCandyRow','renderFingerprintRow','renderModelTraceRow']) {
@@ -259,12 +261,13 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   const cooling = {id:'cooling',source:'auth_files',provider:'codex',plan_type:'promax',unavailable:true,status_message:'quota exhausted',next_retry_after:'2026-10-01T08:00:00Z'};
   const coolingView = run(`credentialView(${JSON.stringify(cooling)}, false)`);
   assert(coolingView.includes('<span class="tag plan-elite"><span>Pro 500'));
-  assert(/class="tag warn" title="quota exhausted · 预计 \d\d-\d\d \d\d:\d\d 恢复"><span>不可用/.test(coolingView));
+  assert(/class="tag warn" data-tip="quota exhausted\n预计 \d\d-\d\d \d\d:\d\d 恢复"><span>不可用/.test(coolingView));
   assert.equal(run(`availableCredential(${JSON.stringify(cooling)})`), false, 'unavailable credentials cannot be tested');
   const enableSwitchInput = (a) => run(`enableSwitch(${JSON.stringify(a)})`).match(/<input[^>]*>/)[0];
   assert.match(enableSwitchInput({id:'on',source:'auth_files',provider:'codex'}), /checked(?! disabled)/);
   assert.doesNotMatch(enableSwitchInput({id:'off',source:'auth_files',provider:'codex',disabled:true}), /checked|disabled/, 'disabled files must be re-enabled');
   assert.match(enableSwitchInput({id:'busy',source:'auth_files',provider:'codex',fingerprint_running:{}}), /disabled/);
+  assert.equal(run(`unavailableReason({status_message:'{"error":{"message":"The usage limit has been reached"}}'})`), 'The usage limit has been reached', 'upstream JSON errors show only their message');
   assert.doesNotMatch(enableSwitchInput({id:'claude:apikey:1',source:'ai_providers',provider:'claude'}), /disabled/, 'config API keys are switchable');
   assert.match(enableSwitchInput({id:'openai-compatibility:demo:1',source:'ai_providers',provider:'openai-compatible-demo'}), /disabled/);
   for (const [renderer, rows, expanded] of [['renderCandyRow','rows','candyExpanded'], ['renderFingerprintRow','fp-rows','fpExpanded'], ['renderModelTraceRow','mt-rows','mtExpanded']]) {

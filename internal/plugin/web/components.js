@@ -57,9 +57,9 @@ function fmtTime(iso, seconds = true) {
   const p = (n) => String(n).padStart(2, "0");
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${seconds ? ":" + p(d.getSeconds()) : ""}`;
 }
-const listTime = (iso) => `<div class="test-time mono" ${iso ? `title="${esc(fmtTime(iso))}"` : ""}>${iso ? esc(fmtTime(iso, false)) : "—"}</div>`;
+const listTime = (iso) => `<div class="test-time mono" ${iso ? `data-tip="${esc(fmtTime(iso))}"` : ""}>${iso ? esc(fmtTime(iso, false)) : "—"}</div>`;
 const modelName = (r) => r.effort ? `${r.model}(${r.effort})` : r.model;
-const metric = (name, label, value, cls = "") => `<span class="metric ${cls}" title="${esc(`${label} ${value}`)}" aria-label="${esc(`${label} ${value}`)}">${icon(name)}<span class="meta mono">${esc(value)}</span></span>`;
+const metric = (name, label, value, cls = "") => `<span class="metric ${cls}" aria-label="${esc(`${label} ${value}`)}" data-tip>${icon(name)}<span class="meta mono">${esc(value)}</span></span>`;
 const modelMeta = (r) => metric("astroid", "模型", modelName(r), "model-meta");
 const metrics = (r) =>
   metric("clock", "耗时", r.duration_ms != null ? fmtSec(r.duration_ms) : "—") +
@@ -98,19 +98,29 @@ function credentialView(a, open) {
   const label = configured ? a.base_url?.replace(/^https:\/\//i, "") || "默认地址" : a.email || a.name;
   return `<div class="credential"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(label)}</span></button>
     ${configured ? `<div class="api-key name mono">${esc(a.name)}</div>` : ""}
-    <div class="tags"><span class="tag" title="${esc(credentialTypeLabel(a))}" aria-label="${esc(credentialTypeLabel(a))}">${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(providerType(a))}</span></span>${a.provider_name ? `<span class="tag"><span>${esc(a.provider_name)}</span></span>` : ""}${plan ? `<span class="tag ${plan.badge ? "plan-" + plan.badge : ""}"><span>${esc(plan.label)}</span></span>` : ""}${a.unavailable ? `<span class="tag warn" title="${esc(unavailableReason(a))}"><span>不可用</span></span>` : ""}</div></div>`;
+    <div class="tags"><span class="tag" aria-label="${esc(credentialTypeLabel(a))}" data-tip>${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(providerType(a))}</span></span>${a.provider_name ? `<span class="tag"><span>${esc(a.provider_name)}</span></span>` : ""}${plan ? `<span class="tag ${plan.badge ? "plan-" + plan.badge : ""}"><span>${esc(plan.label)}</span></span>` : ""}${a.unavailable ? `<span class="tag warn" data-tip="${esc(unavailableReason(a))}"><span>不可用</span></span>` : ""}</div></div>`;
 }
 function unavailableReason(a) {
   const retry = a.next_retry_after && `预计 ${fmtTime(a.next_retry_after, false)} 恢复`;
-  return [a.status_message, retry].filter(Boolean).join(" · ") || "CPA 暂时无法使用此凭证";
+  return [statusText(a.status_message), retry].filter(Boolean).join("\n") || "CPA 暂时无法使用此凭证";
 }
+// CPA keeps the upstream error body, often JSON; show only its message.
+function statusText(text) {
+  try {
+    const data = JSON.parse(text), message = data?.error?.message ?? data?.error ?? data?.message;
+    if (typeof message === "string" && message) return message;
+  } catch (_) {}
+  return text;
+}
+
+const disabledFor = (reason) => reason ? `disabled data-tip="${esc(reason)}"` : "";
 
 // CPA toggles auth files and config API keys (IDs "<provider>:apikey:…");
 // OpenAI-compatible providers can only be switched as a whole in CPA.
 const switchable = (a) => a.source === "auth_files" || a.id.startsWith(a.provider + ":apikey:");
 function enableSwitch(a) {
-  const locked = !switchable(a) ? "请在 CPA 中启用或停用此凭证" : credentialBusy(a) ? "测试结束后才能切换" : "";
-  return `<label class="switch" ${locked ? `title="${locked}"` : ""}><input type="checkbox" role="switch" data-enable="${esc(a.id)}" aria-label="启用此凭证" aria-busy="${switching.has(a.id)}" ${a.disabled ? "" : "checked"} ${switching.has(a.id) || locked ? "disabled" : ""}></label>`;
+  const locked = !switchable(a) ? "请在 CPA 中启用或停用此凭证" : credentialBusy(a) ? `${busyTest(a)}进行中，结束后才能切换` : switching.has(a.id) ? "正在保存…" : "";
+  return `<label class="switch"><input type="checkbox" role="switch" data-enable="${esc(a.id)}" aria-label="启用此凭证" aria-busy="${switching.has(a.id)}" ${a.disabled ? "" : "checked"} ${disabledFor(locked)}></label>`;
 }
 
 // Row details are separate columns on wide screens and one footer line on narrow ones.
@@ -135,8 +145,8 @@ function collectionOutcome(p, total, showModel = false) {
   });
 }
 function collectionButton(type, credential, progress, label) {
-  if (progress) return `<button class="btn ghost" type="button" data-${type}-cancel="${esc(credential.id)}" title="停止发送新请求，已发出的请求会继续完成" ${pending || progress.phase === "cancelling" ? "disabled" : ""}>停止</button>`;
-  return `<button class="btn" type="button" data-${type}-run="${esc(credential.id)}" ${runnable(type + "-", credential) ? "" : "disabled"}>${icon("play")}${esc(label)}</button>`;
+  if (progress) return `<button class="btn ghost" type="button" data-${type}-cancel="${esc(credential.id)}" data-tip="停止发送新请求，已发出的请求会继续完成" ${pending || progress.phase === "cancelling" ? "disabled" : ""}>停止</button>`;
+  return `<button class="btn" type="button" data-${type}-run="${esc(credential.id)}" ${disabledFor(runBlocker(type + "-", credential))}>${icon("play")}${esc(label)}</button>`;
 }
 function historyCard(r, contentHTML, extraMetaHTML = "") {
   return `<article class="history-card">
@@ -191,10 +201,64 @@ function setNotice(id, message, tone = "error") {
   notice.timer = setTimeout(() => hideNotice(id), 8000);
 }
 
+// The page tooltip: [data-tip] shows its text, or the aria-label when empty; candy marks show their result.
+const TIP_TARGETS = "[data-tip], [data-auth]";
+let tipTarget = null, tipPoint = null;
+function showTip(target) {
+  const rich = !!target.dataset.auth;
+  const html = rich ? candyTip(target) : esc(target.dataset.tip || target.getAttribute("aria-label"));
+  hideTip();
+  if (!html) return;
+  const tip = $("tip");
+  tip.innerHTML = html;
+  tip.classList.toggle("rich", rich);
+  tip.hidden = false;
+  const box = target.getBoundingClientRect();
+  const { width, height } = tip.getBoundingClientRect();
+  const left = Math.min(Math.max(box.left + box.width / 2 - width / 2, 8), innerWidth - width - 8);
+  const top = box.top - height - 8 >= 8 ? box.top - height - 8 : Math.max(8, Math.min(box.bottom + 8, innerHeight - height - 8));
+  tip.style.left = left + "px";
+  tip.style.top = top + "px";
+  // A tip that only repeats the aria-label is not announced again.
+  if (rich || target.dataset.tip) target.setAttribute("aria-describedby", "tip");
+  tipTarget = target;
+}
+function hideTip() {
+  $("tip").hidden = true;
+  tipTarget?.removeAttribute("aria-describedby");
+  tipTarget = null;
+}
+// Renders replace rows and change labels; redraw the open tip for whatever is now under the pointer.
+function refreshTip() {
+  if (!tipTarget) return;
+  const target = tipTarget.isConnected ? tipTarget : tipPoint && document.elementFromPoint(...tipPoint)?.closest(TIP_TARGETS);
+  target ? showTip(target) : hideTip();
+}
+function setLabel(el, label) {
+  el.setAttribute("aria-label", label);
+  refreshTip();
+}
+function initializeTips() {
+  document.addEventListener("mouseover", (e) => {
+    tipPoint = [e.clientX, e.clientY];
+    const target = e.target.closest(TIP_TARGETS);
+    if (target !== tipTarget) target ? showTip(target) : hideTip();
+  });
+  document.addEventListener("mouseout", (e) => { if (!e.relatedTarget) hideTip(); });
+  document.addEventListener("focusin", (e) => {
+    const target = e.target.closest(TIP_TARGETS);
+    if (target && e.target.matches(":focus-visible")) showTip(target);
+  });
+  document.addEventListener("focusout", (e) => { if (tipTarget?.contains(e.target)) hideTip(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
+  addEventListener("scroll", hideTip, true);
+  addEventListener("resize", hideTip);
+}
+
 function credentialCard(prefix, columns) {
   const clearLabel = prefix === "mt-" ? "清空 ModelTrace 测试记录" : prefix ? "清空指纹测试记录" : "清空糖果测试记录";
   return `<div class="section-head credential-head"><h2>凭证</h2><div class="credential-filters"><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span><span id="${prefix}plan-filter" class="native-select credential-filter" hidden><select id="${prefix}credential-plan" aria-label="订阅类型"><option value="all">所有订阅类型</option></select></span></div>
-    <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" title="脱敏" aria-label="脱敏"></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" title="${clearLabel}" aria-label="${clearLabel}" disabled>${icon("trash-2")}</button></div></div>
+    <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" aria-label="脱敏" data-tip></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" aria-label="${clearLabel}" data-tip disabled>${icon("trash-2")}</button></div></div>
     <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${[...columns, "启用", ""].map((label) => `<div>${label}</div>`).join("")}</div>
     <div id="${prefix}rows"><div class="empty">正在加载…</div></div>`;
 }

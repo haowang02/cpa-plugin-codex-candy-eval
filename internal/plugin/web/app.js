@@ -127,7 +127,7 @@ function renderList(prefix, renderRow) {
     const selector = [...focused.attributes].filter((a) => a.name.startsWith("data-")).map((a) => `[${a.name}="${CSS.escape(a.value)}"]`).join("");
     if (selector) list.querySelector(selector)?.focus({ preventScroll: true });
   }
-  if (tipTarget && !tipTarget.isConnected) hideTip();
+  refreshTip();
 }
 function rowNode(html) {
   const template = document.createElement("template");
@@ -279,10 +279,8 @@ function setMasked(masked) {
   document.body.classList.toggle("masked", masked);
   for (const id of ["mask", "fp-mask", "mt-mask"]) {
     $(id).setAttribute("aria-pressed", masked);
-    const label = masked ? "取消脱敏" : "脱敏";
     $(id).innerHTML = icon(masked ? "eye" : "eye-off");
-    $(id).setAttribute("aria-label", label);
-    $(id).title = label;
+    setLabel($(id), masked ? "取消脱敏" : "脱敏");
   }
 }
 function switchTab(name) {
@@ -295,10 +293,20 @@ function switchTab(name) {
   hideTip();
   store(PREF_STORE + ".tab", name);
 }
-const credentialBusy = (a) => !!(a.running || a.fingerprint_running || a.modeltrace_running);
+const BUSY_TESTS = [["running", "糖果测试"], ["fingerprint_running", "指纹测试"], ["modeltrace_running", "ModelTrace 测试"]];
+const busyTest = (a) => BUSY_TESTS.find(([field]) => a[field])?.[1] || "";
+const credentialBusy = (a) => !!busyTest(a);
 const usableCredential = (a) => !a.disabled && !a.unavailable;
 const availableCredential = (a) => usableCredential(a) && !credentialBusy(a);
-const runnable = (prefix, a) => !pending && !!$(prefix + "model").value && availableCredential(a);
+// Why a test cannot start, shown on its disabled button; empty when it can.
+const pageBlocker = (prefix) => !$(prefix + "model").value ? "模型列表为空，请刷新后重试" : pending ? "正在处理上一个操作，请稍候" : "";
+function runBlocker(prefix, a) {
+  if (a.disabled) return "凭证已停用，启用后才能测试";
+  if (a.unavailable) return "凭证暂不可用：" + unavailableReason(a);
+  if (credentialBusy(a)) return `${busyTest(a)}进行中，结束后才能开始新测试`;
+  return pageBlocker(prefix);
+}
+const runnable = (prefix, a) => !runBlocker(prefix, a);
 const selectedCredentials = (prefix, selection) => visibleCredentials(prefix).filter((a) => selection.has(a.id));
 const batchCredentials = (prefix, selection) => {
   const selected = selectedCredentials(prefix, selection);
@@ -330,7 +338,9 @@ function renderSelection(prefix, selection, action) {
   const targets = batchCredentials(prefix, selection);
   const button = $(prefix + "run-batch");
   button.innerHTML = `${icon("play")}${action}${selected.length ? "所选" : "全部"} (${targets.length})`;
-  button.disabled = pending || !targets.length || !$(prefix + "model").value;
+  const blocker = pageBlocker(prefix) || (targets.length ? "" : selected.length ? "所选凭证均已停用、不可用或正在测试" : "当前列表没有可测试的凭证");
+  button.disabled = !!blocker;
+  button.dataset.tip = blocker;
   const checkbox = $(prefix + "select-all");
   checkbox.checked = available.length > 0 && available.every((a) => selection.has(a.id));
   checkbox.indeterminate = selected.length > 0 && !checkbox.checked;
@@ -390,11 +400,12 @@ function initializeLayout() {
   $("candy-credentials").innerHTML = credentialCard("", ["凭证", "最近一次", "正确率", "最近 20 次"]);
   $("fp-credentials").innerHTML = credentialCard("fp-", ["凭证", "指纹结果", "模式", "测试时间"]);
   $("mt-credentials").innerHTML = credentialCard("mt-", ["凭证", "归因结果", "测试模型", "测试时间"]);
-  $("notifications").innerHTML = ["flash", "load-error", "catalog-error", "storage-error"].map((id) => `<div id="${id}" class="global-flash" role="alert" hidden><span class="notice-symbol" aria-hidden="true"></span><span class="notice-message"></span><button class="notice-close" type="button" title="隐藏提示" aria-label="隐藏提示">${icon("x")}</button></div>`).join("");
+  $("notifications").innerHTML = ["flash", "load-error", "catalog-error", "storage-error"].map((id) => `<div id="${id}" class="global-flash" role="alert" hidden><span class="notice-symbol" aria-hidden="true"></span><span class="notice-message"></span><button class="notice-close" type="button" aria-label="隐藏提示" data-tip>${icon("x")}</button></div>`).join("");
 }
 
 // Events and initialization.
 initializeLayout();
+initializeTips();
 initializeCandy();
 initializeFingerprint();
 initializeModelTrace();
@@ -431,7 +442,7 @@ for (const id of ["fp-mask", "mt-mask"]) $(id).addEventListener("click", () => $
 for (const [id, scope] of [["clear", "candy"], ["fp-clear", "fingerprint"], ["mt-clear", "modeltrace"], ["clear-all", "all"]]) {
   $(id).addEventListener("click", () => {
     clearScope = scope;
-    $("clear-title").textContent = `${$(id).title}？`;
+    $("clear-title").textContent = `${$(id).getAttribute("aria-label")}？`;
     $("confirm-clear").returnValue = ""; // Esc keeps the previous returnValue.
     $("confirm-clear").showModal();
   });
