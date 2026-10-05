@@ -4,7 +4,7 @@ const KEY_STORE = "cpa-codex-candy-eval.key";
 const PREF_STORE = "cpa-codex-candy-eval.prefs";
 const MASK_STORE = "cpa-codex-candy-eval.masked";
 const DEFAULT_MODEL = "gpt-6.1-sol";
-const HIDDEN_MODEL = (id) => id.toLowerCase().includes("image") || id.toLowerCase().split("/").pop().split("(")[0] === "codex-auto-review";
+const HIDDEN_MODEL = (id) => id.toLowerCase().includes("image");
 const tabNames = ["candy", "fingerprint", "modeltrace"];
 
 let key = "";

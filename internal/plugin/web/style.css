@@ -83,8 +83,9 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .problem-body:hover .copy-btn, .problem-body:focus-within .copy-btn, .copy-btn.copied { opacity: 1; }
 .copy-btn:hover, .copy-btn.copied { color: var(--accent); border-color: currentColor; }
 .clipboard-buffer { position: fixed; opacity: 0; pointer-events: none; }
-.page-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px; margin-bottom: var(--section-gap); }
-.tabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
+.page-navigation { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: var(--section-gap); }
+/* The padding keeps the tabs' press spring inside the scroll area. */
+.tabs { display: flex; gap: 2px; min-width: 0; padding: 3px; overflow-x: auto; }
 .page-navigation button { flex: none; height: 32px; padding: 0 16px; border: 0; border-radius: calc(var(--radius) - 4px); background: transparent; color: var(--muted); font-weight: 600; white-space: nowrap; cursor: pointer; transition: scale .3s cubic-bezier(.34, 1.56, .64, 1), translate .2s, box-shadow .2s; }
 .page-navigation button:hover:not(:disabled) { color: var(--ink); }
 .page-navigation button:active:not(:disabled) { scale: .95; transition-duration: .08s; }
@@ -92,7 +93,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .page-navigation button:disabled { opacity: .55; cursor: default; }
 .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: var(--shadow); }
 .tab[aria-selected="true"]:hover { translate: 0 -1px; }
-.page-actions { display: flex; gap: 2px; }
+.page-actions { display: flex; gap: 2px; padding: 3px; }
 .page-actions button { display: inline-flex; align-items: center; justify-content: center; width: 32px; padding: 0; }
 #refresh[aria-busy="true"] .icon { animation: spin .8s linear infinite; }
 .panel-intro { margin-bottom: var(--section-gap); color: var(--muted); }
@@ -122,11 +123,11 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .none { color: var(--faint); }
 
 /* Credential lists and history alignment */
-/* Short columns are fixed. Credential and result tracks share the rest equally up to their caps;
+/* Short columns are fixed. Credential, result and model tracks share the rest equally up to their caps;
    any remaining space is spread evenly across the gaps. */
 #candy-panel { --toolbar-columns: 200px 120px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) 56px var(--marks-width) var(--switch-width) var(--action-width); }
 #fingerprint-panel { --toolbar-columns: 200px 190px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) 56px 84px var(--switch-width) var(--action-width); }
-#modeltrace-panel { --toolbar-columns: 200px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) 104px 84px var(--switch-width) var(--action-width); }
+#modeltrace-panel { --toolbar-columns: 200px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) minmax(104px, 160px) 84px var(--switch-width) var(--action-width); }
 .list-head, .list-row, .history-panel { display: grid; grid-template-columns: var(--list-columns); justify-content: space-between; align-items: center; gap: var(--list-gap); padding-inline: var(--list-padding); }
 .list-head { padding-block: 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .list-head > :nth-child(2) { padding-left: var(--credential-indent); }

@@ -114,8 +114,6 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   run(`credentials = []`);
 
   assert.equal(run(`HIDDEN_MODEL('vendor/IMAGE-preview')`), true);
-  assert.equal(run(`HIDDEN_MODEL('codex-auto-review')`), true);
-  assert.equal(run(`HIDDEN_MODEL('provider/codex-auto-review(high)')`), true);
   assert.equal(run(`HIDDEN_MODEL('claude-sonnet')`), false);
   run(`initializeCandy(); initializeFingerprint(); catalogCache.models = {time:Date.now(),ids:['prefix/model','gpt-5.6-sol','claude-sonnet','gpt-6.1-sol']}; fillModels()`);
   assert.equal(element('model').value, 'gpt-6.1-sol');
@@ -123,7 +121,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('model').innerHTML, '<option value="gpt-6.1-sol">gpt-6.1-sol</option><option value="gpt-5.6-sol">gpt-5.6-sol</option><option value="claude-sonnet">claude-sonnet</option><option value="prefix/model">prefix/model</option>');
   assert.equal(element('fp-model').innerHTML, element('model').innerHTML);
   assert.equal(element('mt-model').innerHTML, element('model').innerHTML);
-  const sortedModels = ['gpt-6.1-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6.1-luna','gpt-6-astra','gpt-6-sol','gpt-6-terra','gpt-6-luna','gpt-5.6-sol','claude-sonnet-4.6','claude-opus-4.6','claude-opus-4.5','gemini-pro','qwen'];
+  const sortedModels = ['gpt-6.1-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6.1-luna','gpt-6-astra','gpt-6-sol','gpt-6-terra','gpt-6-luna','gpt-5.6-sol','codex-auto-review(high)','codex-auto-review','claude-sonnet-4.6','claude-opus-4.6','claude-opus-4.5','gemini-pro','qwen'];
   assert.deepEqual(plain(run(`${JSON.stringify([...sortedModels].reverse())}.sort(compareModels)`)), sortedModels);
   assert.deepEqual(plain(run(`['gpt-6.9-sol','gpt-6.10-sol','gpt-7-sol'].sort(compareModels)`)), ['gpt-7-sol','gpt-6.10-sol','gpt-6.9-sol']);
   assert.deepEqual(plain(run(`['gpt-6-luna','vendor/gpt-6.1-sol','gpt-6-astra','vendor/claude-sonnet','other'].sort(compareModels)`)), ['vendor/gpt-6.1-sol','gpt-6-astra','gpt-6-luna','vendor/claude-sonnet','other']);

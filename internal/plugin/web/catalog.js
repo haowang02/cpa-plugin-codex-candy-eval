@@ -69,7 +69,7 @@ function modelIDs(entries) {
 // intact for requests and use them to break ties between aliases.
 function compareModels(a, b) {
   const name = (id) => id.toLowerCase().split("/").pop();
-  const group = (id) => id.startsWith("gpt-") ? 0 : id.startsWith("claude-") ? 1 : 2;
+  const group = (id) => id.startsWith("gpt-") ? 0 : id.split("(")[0] === "codex-auto-review" ? 1 : id.startsWith("claude-") ? 2 : 3;
   const left = name(a), right = name(b), family = group(left) - group(right);
   const lexical = (x, y) => x < y ? -1 : x > y ? 1 : 0;
   if (family) return family;
@@ -88,7 +88,7 @@ function compareModels(a, b) {
       if (tier) return tier;
     }
   }
-  return (group(left) < 2 ? lexical(right, left) : lexical(left, right)) || lexical(a, b);
+  return (group(left) < 3 ? lexical(right, left) : lexical(left, right)) || lexical(a, b);
 }
 
 async function refreshCatalog({ signal, force = false } = {}) {
