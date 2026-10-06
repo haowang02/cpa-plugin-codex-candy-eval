@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // streamHost fakes the host's model streams on top of host: host.model.execute_stream streams the
@@ -183,7 +185,7 @@ func TestExecuteModel(t *testing.T) {
 				chunks = chunks[1:]
 				return json.Marshal(map[string]any{"payload": []byte(chunk)})
 			}
-			out, status, err := executeModel(credential{ID: "a", Provider: "claude"}, "m", map[string]string{"input": "<q>"}, http.Header{"Originator": {"codex-tui"}})
+			out, status, err := executeModel(context.Background(), credential{ID: "a", Provider: "claude"}, "m", map[string]string{"input": "<q>"}, http.Header{"Originator": {"codex-tui"}})
 			if (err == nil) != (tc.answer != "") || (err == nil && out.Answer != tc.answer) || status != tc.status || closed != 1 {
 				t.Fatalf("answer=%q status=%d err=%v closed=%d", out.Answer, status, err, closed)
 			}
@@ -199,11 +201,11 @@ func TestExecuteModel(t *testing.T) {
 	hostCall = func(string, any) (json.RawMessage, error) {
 		return nil, &EnvelopeError{Code: "upstream", Message: "busy", HTTPStatus: 429}
 	}
-	if _, status, err := executeModel(auth, "m", nil, nil); err == nil || status != 429 {
+	if _, status, err := executeModel(context.Background(), auth, "m", nil, nil); err == nil || status != 429 {
 		t.Fatalf("rejected request: status=%d err=%v", status, err)
 	}
 	hostCall = func(string, any) (json.RawMessage, error) { panic("host down") }
-	if _, _, err := executeModel(auth, "m", nil, nil); err == nil {
+	if _, _, err := executeModel(context.Background(), auth, "m", nil, nil); err == nil {
 		t.Fatal("host panic was not reported")
 	}
 	hostCall = func(string, any) (json.RawMessage, error) {
@@ -211,8 +213,30 @@ func TestExecuteModel(t *testing.T) {
 		return nil, nil
 	}
 	for _, unpinned := range []credential{{ID: "a"}, {Provider: "claude"}} {
-		if _, _, err := executeModel(unpinned, "m", nil, nil); err == nil {
+		if _, _, err := executeModel(context.Background(), unpinned, "m", nil, nil); err == nil {
 			t.Fatal("unpinned request accepted")
 		}
+	}
+}
+
+func TestExecuteModelAbandonsStream(t *testing.T) {
+	setupTest(t)
+	closed := make(chan struct{})
+	hostCall = func(method string, _ any) (json.RawMessage, error) {
+		switch method {
+		case "host.model.execute_stream":
+			return json.RawMessage(`{"stream_id":"s"}`), nil
+		case "host.model.stream_close":
+			close(closed)
+			return json.RawMessage(`{}`), nil
+		}
+		<-closed
+		return json.RawMessage(`{"done":true}`), nil
+	}
+	timeout := errors.New("timed out")
+	ctx, cancel := context.WithTimeoutCause(context.Background(), time.Millisecond, timeout)
+	defer cancel()
+	if _, status, err := executeModel(ctx, credential{ID: "a", Provider: "codex"}, "m", nil, nil); status != 0 || err != timeout {
+		t.Fatalf("status=%d err=%v", status, err)
 	}
 }

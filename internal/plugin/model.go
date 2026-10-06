@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
@@ -27,6 +28,17 @@ func validModelName(model string, allowEffort bool) bool {
 
 func retryableModelStatus(status int) bool {
 	return status == 0 || status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
+}
+
+// Time limits of a model request, as a model stuck repeating itself streams until the upstream cuts it off.
+// Probes normally answer within a minute.
+const (
+	probeTimeout  = 3 * time.Minute
+	answerTimeout = 10 * time.Minute
+)
+
+func withModelTimeout(ctx context.Context, limit time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeoutCause(ctx, limit, fmt.Errorf("模型 %d 分钟内未完成回答，已中断请求", int(limit.Minutes())))
 }
 
 // Collection probes retry the same request at most twice, after 2s and 4s.
@@ -49,8 +61,10 @@ func executeProbe(ctx context.Context, auth credential, model string, body any, 
 				return
 			}
 			attempts++
+			requestCtx, cancel := withModelTimeout(ctx, probeTimeout)
+			defer cancel()
 			var response modelResponse
-			response, status, err = executeModel(auth, model, body, headers)
+			response, status, err = executeModel(requestCtx, auth, model, body, headers)
 			out.Answer = response.Answer
 			out.InputTokens += response.InputTokens
 			out.OutputTokens += response.OutputTokens
@@ -71,9 +85,9 @@ func executeProbe(ctx context.Context, auth credential, model string, body any, 
 }
 
 // executeModel sends a streaming Responses request body with headers on auth's provider; CPA translates
-// it to the provider's own protocol. On failure, status is the upstream HTTP status, or 0 when no complete
-// response arrived.
-func executeModel(auth credential, model string, body any, headers http.Header) (result modelResponse, status int, err error) {
+// it to the provider's own protocol. When ctx ends first, the request is abandoned with ctx's cause. On
+// failure, status is the upstream HTTP status, or 0 when no complete response arrived.
+func executeModel(ctx context.Context, auth credential, model string, body any, headers http.Header) (result modelResponse, status int, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("模型请求异常：%v", recovered)
@@ -107,10 +121,17 @@ func executeModel(auth credential, model string, body any, headers http.Header) 
 	if err := json.Unmarshal(raw, &stream); err != nil || stream.ID == "" {
 		return result, 0, fmt.Errorf("解析 CPA 响应失败：%s", raw)
 	}
-	// The host closes a stream by itself only once it is read to the end.
-	defer hostCall("host.model.stream_close", map[string]any{"stream_id": stream.ID})
+	// The host closes a stream by itself only once it is read to the end. Closing it early ends the pending
+	// read and cancels the upstream request.
+	closeStream := sync.OnceFunc(func() { hostCall("host.model.stream_close", map[string]any{"stream_id": stream.ID}) })
+	defer closeStream()
+	stop := context.AfterFunc(ctx, closeStream)
+	defer stop()
 	out, err := readResponseStream(stream.ID)
 	if err != nil {
+		if ctx.Err() != nil {
+			err = context.Cause(ctx)
+		}
 		return result, 0, err
 	}
 	result.InputTokens = out.Usage.InputTokens

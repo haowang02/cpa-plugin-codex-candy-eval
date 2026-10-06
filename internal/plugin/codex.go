@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -185,8 +186,10 @@ func askCodex(auth credential, model, effort, prompt string) (out modelResponse,
 		effort = ""
 	}
 	body, headers := codexTurn(auth.ID, model, effort, prompt)
+	ctx, cancel := withModelTimeout(context.Background(), answerTimeout)
+	defer cancel()
 	start := time.Now()
-	out, _, err = executeModel(auth, model, body, headers)
+	out, _, err = executeModel(ctx, auth, model, body, headers)
 	return out, time.Since(start), err
 }
 
