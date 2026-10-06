@@ -40,6 +40,9 @@ var uiThemes string
 //go:embed web/vendor/markdown-it.min.js
 var markdownScript string
 
+//go:embed web/vendor/markdown-it-cjk-friendly.min.js
+var cjkFriendlyScript string
+
 //go:embed web/vendor/texmath.js
 var texmathScript string
 
@@ -81,6 +84,7 @@ var uiHTML = func() []byte {
 		"<!--CANDY_PROMPT-->", html.EscapeString(candyPrompt),
 		"<!--MODELTRACE_LICENSE-->", "<!-- ModelTrace\n"+modelTraceLicense+"-->",
 		"/*MARKDOWN_SCRIPT*/", markdownScript,
+		"/*CJK_FRIENDLY_SCRIPT*/", cjkFriendlyScript,
 		"/*TEXMATH_SCRIPT*/", texmathScript,
 		"/*TEMML_SCRIPT*/", temmlScript,
 		"/*CREDENTIALS_SCRIPT*/", credentialScript,

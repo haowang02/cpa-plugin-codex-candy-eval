@@ -262,7 +262,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .history-card .outcome-title { font-size: 13px; }
 
 /* Dialogs */
-dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: var(--float); backdrop-filter: var(--glass); }
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--dialog-bg); color: var(--ink); box-shadow: var(--float); backdrop-filter: var(--glass); }
 dialog::backdrop { background: rgb(0 0 0 / 35%); }
 .confirm { width: min(400px, calc(100vw - 32px)); padding: 22px; }
 .confirm h2 { margin: 0 0 6px; font-size: 16px; }
@@ -271,7 +271,7 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
 .dialog-actions .btn { height: 34px; }
 /* Centered dialogs leave 80px above the header for CPA's floating controls. */
 .result-dialog { --dialog-padding: 22px; width: min(920px, calc(100vw - 32px)); max-height: calc(100dvh - 160px); padding: 0; border-radius: 16px; }
-.result-dialog-head { --heading-padding: 18px var(--dialog-padding); --heading-size: 18px; position: sticky; top: 0; z-index: 1; background: var(--surface); backdrop-filter: var(--glass); }
+.result-dialog-head { --heading-padding: 18px var(--dialog-padding); --heading-size: 18px; position: sticky; top: 0; z-index: 1; background: var(--dialog-bg); backdrop-filter: var(--glass); }
 .result-dialog-body { padding: var(--dialog-padding); }
 .result-dialog-meta { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
 .result-dialog-section { margin-top: 24px; }

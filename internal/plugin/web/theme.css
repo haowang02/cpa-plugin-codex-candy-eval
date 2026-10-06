@@ -35,9 +35,9 @@
   --danger: #c65746; --danger-ink: #8a3a30; --danger-soft: rgb(198 87 70 / 14%); --danger-soft-hover: rgb(198 87 70 / 24%); --danger-line: rgb(198 87 70 / 35%);
   --warning-ink: #92400e; --warning-soft: rgb(217 119 6 / 10%); --warning-line: rgb(217 119 6 / 30%);
   --radius: 12px; --shadow: 0 1px 2px rgb(0 0 0 / 8%); --float: 0 12px 26px rgb(0 0 0 / 14%); --glass: none;
-  /* Label tips copy .nav-tooltip, data tips .statusTooltip on --floating-surface. */
+  /* Label tips copy .nav-tooltip, data tips .statusTooltip on --floating-surface, dialogs .modal on --bg-primary. */
   --tip-bg: #24211c; --tip-ink: #f6f4f1; --tip-line: transparent; --tip-shadow: 0 14px 36px rgb(0 0 0 / 32%); --tip-radius: 10px; --tip-padding: 9px 12px;
-  --popover-bg: #fffdf9; --popover-line: var(--line); --popover-shadow: var(--float);
+  --popover-bg: #fffdf9; --popover-line: var(--line); --popover-shadow: var(--float); --dialog-bg: var(--surface);
 
   &[data-theme="white"] {
     --bg: #ffffff; --surface: #ffffff; --sunken: #f6f6f6; --field: #ffffff; --line: #e5e5e5;
@@ -84,9 +84,9 @@
   --danger: #ef4444; --danger-ink: #dc2626; --danger-soft: #fef2f2; --danger-soft-hover: #fee2e2; --danger-line: #fecaca;
   --warning-ink: #d97706; --warning-soft: #fffbeb; --warning-line: #fde68a;
   --radius: 20px; --shadow: none; --float: 0 10px 15px -3px rgb(0 0 0 / 10%); --glass: blur(20px);
-  /* Tips copy InfoTooltip, lifted by DropdownMenu's floating shadow. */
-  --tip-bg: rgb(255 255 255 / 90%); --tip-ink: var(--muted); --tip-line: var(--control-line); --tip-shadow: 0 16px 32px rgb(15 23 42 / 14%); --tip-radius: 8px; --tip-padding: 8px 10px;
-  --popover-bg: var(--tip-bg); --popover-line: var(--tip-line); --popover-shadow: var(--tip-shadow);
+  /* Tips copy InfoTooltip, lifted by DropdownMenu's floating shadow, and dialogs .modal; both sit on --bg-primary. */
+  --tip-bg: rgb(255 255 255 / 94%); --tip-ink: var(--muted); --tip-line: var(--control-line); --tip-shadow: 0 16px 32px rgb(15 23 42 / 14%); --tip-radius: 8px; --tip-padding: 8px 10px;
+  --popover-bg: var(--tip-bg); --popover-line: var(--tip-line); --popover-shadow: var(--tip-shadow); --dialog-bg: var(--tip-bg);
   --blob-1: linear-gradient(135deg, #7aa2ff, #b6d4ff); --blob-1-opacity: .5;
   --blob-2: linear-gradient(90deg, #6bc5ff, #7debdc); --blob-2-opacity: .5; --blob-blur: 60px;
 
@@ -119,8 +119,10 @@
     & body::before { width: 420px; }
     & body::after { width: 360px; }
   }
+  /* Unblurred, the translucent --bg-primary lets text show through tips and dialogs, so both themes swap in the
+     solid --app-surface-strong of CPAMP's Drawer, which is --control-bg here. */
   @media (max-width: 768px), (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
-    --glass: none;
+    &, &[data-theme="dark"] { --glass: none; --tip-bg: var(--control-bg); }
   }
   @media (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
     & body::before, & body::after { content: none; }

@@ -20,9 +20,10 @@ const MARK = { ok: "circle-check", bad: "circle-x", err: "circle-alert", skip: "
 const verdict = (r) => `<span class="verdict ${kind(r)}">${icon(MARK[kind(r)])}${VERDICT[kind(r)]}</span>`;
 const resultMeta = (r) => `<div class="result-meta">${verdict(r)}${metric("calendar", "测试时间", fmtTime(r.time))}${modelMeta(r)}</div>`;
 // Answers come from untrusted upstreams: raw HTML is escaped, links and images stay text, and Temml
-// refuses commands that need trust, such as \href.
+// refuses commands that need trust, such as \href. The CJK plugin lets emphasis close after full-width
+// punctuation, as in **答案：**21.
 const markdown = markdownit({ breaks: true }).disable(["link", "image", "autolink"])
-  .use(texmath, { engine: temml, delimiters: ["dollars", "brackets"] });
+  .use(markdownItCjkFriendly).use(texmath, { engine: temml, delimiters: ["dollars", "brackets"] });
 const answerHTML = (r) => r.error ? esc(r.error) : markdown.render(r.answer || "");
 const answerKey = (id, r) => JSON.stringify([id, r.time, r.model, r.effort]);
 const answerToggle = (open) => `${icon("chevron-right", "chev")}${open ? "收起" : "展开"}`;
