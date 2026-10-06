@@ -73,6 +73,9 @@ var fingerprintScript string
 //go:embed web/modeltrace.js
 var modelTraceScript string
 
+//go:embed web/pelican.js
+var pelicanScript string
+
 var uiHTML = func() []byte {
 	config, _ := json.Marshal(map[string]any{"modes": fingerprintModes, "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
 	fpScript := strings.Replace(fingerprintScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
@@ -82,6 +85,7 @@ var uiHTML = func() []byte {
 		"/*APP_STYLES*/", temmlStyles+"\n"+uiThemes+"\n"+uiStyles,
 		"<!--PLUGIN_VERSION-->", pluginVersion,
 		"<!--CANDY_PROMPT-->", html.EscapeString(candyPrompt),
+		"<!--PELICAN_PROMPT-->", html.EscapeString(pelicanPrompt),
 		"<!--MODELTRACE_LICENSE-->", "<!-- ModelTrace\n"+modelTraceLicense+"-->",
 		"/*MARKDOWN_SCRIPT*/", markdownScript,
 		"/*CJK_FRIENDLY_SCRIPT*/", cjkFriendlyScript,
@@ -93,6 +97,7 @@ var uiHTML = func() []byte {
 		"/*CANDY_SCRIPT*/", candyScript,
 		"/*FINGERPRINT_SCRIPT*/", fpScript,
 		"/*MODELTRACE_SCRIPT*/", traceScript,
+		"/*PELICAN_SCRIPT*/", pelicanScript,
 		"/*APP_SCRIPT*/", appScript,
 	).Replace(uiTemplate))
 }()
@@ -172,10 +177,13 @@ func HandleMethod(method string, request []byte) (response []byte) {
 				{"Method": http.MethodPost, "Path": managementBase + "/modeltrace/cancel", "Description": "Stop ModelTrace collection"},
 				{"Method": http.MethodGet, "Path": managementBase + "/modeltrace/record", "Description": "View a ModelTrace record"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/modeltrace/results", "Description": "Clear ModelTrace history"},
+				{"Method": http.MethodPost, "Path": managementBase + "/pelican/run", "Description": "Run the pelican test on credentials"},
+				{"Method": http.MethodGet, "Path": managementBase + "/pelican/record", "Description": "View a pelican animation"},
+				{"Method": http.MethodDelete, "Path": managementBase + "/pelican/results", "Description": "Clear pelican history"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/all/results", "Description": "Clear all test history"},
 			},
 			"resources": []map[string]string{
-				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果测试、指纹测试和 ModelTrace 检测 CPA 凭证"},
+				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果测试、指纹测试、ModelTrace 和鹈鹕测试检测 CPA 凭证"},
 			},
 		})
 	case "management.handle":
@@ -202,7 +210,7 @@ func handleManagement(req managementRequest) managementResponse {
 				"Content-Type":            {"text/html; charset=utf-8"},
 				"Cache-Control":           {"no-store"},
 				"X-Content-Type-Options":  {"nosniff"},
-				"Content-Security-Policy": {"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"},
+				"Content-Security-Policy": {"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"},
 			},
 			Body: uiHTML,
 		}
@@ -230,6 +238,12 @@ func handleManagement(req managementRequest) managementResponse {
 		return recordResponse("modeltrace", req.Query)
 	case req.Method == http.MethodDelete && path == managementBase+"/modeltrace/results":
 		return clearHistoryResponse("modeltrace")
+	case req.Method == http.MethodPost && path == managementBase+"/pelican/run":
+		return pelicanRunResponse(req.Body)
+	case req.Method == http.MethodGet && path == managementBase+"/pelican/record":
+		return recordResponse("pelican", req.Query)
+	case req.Method == http.MethodDelete && path == managementBase+"/pelican/results":
+		return clearHistoryResponse("pelican")
 	case req.Method == http.MethodDelete && path == managementBase+"/all/results":
 		return clearHistoryResponse("all")
 	default:
@@ -261,6 +275,8 @@ func stateResponse() managementResponse {
 		view.Fingerprints = summaries(fingerprintResults[auth.ID])
 		view.ModelTraceRunning = traceRunning[auth.ID]
 		view.ModelTraces = summaries(traceResults[auth.ID])
+		view.PelicanRunning = pelicanRunning[auth.ID]
+		view.Pelicans = summaries(pelicanResults[auth.ID])
 		views = append(views, view)
 	}
 	return jsonResponse(http.StatusOK, map[string]any{"auths": views, "storage_error": storageError})

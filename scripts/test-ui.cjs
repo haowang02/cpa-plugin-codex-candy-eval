@@ -10,9 +10,11 @@ const noticeTimers = new Map();
 const browserStorage = new Map();
 let now = Date.now(), storageBlocked = false, storageWrites = 0;
 let timerID = 0;
-// Just enough of a node tree for keyed list rendering.
+// Just enough of a node tree for keyed list rendering; nodes differ by markup, so a changed row is swapped whole.
 const fakeNode = html => ({
-  html, parentNode: null,
+  html, nodeName: html, parentNode: null,
+  isEqualNode(other) { return other.html === html; },
+  replaceWith(node) { const siblings = this.parentNode.childNodes; siblings[siblings.indexOf(this)] = node; node.parentNode = this.parentNode; this.parentNode = null; },
   get nextSibling() { const siblings = this.parentNode?.childNodes || []; return siblings[siblings.indexOf(this) + 1] ?? null; },
   get isConnected() { return !!this.parentNode; },
   remove() { if (this.parentNode) this.parentNode.childNodes.splice(this.parentNode.childNodes.indexOf(this), 1); this.parentNode = null; },
@@ -41,7 +43,7 @@ const context = vm.createContext({
     setItem(key, value) { if (storageBlocked) throw new Error('Storage unavailable'); storageWrites++; browserStorage.set(key, value); },
   },
 });
-let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'modeltrace.js', 'app.js']
+let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'modeltrace.js', 'pelican.js', 'app.js']
   .map(file => webFile(file).split('// Events and initialization.')[0]).join('\n');
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({ modes: [{ id: 'quick', name: '快速', cells: 4, samples_per_cell: 15 }], default_concurrency: 2, max_concurrency: 6 }));
 source = source.replace('/*MODELTRACE_CONFIG*/{}', JSON.stringify({requests:3,default_concurrency:3,max_concurrency:3}));
@@ -178,15 +180,17 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   const historyRecord = {id:'record',time:'2026-09-28T00:00:00Z',model:'<model>',effort:'low',mode:'quick',status:'completed',ok:true,answer:'21',duration_ms:1200,input_tokens:1234,output_tokens:567,reasoning_tokens:89,attribution:{status:'consistent',prediction:'<model>',probability:0.9}};
   const answer = run(`answerHTML({answer:String.raw\`**答案：**21 <img src=x onerror=alert(1)> [a](javascript:alert(1)) ![b](https://example.com/b.png) \\(r\\le8\\) \\(\\href{javascript:alert(1)}{x}\\)\`})`);
   assert(answer.includes('<strong>答案：</strong>21 &lt;img') && answer.includes('<math') && !/<(img|a)\b|\shref=/.test(answer), 'answers render Markdown and TeX, never HTML, links or images');
+  const frame = run(`pelicanFrame('<script>top.location = "x"</script>')`);
+  assert(frame.startsWith('<iframe sandbox="allow-scripts" srcdoc="&lt;script&gt;top.location = &quot;x&quot;'), 'model pages run in an opaque origin, inside their srcdoc');
   const historyCredential = {id:'history',name:'Test',source:'auth_files',provider:'codex',results:[historyRecord,historyRecord],fingerprints:[historyRecord,historyRecord],modeltraces:[historyRecord,historyRecord]};
   run(`candyExpanded.add('history'); fpExpanded.add('history'); mtExpanded.add('history')`);
   for (const renderer of ['renderCandyRow','renderFingerprintRow','renderModelTraceRow']) {
     const markup = run(`${renderer}(${JSON.stringify(historyCredential)})`);
     assert.equal((markup.match(/class="history-title"/g) || []).length, 1);
     assert.equal((markup.match(/<article class="history-card">/g) || []).length, 2);
-    assert.equal((markup.match(/class="history-card-head"/g) || []).length, 2);
+    assert.equal((markup.match(/class="history-card-head record-meta"/g) || []).length, 2);
     assert(markup.includes('data-row="history"'));
-    for (const head of markup.matchAll(/class="history-card-head">(.*?)<div class="history-card-body">/gs)) {
+    for (const head of markup.matchAll(/class="history-card-head record-meta">(.*?)<div class="history-card-body">/gs)) {
       const labels = [...head[1].matchAll(/aria-label="(耗时|输入 Token|输出 Token|推理 Token) ([^"]+)"/g)].map(match => match[1] + ' ' + match[2]);
       assert.deepEqual(labels, ['耗时 1.2s', '输入 Token 1,234', '输出 Token 567', '推理 Token 89']);
       assert(head[1].includes(run(`ICONS['square-arrow-right-enter']`)));
@@ -424,7 +428,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('flash').role, 'status');
   assert.equal(noticeTimers.size, 1);
 
-  const validState = {auths:[{id:'valid-state',name:'Test',source:'auth_files',provider:'codex',results:[],fingerprints:[],modeltraces:[]}],storage_error:''};
+  const validState = {auths:[{id:'valid-state',name:'Test',source:'auth_files',provider:'codex',results:[],fingerprints:[],modeltraces:[],pelicans:[]}],storage_error:''};
   run(`resetCatalogCache(); let finishModels, finishSync, modelsStarted, syncStarted;
     const modelsWaiting = new Promise(resolve => {modelsStarted=resolve});
     const syncWaiting = new Promise(resolve => {syncStarted=resolve});
@@ -448,7 +452,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('catalog-error').hidden, false);
   run(`refreshCatalog = async () => {}; api = async () => (${JSON.stringify(validState)})`);
   await run(`load()`);
-  for (const invalid of [{auths:null},{auths:[null]},{auths:[{id:'broken',results:null,fingerprints:[],modeltraces:[]}]},{auths:[{...validState.auths[0],results:[null]}]}]) {
+  for (const invalid of [{auths:null},{auths:[null]},{auths:[{id:'broken',results:null,fingerprints:[],modeltraces:[],pelicans:[]}]},{auths:[{...validState.auths[0],results:[null]}]}]) {
     run(`api = async () => (${JSON.stringify(invalid)})`);
     await run(`load()`);
     assert.equal(run(`credentials[0].id`), 'valid-state', 'invalid responses must not replace the last valid state');

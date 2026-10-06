@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	fingerprintHistoryLimit       = 5
 	fingerprintDefaultConcurrency = 2
 	fingerprintMaxConcurrency     = 6
 )
@@ -113,48 +112,17 @@ func fingerprintRunResponse(body []byte) managementResponse {
 	if req.Concurrency < 1 || req.Concurrency > fingerprintMaxConcurrency {
 		return jsonError(http.StatusBadRequest, fmt.Sprintf("每凭证并发须为 1–%d", fingerprintMaxConcurrency))
 	}
-	auths, err := selectedCredentials(req.AuthIDs, req.All)
-	if err != nil {
-		return jsonError(http.StatusBadGateway, err.Error())
-	}
-	if len(auths) == 0 {
-		return jsonError(http.StatusBadRequest, "没有可采集的已启用凭证")
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if quiescing {
-		return jsonError(http.StatusServiceUnavailable, "插件正在停止，请稍后重试")
-	}
-	summary := runSummary{}
-	for _, auth := range auths {
-		if credentialBusyLocked(auth.ID) {
-			summary.Busy++
-			continue
-		}
-		if known, supported := credentialSupportsModel(req.ModelCatalog, auth.ID, req.Model); known && !supported {
+	return startRuns(req.AuthIDs, req.All, req.ModelCatalog, req.Model,
+		func(id string) {
 			now := time.Now().UTC()
-			appendFingerprintResult(auth.ID, fingerprintResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Mode: mode.ID, Effort: "low", Status: "skipped", Error: unsupportedModelMessage})
-			summary.Skipped++
-			continue
-		} else if !known {
-			summary.Unchecked++
-		}
-		ctx, cancel := context.WithCancel(context.Background())
-		p := &fingerprintProgress{Model: req.Model, Mode: mode.ID, Total: mode.Cells * mode.Samples, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
-		fingerprintRunning[auth.ID] = p
-		summary.Started++
-		tasks.Add(1)
-		go runFingerprint(ctx, auth, req.Model, mode, p)
-	}
-	if summary.Skipped > 0 {
-		_ = saveStateLocked()
-	}
-	return jsonResponse(http.StatusOK, summary)
-}
-
-func appendFingerprintResult(id string, r fingerprintResult) {
-	history := append(fingerprintResults[id], r)
-	fingerprintResults[id] = history[max(0, len(history)-fingerprintHistoryLimit):]
+			fingerprintResults[id] = appendRecent(fingerprintResults[id], fingerprintResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Mode: mode.ID, Effort: "low", Status: "skipped", Error: unsupportedModelMessage})
+		},
+		func(auth credential) {
+			ctx, cancel := context.WithCancel(context.Background())
+			p := &fingerprintProgress{Model: req.Model, Mode: mode.ID, Total: mode.Cells * mode.Samples, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
+			fingerprintRunning[auth.ID] = p
+			go runFingerprint(ctx, auth, req.Model, mode, p)
+		})
 }
 
 func runFingerprint(ctx context.Context, auth credential, model string, mode fingerprintMode, p *fingerprintProgress) {
@@ -174,7 +142,7 @@ func runFingerprint(ctx context.Context, auth credential, model string, mode fin
 			r.Status = "cancelled"
 		}
 		p.cancel()
-		appendFingerprintResult(id, r)
+		fingerprintResults[id] = appendRecent(fingerprintResults[id], r)
 		delete(fingerprintRunning, id)
 		_ = saveStateLocked()
 		mu.Unlock()

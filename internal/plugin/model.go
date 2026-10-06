@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -131,6 +132,10 @@ func executeModel(auth credential, model string, body any, headers http.Header) 
 	}
 	result.Answer = answer.String()
 	if strings.TrimSpace(result.Answer) == "" {
+		// Codex turns list tools, and items such as function_call or custom_tool_call request one.
+		if slices.ContainsFunc(out.Output, func(item responseItem) bool { return strings.HasSuffix(item.Type, "_call") }) {
+			return result, http.StatusOK, fmt.Errorf("模型调用了工具，没有直接回答")
+		}
 		return result, http.StatusOK, fmt.Errorf("模型未返回文本")
 	}
 	return result, http.StatusOK, nil

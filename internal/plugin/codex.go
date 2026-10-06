@@ -179,6 +179,17 @@ func codexTurn(authID, model, effort, prompt string) (codexRequest, http.Header)
 	return request, headers
 }
 
+// askCodex sends prompt as a new Codex turn on auth. Effort "none" leaves the reasoning effort to CPA.
+func askCodex(auth credential, model, effort, prompt string) (out modelResponse, elapsed time.Duration, err error) {
+	if effort == "none" {
+		effort = ""
+	}
+	body, headers := codexTurn(auth.ID, model, effort, prompt)
+	start := time.Now()
+	out, _, err = executeModel(auth, model, body, headers)
+	return out, time.Since(start), err
+}
+
 // codexPrefix builds the tools and base instructions items Codex puts first in every request, with
 // IDs hashed from the thread ID and their content.
 func codexPrefix(thread uuid) []codexItem {

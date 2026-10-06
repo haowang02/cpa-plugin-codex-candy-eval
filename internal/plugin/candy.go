@@ -7,10 +7,7 @@ import (
 	"time"
 )
 
-const (
-	candyHistoryLimit = 20
-	candyMaxRuns      = 10
-)
+const candyMaxRuns = 10
 
 var (
 	candyResults = map[string][]candyResult{}
@@ -65,41 +62,14 @@ func candyRunResponse(body []byte) managementResponse {
 		return jsonError(http.StatusBadRequest, "请选择模型")
 	}
 	req.Runs = min(max(req.Runs, 1), candyMaxRuns)
-	auths, err := selectedCredentials(req.AuthIDs, req.All)
-	if err != nil {
-		return jsonError(http.StatusBadGateway, err.Error())
-	}
-	if len(auths) == 0 {
-		return jsonError(http.StatusBadRequest, "没有可测试的已启用凭证")
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if quiescing {
-		return jsonError(http.StatusServiceUnavailable, "插件正在停止，请稍后重试")
-	}
-	summary := runSummary{}
-	for _, auth := range auths {
-		id := auth.ID
-		if credentialBusyLocked(id) {
-			summary.Busy++
-			continue
-		}
-		if known, supported := credentialSupportsModel(req.ModelCatalog, id, req.Model); known && !supported {
-			appendCandyResult(id, candyResult{Time: time.Now().UTC(), Model: req.Model, Effort: req.Effort, Skipped: true, Error: unsupportedModelMessage})
-			summary.Skipped++
-			continue
-		} else if !known {
-			summary.Unchecked++
-		}
-		candyRunning[id] = &candyProgress{Total: req.Runs}
-		summary.Started++
-		tasks.Add(1)
-		go runCandy(auth, req.Model, req.Effort, req.Runs)
-	}
-	if summary.Skipped > 0 {
-		_ = saveStateLocked()
-	}
-	return jsonResponse(http.StatusOK, summary)
+	return startRuns(req.AuthIDs, req.All, req.ModelCatalog, req.Model,
+		func(id string) {
+			candyResults[id] = appendRecent(candyResults[id], candyResult{Time: time.Now().UTC(), Model: req.Model, Effort: req.Effort, Skipped: true, Error: unsupportedModelMessage})
+		},
+		func(auth credential) {
+			candyRunning[auth.ID] = &candyProgress{Total: req.Runs}
+			go runCandy(auth, req.Model, req.Effort, req.Runs)
+		})
 }
 
 // Each credential runs serially; different credentials run in parallel.
@@ -120,7 +90,7 @@ func runCandy(auth credential, model, effort string, runs int) {
 		}
 		r := evaluateCandy(auth, model, effort)
 		mu.Lock()
-		appendCandyResult(id, r)
+		candyResults[id] = appendRecent(candyResults[id], r)
 		candyRunning[id].Done++
 		_ = saveStateLocked()
 		mu.Unlock()
@@ -129,13 +99,8 @@ func runCandy(auth credential, model, effort string, runs int) {
 
 func evaluateCandy(auth credential, model, effort string) candyResult {
 	r := candyResult{Time: time.Now().UTC(), Model: model, Effort: effort}
-	if effort == "none" {
-		effort = ""
-	}
-	body, headers := codexTurn(auth.ID, model, effort, candyPrompt)
-	start := time.Now()
-	out, _, err := executeModel(auth, model, body, headers)
-	r.DurationMS = time.Since(start).Milliseconds()
+	out, elapsed, err := askCodex(auth, model, effort, candyPrompt)
+	r.DurationMS = elapsed.Milliseconds()
 	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if err != nil {
 		r.Error = truncate(err.Error(), 500)
@@ -155,9 +120,4 @@ func hasStandalone21(text string) bool {
 		}
 	}
 	return false
-}
-
-func appendCandyResult(id string, r candyResult) {
-	history := append(candyResults[id], r)
-	candyResults[id] = history[max(len(history)-candyHistoryLimit, 0):]
 }

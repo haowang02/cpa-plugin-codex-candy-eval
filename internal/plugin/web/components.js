@@ -61,6 +61,8 @@ const listTime = (iso) => `<div class="test-time mono" ${iso ? `data-tip="${esc(
 const modelName = (r) => r.effort ? `${r.model}(${r.effort})` : r.model;
 const metric = (name, label, value, cls = "") => `<span class="metric ${cls}" aria-label="${esc(`${label} ${value}`)}" data-tip>${icon(name)}<span class="meta mono">${esc(value)}</span></span>`;
 const modelMeta = (r) => metric("astroid", "模型", modelName(r), "model-meta");
+const STATUS_ICONS = { ok: "circle-check", bad: "circle-x", err: "circle-alert", skip: "ban" };
+const statusPill = (kind, label) => `<span class="verdict ${kind}">${icon(STATUS_ICONS[kind])}${label}</span>`;
 const metrics = (r) =>
   metric("clock", "耗时", r.duration_ms != null ? fmtSec(r.duration_ms) : "—") +
   metric("square-arrow-right-enter", "输入 Token", r.input_tokens != null ? fmtNum(r.input_tokens) : "—") +
@@ -148,9 +150,15 @@ function collectionButton(type, credential, progress, label) {
   if (progress) return `<button class="btn ghost" type="button" data-${type}-cancel="${esc(credential.id)}" data-tip="停止发送新请求，已发出的请求会继续完成" ${pending || progress.phase === "cancelling" ? "disabled" : ""}>停止</button>`;
   return `<button class="btn" type="button" data-${type}-run="${esc(credential.id)}" ${disabledFor(runBlocker(type + "-", credential))}>${icon("play")}${esc(label)}</button>`;
 }
+// The latest result of a single-prompt test: its verdict and model, then its usage.
+const latestResult = (r, verdict) => r
+  ? `<div class="latest-top">${verdict(r)}${modelMeta(r)}</div><div class="metrics">${r.skipped ? "" : metrics(r)}</div>`
+  : `<span class="none">尚未测试</span>`;
+// A record's time, model and usage, as history cards and detail dialogs head it.
+const recordMeta = (r, extraMetaHTML = "") => `<div class="result-meta">${metric("calendar", "测试时间", fmtTime(r.time))}${modelMeta(r)}${extraMetaHTML}</div><span class="metrics">${metrics(r)}</span>`;
 function historyCard(r, contentHTML, extraMetaHTML = "") {
   return `<article class="history-card">
-    <div class="history-card-head"><div class="result-meta">${metric("calendar", "测试时间", fmtTime(r.time))}${modelMeta(r)}${extraMetaHTML}</div><span class="metrics">${metrics(r)}</span></div>
+    <div class="history-card-head record-meta">${recordMeta(r, extraMetaHTML)}</div>
     <div class="history-card-body">${contentHTML}</div>
   </article>`;
 }
@@ -255,10 +263,49 @@ function initializeTips() {
   addEventListener("resize", hideTip);
 }
 
-function credentialCard(prefix, columns) {
-  const clearLabel = prefix === "mt-" ? "清空 ModelTrace 测试记录" : prefix ? "清空指纹测试记录" : "清空糖果测试记录";
+function credentialCard(prefix, test, columns) {
+  const clearLabel = `清空${test}记录`;
   return `<div class="section-head credential-head"><h2>凭证</h2><div class="credential-filters"><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span><span id="${prefix}plan-filter" class="native-select credential-filter" hidden><select id="${prefix}credential-plan" aria-label="订阅类型"><option value="all">所有订阅类型</option></select></span></div>
     <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" aria-label="脱敏" data-tip></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" aria-label="${clearLabel}" data-tip disabled>${icon("trash-2")}</button></div></div>
     <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${[...columns, "启用", ""].map((label) => `<div>${label}</div>`).join("")}</div>
     <div id="${prefix}rows"><div class="empty">正在加载…</div></div>`;
+}
+
+// Copy buttons copy the prompt beside them.
+function initializeCopyButtons() {
+  for (const button of document.querySelectorAll(".copy-btn")) {
+    let timer = 0;
+    const reset = () => {
+      button.innerHTML = icon("copy");
+      button.classList.remove("copied");
+      setLabel(button, "复制题目");
+    };
+    reset();
+    button.addEventListener("click", async () => {
+      const prompt = button.parentElement.querySelector("code").textContent;
+      try {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(prompt);
+        } else {
+          const area = Object.assign(document.createElement("textarea"), { value: prompt, className: "clipboard-buffer" });
+          document.body.append(area);
+          try {
+            area.select();
+            if (!document.execCommand("copy")) throw new Error("copy failed");
+          } finally {
+            area.remove();
+            button.focus();
+          }
+        }
+      } catch (_) {
+        setLabel(button, "复制失败，请手动复制题目");
+        return;
+      }
+      clearTimeout(timer);
+      button.innerHTML = icon("check");
+      button.classList.add("copied");
+      setLabel(button, "已复制");
+      timer = setTimeout(reset, 1600);
+    });
+  }
 }

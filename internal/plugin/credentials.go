@@ -59,6 +59,8 @@ type credentialView struct {
 	Fingerprints       []fingerprintResult  `json:"fingerprints"`
 	ModelTraceRunning  *traceProgress       `json:"modeltrace_running,omitempty"`
 	ModelTraces        []traceResult        `json:"modeltraces"`
+	PelicanRunning     bool                 `json:"pelican_running,omitempty"`
+	Pelicans           []pelicanResult      `json:"pelicans"`
 }
 
 // host.auth.list omits some config-backed credentials. The UI syncs their CPA
@@ -192,13 +194,6 @@ func selectedCredentials(ids []string, all bool) ([]credential, error) {
 }
 
 const unsupportedModelMessage = "已跳过：此凭证不支持所选模型"
-
-type runSummary struct {
-	Started   int `json:"started"`
-	Busy      int `json:"busy,omitempty"`
-	Skipped   int `json:"skipped,omitempty"`
-	Unchecked int `json:"unchecked,omitempty"`
-}
 
 // The UI supplies CPA's credential model catalogs. A missing/null catalog means
 // support is unknown, not unsupported.

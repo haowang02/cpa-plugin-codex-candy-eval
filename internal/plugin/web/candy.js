@@ -1,10 +1,5 @@
 "use strict";
 
-const DEFAULT_EFFORT = "low";
-const DEFAULT_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"];
-
-let copyTimer = 0;
-const COPY_LABEL = icon("copy");
 const candyExpanded = new Set();
 const candyAnswersExpanded = new Set();
 const candySelected = new Set();
@@ -16,8 +11,7 @@ const candyRuns = () => boundedInput("runs", 1, 10);
 const scopeMatch = (r) => r.model === $("model").value && (r.effort || "none") === $("effort").value;
 const kind = (r) => (r.skipped ? "skip" : r.error ? "err" : r.ok ? "ok" : "bad");
 const VERDICT = { ok: "答对", bad: "答错", err: "出错", skip: "已跳过" };
-const MARK = { ok: "circle-check", bad: "circle-x", err: "circle-alert", skip: "ban" };
-const verdict = (r) => `<span class="verdict ${kind(r)}">${icon(MARK[kind(r)])}${VERDICT[kind(r)]}</span>`;
+const verdict = (r) => statusPill(kind(r), VERDICT[kind(r)]);
 const resultMeta = (r) => `<div class="result-meta">${verdict(r)}${metric("calendar", "测试时间", fmtTime(r.time))}${modelMeta(r)}</div>`;
 // Answers come from untrusted upstreams: raw HTML is escaped, links and images stay text, and Temml
 // refuses commands that need trust, such as \href. The CJK plugin lets emphasis close after full-width
@@ -44,15 +38,10 @@ function renderCandyRow(a) {
   const graded = results.filter((r) => scopeMatch(r) && !r.error && !r.skipped);
   const correct = graded.filter((r) => r.ok).length;
 
-  const latest = last
-    ? `<div class="latest-top">${verdict(last)}
-         ${modelMeta(last)}</div>
-       <div class="metrics">${last.skipped ? "" : metrics(last)}</div>`
-    : `<span class="none">尚未测试</span>`;
   const rate = graded.length
     ? `<b class="mono">${Math.round((correct / graded.length) * 100)}%</b><small class="mono">${correct}/${graded.length}</small>`
     : `<span class="none">—</span>`;
-  const marks = results.map((r, i) => `<button class="mark-hit" type="button" data-auth="${esc(a.id)}" data-i="${i}" aria-label="${esc(`${fmtTime(r.time)} ${modelName(r)} ${VERDICT[kind(r)]}`)}">${icon(MARK[kind(r)], `mark ${kind(r)} ${scopeMatch(r) ? "" : "dim"}`)}</button>`).join("");
+  const marks = results.map((r, i) => `<button class="mark-hit" type="button" data-auth="${esc(a.id)}" data-i="${i}" aria-label="${esc(`${fmtTime(r.time)} ${modelName(r)} ${VERDICT[kind(r)]}`)}">${icon(STATUS_ICONS[kind(r)], `mark ${kind(r)} ${scopeMatch(r) ? "" : "dim"}`)}</button>`).join("");
   const progress = a.running && `${a.running.done}/${a.running.total}`;
   const blocker = runBlocker("", a);
   const button = progress
@@ -61,7 +50,7 @@ function renderCandyRow(a) {
 
   return credentialRow({
     type: "candy", credential: a, selected: candySelected.has(a.id), open: candyExpanded.has(a.id), selectable: !blocker, button,
-    result: latest, meta: `<div class="rate">${rate}</div><div class="marks">${marks}</div>`, tested: results.length > 0,
+    result: latestResult(last, verdict), meta: `<div class="rate">${rate}</div><div class="marks">${marks}</div>`, tested: results.length > 0,
     history: () => [...results].reverse().map((r, i) => candyHistory(a, r, i)).join(""),
   });
 }
@@ -91,38 +80,6 @@ function initializeCandy() {
   fillSelect("effort", DEFAULT_EFFORTS, saved.effort, DEFAULT_EFFORT);
   $("runs").value = saved.runs || 1;
   $("runs").value = candyRuns();
-
-  $("copy").innerHTML = COPY_LABEL;
-  $("copy").addEventListener("click", async () => {
-    const prompt = $("question").textContent;
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(prompt);
-      } else {
-        const area = Object.assign(document.createElement("textarea"), { value: prompt, className: "clipboard-buffer" });
-        document.body.append(area);
-        try {
-          area.select();
-          if (!document.execCommand("copy")) throw new Error("copy failed");
-        } finally {
-          area.remove();
-          $("copy").focus();
-        }
-      }
-    } catch (_) {
-      setLabel($("copy"), "复制失败，请手动复制题目");
-      return;
-    }
-    clearTimeout(copyTimer);
-    $("copy").innerHTML = icon("check");
-    $("copy").classList.add("copied");
-    setLabel($("copy"), "已复制");
-    copyTimer = setTimeout(() => {
-      $("copy").innerHTML = COPY_LABEL;
-      $("copy").classList.remove("copied");
-      setLabel($("copy"), "复制题目");
-    }, 1600);
-  });
 
   $("model").addEventListener("change", () => { candySavePrefs(); render(); });
   $("effort").addEventListener("change", () => { candySavePrefs(); render(); });

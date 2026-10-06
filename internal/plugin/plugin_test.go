@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -21,6 +23,7 @@ func setupTest(t *testing.T) {
 	previousResults, previousRunning := candyResults, candyRunning
 	previousFPResults, previousFPRunning, previousFPError := fingerprintResults, fingerprintRunning, storageError
 	previousTraceResults, previousTraceRunning := traceResults, traceRunning
+	previousPelicanResults, previousPelicanRunning := pelicanResults, pelicanRunning
 	t.Cleanup(func() {
 		tasks.Wait()
 		configuredCredentials = previousCredentials
@@ -29,12 +32,14 @@ func setupTest(t *testing.T) {
 		candyResults, candyRunning = previousResults, previousRunning
 		fingerprintResults, fingerprintRunning, storageError = previousFPResults, previousFPRunning, previousFPError
 		traceResults, traceRunning = previousTraceResults, previousTraceRunning
+		pelicanResults, pelicanRunning = previousPelicanResults, previousPelicanRunning
 	})
 	statePath, loaded = filepath.Join(t.TempDir(), "state.json"), false
 	stateLoadError, quiescing = nil, false
 	candyResults, candyRunning = map[string][]candyResult{}, map[string]*candyProgress{}
 	fingerprintResults, fingerprintRunning, storageError = map[string][]fingerprintResult{}, map[string]*fingerprintProgress{}, ""
 	traceResults, traceRunning = map[string][]traceResult{}, map[string]*traceProgress{}
+	pelicanResults, pelicanRunning = map[string][]pelicanResult{}, map[string]bool{}
 	hostCall = func(method string, _ any) (json.RawMessage, error) {
 		t.Errorf("unexpected host call: %s", method)
 		return nil, fmt.Errorf("unexpected host call: %s", method)
@@ -55,6 +60,13 @@ func TestHasStandalone21(t *testing.T) {
 func TestFooterVersion(t *testing.T) {
 	if !bytes.Contains(uiHTML, []byte("版本 v"+pluginVersion)) || bytes.Contains(uiHTML, []byte("<!--PLUGIN_VERSION-->")) {
 		t.Fatal("footer must use the active plugin version")
+	}
+}
+
+// The page inlines its scripts, and an inline script ends at the first "</script" anywhere in its text.
+func TestScriptsInlineSafely(t *testing.T) {
+	if got, want := strings.Count(strings.ToLower(string(uiHTML)), "</script"), strings.Count(uiTemplate, "</script>"); got != want {
+		t.Fatalf("page has %d closing script tags, its template %d", got, want)
 	}
 }
 
@@ -120,7 +132,7 @@ func TestRunAllKeepsRecentHistory(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	history := candyResults["a.json"]
-	if len(history) != candyHistoryLimit || history[candyHistoryLimit-candyMaxRuns-1].Error != "" || history[candyHistoryLimit-candyMaxRuns].Error == "" {
+	if len(history) != historyLimit || history[historyLimit-candyMaxRuns-1].Error != "" || history[historyLimit-candyMaxRuns].Error == "" {
 		t.Fatalf("want 10 old and %d new results, got %+v", candyMaxRuns, history)
 	}
 	if len(candyResults["off.json"]) != 0 || len(candyResults["c.json"]) != candyMaxRuns {
@@ -142,8 +154,10 @@ func TestRegistration(t *testing.T) {
 			t.Errorf("metadata %s is empty", field)
 		}
 	}
-	if !bytes.Contains(uiHTML, []byte(`<code id="question">`+candyPrompt+`</code>`)) {
-		t.Error("displayed question differs from the evaluation prompt")
+	for _, prompt := range []string{candyPrompt, pelicanPrompt} {
+		if !bytes.Contains(uiHTML, []byte("<code>"+html.EscapeString(prompt)+"</code>")) {
+			t.Error("displayed prompt differs from the evaluation prompt")
+		}
 	}
 }
 
@@ -221,7 +235,7 @@ func TestStatePersistence(t *testing.T) {
 		t.Fatal("independent candy history was not restored")
 	}
 	loaded = false
-	for i := range candyHistoryLimit + 5 {
+	for i := range historyLimit + 5 {
 		candyResults["a"] = append(candyResults["a"], candyResult{InputTokens: int64(i)})
 	}
 	if err := saveStateLocked(); err != nil {
@@ -229,8 +243,8 @@ func TestStatePersistence(t *testing.T) {
 	}
 	candyResults = map[string][]candyResult{}
 	loadState()
-	if history := candyResults["a"]; len(history) != candyHistoryLimit || history[0].InputTokens != 5 {
-		t.Fatalf("restored history must keep the latest %d results: %+v", candyHistoryLimit, history)
+	if history := candyResults["a"]; len(history) != historyLimit || history[0].InputTokens != 5 {
+		t.Fatalf("restored history must keep the latest %d results: %+v", historyLimit, history)
 	}
 	candyRunning["a"] = &candyProgress{Done: 1, Total: 2}
 	request := managementRequest{Method: http.MethodDelete, Path: managementBase + "/results"}

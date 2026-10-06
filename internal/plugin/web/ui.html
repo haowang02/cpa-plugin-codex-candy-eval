@@ -26,9 +26,10 @@
     <div id="app" hidden>
       <div class="page-navigation card">
         <div class="tabs" role="tablist" aria-label="测试类型">
-          <button id="tab-candy" class="tab" role="tab" aria-selected="true" aria-controls="candy-panel" type="button">糖果测试</button>
-          <button id="tab-fingerprint" class="tab" role="tab" aria-selected="false" aria-controls="fingerprint-panel" tabindex="-1" type="button">指纹测试</button>
+          <button id="tab-candy" class="tab" role="tab" aria-selected="true" aria-controls="candy-panel" type="button">糖果</button>
+          <button id="tab-fingerprint" class="tab" role="tab" aria-selected="false" aria-controls="fingerprint-panel" tabindex="-1" type="button">指纹</button>
           <button id="tab-modeltrace" class="tab" role="tab" aria-selected="false" aria-controls="modeltrace-panel" tabindex="-1" type="button">ModelTrace</button>
+          <button id="tab-pelican" class="tab" role="tab" aria-selected="false" aria-controls="pelican-panel" tabindex="-1" type="button">鹈鹕</button>
         </div>
         <div class="page-actions">
           <button id="clear-all" type="button" aria-label="清空全部测试记录" data-tip disabled><i data-icon="trash-2"></i></button>
@@ -38,11 +39,11 @@
       <div id="notifications"></div>
       <section id="candy-panel" role="tabpanel" aria-labelledby="tab-candy">
         <div class="panel-intro">
-          <p>让每个凭证解同一道糖果题，答出 <b class="mono">21</b> 即为正确。</p>
+          <p>让模型解一道糖果题，答出 <b class="mono">21</b> 即为正确。</p>
           <details class="problem">
             <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
-            <div class="problem-body"><pre class="mono"><code id="question"><!--CANDY_PROMPT--></code></pre>
-              <button id="copy" class="copy-btn" type="button" aria-label="复制题目" data-tip></button>
+            <div class="problem-body"><pre class="mono"><code><!--CANDY_PROMPT--></code></pre>
+              <button class="copy-btn" type="button" aria-label="复制题目" data-tip></button>
             </div>
           </details>
         </div>
@@ -105,6 +106,24 @@
         <div class="legend"><span id="mt-cost"></span></div>
         <section id="mt-credentials" class="card"></section>
       </section>
+      <section id="pelican-panel" role="tabpanel" aria-labelledby="tab-pelican" hidden>
+        <div class="panel-intro">
+          <p>让模型写一个 HTML 页面，用 SVG 绘制鹈鹕骑自行车的动画。</p>
+          <details class="problem">
+            <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
+            <div class="problem-body"><pre class="mono"><code><!--PELICAN_PROMPT--></code></pre>
+              <button class="copy-btn" type="button" aria-label="复制题目" data-tip></button>
+            </div>
+          </details>
+        </div>
+        <form id="pl-toolbar" class="card toolbar">
+          <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="pl-model"></select></span></label>
+          <label class="field"><span class="field-label">推理强度</span><span class="native-select"><select id="pl-effort" data-tip="none：不指定推理强度，由 CPA 决定；其他强度是否可用由 CPA 或上游判断"></select></span></label>
+          <button id="pl-run-batch" class="btn" type="submit" disabled>测试全部</button>
+        </form>
+        <div class="legend"><span>每个凭证 1 次请求</span></div>
+        <section id="pl-credentials" class="card"></section>
+      </section>
     </div>
 
     <dialog id="confirm-clear" class="confirm">
@@ -125,6 +144,10 @@
       <div class="section-head result-dialog-head"><h2 id="mt-detail-title">ModelTrace 详情</h2><button id="mt-detail-close" class="btn ghost icon-button" type="button" aria-label="关闭 ModelTrace 详情"><i data-icon="x"></i></button></div>
       <div id="mt-detail-body" class="result-dialog-body"></div>
     </dialog>
+    <dialog id="pl-detail" class="result-dialog" aria-labelledby="pl-detail-title">
+      <div class="section-head result-dialog-head"><h2 id="pl-detail-title">鹈鹕动画</h2><button id="pl-detail-close" class="btn ghost icon-button" type="button" aria-label="关闭动画"><i data-icon="x"></i></button></div>
+      <div id="pl-detail-body" class="result-dialog-body"></div>
+    </dialog>
     <div id="tip" class="tip" role="tooltip" hidden></div>
   </main>
   <footer class="page-footer">
@@ -143,6 +166,7 @@
   <script>/*CANDY_SCRIPT*/</script>
   <script>/*FINGERPRINT_SCRIPT*/</script>
   <script>/*MODELTRACE_SCRIPT*/</script>
+  <script>/*PELICAN_SCRIPT*/</script>
   <script>/*APP_SCRIPT*/</script>
 </body>
 </html>

@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	traceHistoryLimit       = 5
 	traceTarget             = 3
 	traceDefaultConcurrency = traceTarget
 	traceMaxConcurrency     = traceTarget
@@ -119,49 +118,22 @@ func traceRunResponse(body []byte) managementResponse {
 	if req.Concurrency < 1 || req.Concurrency > traceMaxConcurrency {
 		return jsonError(http.StatusBadRequest, fmt.Sprintf("每凭证并发须为 1–%d", traceMaxConcurrency))
 	}
-	auths, err := selectedCredentials(req.AuthIDs, req.All)
-	if err != nil {
-		return jsonError(http.StatusBadGateway, err.Error())
-	}
-	if len(auths) == 0 {
-		return jsonError(http.StatusBadRequest, "没有可测试的已启用凭证")
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if quiescing {
-		return jsonError(http.StatusServiceUnavailable, "插件正在停止，请稍后重试")
-	}
-	summary := runSummary{}
-	for _, auth := range auths {
-		if credentialBusyLocked(auth.ID) {
-			summary.Busy++
-			continue
-		}
-		if known, supported := credentialSupportsModel(req.ModelCatalog, auth.ID, req.Model); known && !supported {
+	return startRuns(req.AuthIDs, req.All, req.ModelCatalog, req.Model,
+		func(id string) {
 			now := time.Now().UTC()
-			appendTraceResult(auth.ID, traceResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Status: "skipped", Error: unsupportedModelMessage})
-			summary.Skipped++
-			continue
-		} else if !known {
-			summary.Unchecked++
-		}
-		ctx, cancel := context.WithCancel(context.Background())
-		p := &traceProgress{Model: req.Model, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
-		traceRunning[auth.ID] = p
-		tasks.Add(1)
-		summary.Started++
-		go runModelTrace(ctx, auth, req, p)
-	}
-	if summary.Skipped > 0 {
-		_ = saveStateLocked()
-	}
-	return jsonResponse(http.StatusOK, summary)
+			appendTraceResult(id, traceResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Status: "skipped", Error: unsupportedModelMessage})
+		},
+		func(auth credential) {
+			ctx, cancel := context.WithCancel(context.Background())
+			p := &traceProgress{Model: req.Model, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
+			traceRunning[auth.ID] = p
+			go runModelTrace(ctx, auth, req, p)
+		})
 }
 
 func appendTraceResult(id string, r traceResult) {
 	r.BankRevision = traceBankRevision
-	history := append(traceResults[id], r)
-	traceResults[id] = history[max(0, len(history)-traceHistoryLimit):]
+	traceResults[id] = appendRecent(traceResults[id], r)
 }
 
 func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p *traceProgress) {

@@ -14,6 +14,7 @@ type persistedState struct {
 	Results      map[string][]candyResult       `json:"results"`
 	Fingerprints map[string][]fingerprintResult `json:"fingerprints"`
 	ModelTraces  map[string][]traceResult       `json:"modeltraces,omitempty"`
+	Pelicans     map[string][]pelicanResult     `json:"pelicans,omitempty"`
 }
 
 var (
@@ -55,15 +56,31 @@ func loadState() {
 	if state.ModelTraces != nil {
 		traceResults = state.ModelTraces
 	}
-	for id, history := range candyResults {
-		candyResults[id] = history[max(0, len(history)-candyHistoryLimit):]
+	if state.Pelicans != nil {
+		pelicanResults = state.Pelicans
 	}
-	for id, history := range fingerprintResults {
-		fingerprintResults[id] = history[max(0, len(history)-fingerprintHistoryLimit):]
+	keepRecent(candyResults)
+	keepRecent(fingerprintResults)
+	keepRecent(traceResults)
+	keepRecent(pelicanResults)
+}
+
+// Each credential keeps its latest historyLimit records of every test.
+const historyLimit = 20
+
+func appendRecent[T any](history []T, r T) []T {
+	history = append(history, r)
+	return history[max(0, len(history)-historyLimit):]
+}
+
+func keepRecent[T any](histories map[string][]T) {
+	for id, history := range histories {
+		histories[id] = history[max(0, len(history)-historyLimit):]
 	}
-	for id, history := range traceResults {
-		traceResults[id] = history[max(0, len(history)-traceHistoryLimit):]
-	}
+}
+
+func currentState() persistedState {
+	return persistedState{Results: candyResults, Fingerprints: fingerprintResults, ModelTraces: traceResults, Pelicans: pelicanResults}
 }
 
 // Call with mu held so all histories are written as one snapshot.
@@ -77,7 +94,7 @@ func saveStateLocked() (err error) {
 	if stateLoadError != nil {
 		return stateLoadError
 	}
-	data, err := json.Marshal(persistedState{Results: candyResults, Fingerprints: fingerprintResults, ModelTraces: traceResults})
+	data, err := json.Marshal(currentState())
 	if err != nil {
 		return err
 	}
@@ -103,6 +120,10 @@ func recordResponse(scope string, query url.Values) managementResponse {
 		if i := slices.IndexFunc(traceResults[authID], func(r traceResult) bool { return r.ID == id }); i >= 0 {
 			record = traceResults[authID][i]
 		}
+	case "pelican":
+		if i := slices.IndexFunc(pelicanResults[authID], func(r pelicanResult) bool { return r.ID == id }); i >= 0 {
+			record = pelicanResults[authID][i]
+		}
 	}
 	if record == nil {
 		return jsonError(http.StatusNotFound, "记录不存在，可能已被清空")
@@ -113,7 +134,7 @@ func recordResponse(scope string, query url.Values) managementResponse {
 func clearHistoryResponse(scope string) managementResponse {
 	mu.Lock()
 	defer mu.Unlock()
-	previous := persistedState{Results: candyResults, Fingerprints: fingerprintResults, ModelTraces: traceResults}
+	previous := currentState()
 	switch scope {
 	case "fingerprint":
 		fingerprintResults = map[string][]fingerprintResult{}
@@ -121,14 +142,17 @@ func clearHistoryResponse(scope string) managementResponse {
 		traceResults = map[string][]traceResult{}
 	case "candy":
 		candyResults = map[string][]candyResult{}
+	case "pelican":
+		pelicanResults = map[string][]pelicanResult{}
 	case "all":
-		candyResults, fingerprintResults, traceResults = map[string][]candyResult{}, map[string][]fingerprintResult{}, map[string][]traceResult{}
+		candyResults, fingerprintResults = map[string][]candyResult{}, map[string][]fingerprintResult{}
+		traceResults, pelicanResults = map[string][]traceResult{}, map[string][]pelicanResult{}
 	default:
 		return jsonError(http.StatusBadRequest, "未知测试类型")
 	}
 	if err := saveStateLocked(); err != nil {
 		candyResults, fingerprintResults = previous.Results, previous.Fingerprints
-		traceResults = previous.ModelTraces
+		traceResults, pelicanResults = previous.ModelTraces, previous.Pelicans
 		return jsonError(http.StatusInternalServerError, "清空测试记录失败："+err.Error())
 	}
 	return jsonResponse(http.StatusOK, map[string]bool{"cleared": true})

@@ -142,6 +142,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 #candy-panel { --toolbar-columns: 200px 120px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) 56px var(--marks-width) var(--switch-width) var(--action-width); }
 #fingerprint-panel { --toolbar-columns: 200px 190px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) 56px 84px var(--switch-width) var(--action-width); }
 #modeltrace-panel { --toolbar-columns: 200px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) minmax(104px, 160px) 84px var(--switch-width) var(--action-width); }
+#pelican-panel { --toolbar-columns: 200px 120px minmax(0, 1fr); --preview-scale: .15; --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) calc(800px * var(--preview-scale)) var(--switch-width) var(--action-width); }
 .list-head, .list-row, .history-panel { display: grid; grid-template-columns: var(--list-columns); justify-content: space-between; align-items: center; gap: var(--list-gap); padding-inline: var(--list-padding); }
 .list-head { padding-block: 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .list-head > :nth-child(2) { padding-left: var(--credential-indent); }
@@ -251,14 +252,29 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .outcome-detail strong { color: var(--ink); font-weight: 500; }
 .fp-mode, .test-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .history-title { padding: 0 0 8px; color: var(--muted); font-size: 12px; }
-.result-history { display: grid; gap: 8px; }
-.result-history > .none { padding: 4px 0; text-align: center; }
+.result-history { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 8px; }
+.result-history > .none { grid-column: 1 / -1; padding: 4px 0; text-align: center; }
 .history-card { --outcome-size: 30px; min-width: 0; background: var(--history-bg); border: 1px solid var(--control-line); border-radius: 10px; overflow: clip; }
-.history-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 12px; background: var(--history-head-bg); border-bottom: 1px solid var(--control-line); color: var(--muted); font-size: 12px; }
+.record-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; color: var(--muted); font-size: 12px; }
+.history-card-head { padding: 8px 12px; background: var(--history-head-bg); border-bottom: 1px solid var(--control-line); }
 .history-card-body { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 13px; }
 .history-card-body > .btn { flex: none; }
 .history-card .outcome { flex: 1; }
 .history-card .outcome-title { font-size: 13px; }
+
+/* Pelican previews */
+/* A preview lays a page out in an 800×600 viewport and scales it by --preview-scale. */
+.preview {
+  position: relative; display: grid; place-items: center; flex: none; width: calc(800px * var(--preview-scale)); aspect-ratio: 4 / 3; overflow: hidden;
+  border: 1px solid var(--control-line); border-radius: 8px; background: var(--sunken); color: var(--faint);
+}
+.preview iframe { position: absolute; top: 0; left: 0; width: 800px; height: 600px; border: 0; background: #fff; scale: var(--preview-scale); transform-origin: 0 0; }
+.preview-open { position: absolute; inset: 0; padding: 0; border: 0; border-radius: inherit; background: none; cursor: zoom-in; }
+.preview-open:hover, .preview-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.preview[data-tip] { cursor: help; }
+.history-card .preview { --preview-scale: .3; }
+/* The dialog stage fits on screen; fitPelicanStage scales its page to match. */
+.pelican-stage { width: min(100%, max(280px, calc((100dvh - 310px) * 4 / 3))); margin: 0 auto; }
 
 /* Dialogs */
 dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--dialog-bg); color: var(--ink); box-shadow: var(--float); backdrop-filter: var(--glass); }
@@ -343,6 +359,7 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
 }
 @media (max-width: 1000px) {
   :root { --list-padding: 18px; --list-gap: 10px; }
+  .result-history { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 768px) {
   :root { --list-padding: 16px; }
@@ -369,8 +386,8 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
   .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toolbar > .btn { min-width: 0; width: 100%; }
   .history-panel { grid-template-columns: var(--list-checkbox) minmax(0, 1fr); padding-block: 0 16px; }
-  .history-card-head { gap: 4px 12px; }
-  .history-card-head > .result-meta, .history-card-head > .metrics { display: contents; }
+  .record-meta { gap: 4px 12px; }
+  .record-meta > :is(.result-meta, .metrics) { display: contents; }
   .history-card-body { flex-wrap: wrap; }
   .history-card-body > .btn { margin-left: auto; }
   .history-card .outcome { flex-basis: 100%; }
@@ -379,7 +396,7 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
   .answer-content { grid-column: 1 / -1; }
   .fp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .result-dialog { --dialog-padding: 16px; }
-  #mt-toolbar > .btn { grid-column: 1 / -1; }
+  :is(#mt-toolbar, #pl-toolbar) > .btn { grid-column: 1 / -1; }
   .mt-summary { grid-template-columns: 1fr 1fr; }
   .mt-summary > div:first-child { grid-column: 1 / -1; }
   .mt-rank { grid-template-columns: 18px minmax(0, 1fr) 58px; gap: 8px; padding-inline: 6px; }

@@ -240,14 +240,14 @@ func TestModelTraceValidationAndHistoryProtection(t *testing.T) {
 	if traceResults["a"][0].Status != "skipped" {
 		t.Fatal("unsupported model not skipped")
 	}
-	for i := 0; i < 10; i++ {
+	for i := range historyLimit + 5 {
 		appendTraceResult("a", traceResult{ID: fmt.Sprint(i)})
 	}
-	if len(traceResults["a"]) != 5 || traceResults["a"][0].ID != "5" {
+	if len(traceResults["a"]) != historyLimit || traceResults["a"][0].ID != "5" {
 		t.Fatal("history not bounded")
 	}
 	stateLoadError = fmt.Errorf("corrupt state")
-	if r := clearHistoryResponse("modeltrace"); r.StatusCode != 500 || len(traceResults["a"]) != 5 {
+	if r := clearHistoryResponse("modeltrace"); r.StatusCode != 500 || len(traceResults["a"]) != historyLimit {
 		t.Fatal("failed clear lost history")
 	}
 	ctx, cancel := context.WithCancel(context.Background())

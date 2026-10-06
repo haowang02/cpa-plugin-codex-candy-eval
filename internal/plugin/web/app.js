@@ -4,8 +4,10 @@ const KEY_STORE = "cpa-codex-candy-eval.key";
 const PREF_STORE = "cpa-codex-candy-eval.prefs";
 const MASK_STORE = "cpa-codex-candy-eval.masked";
 const DEFAULT_MODEL = "gpt-6.1-sol";
+const DEFAULT_EFFORT = "low";
+const DEFAULT_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"];
 const HIDDEN_MODEL = (id) => id.toLowerCase().includes("image");
-const tabNames = ["candy", "fingerprint", "modeltrace"];
+const tabNames = ["candy", "fingerprint", "modeltrace", "pelican"];
 
 let key = "";
 let credentials = [];
@@ -89,8 +91,10 @@ function fillModels() {
   fillSelect("model", ids, $("model").value || candyPrefs().model, DEFAULT_MODEL);
   fillSelect("fp-model", probeModels, $("fp-model").value || stored(PREF_STORE + ".fingerprint")?.model, DEFAULT_MODEL);
   fillSelect("mt-model", probeModels, $("mt-model").value || stored(PREF_STORE + ".modeltrace")?.model, DEFAULT_MODEL);
+  fillSelect("pl-model", ids, $("pl-model").value || stored(PREF_STORE + ".pelican")?.model, DEFAULT_MODEL);
 }
-// Rows are keyed by credential, so an update only replaces the rows whose markup changed.
+// Rows are keyed by credential, and an update patches only the markup that changed, so the rest keeps its
+// state, such as focus or a loaded preview.
 const renderedLists = new Map();
 function renderList(prefix, renderRow) {
   const list = $(prefix + "rows"), previous = renderedLists.get(list) || { rows: new Map(), empty: "" };
@@ -104,10 +108,10 @@ function renderList(prefix, renderRow) {
   }
   const rows = new Map(visible.map((a) => {
     const html = renderRow(a), row = previous.rows.get(a.id);
-    return [a.id, row?.html === html ? row : { html, node: rowNode(html) }];
+    if (row?.html === html) return [a.id, row];
+    return [a.id, { html, node: row ? patch(row.node, rowNode(html)) : rowNode(html) }];
   }));
   renderedLists.set(list, { rows, empty: "" });
-  const focused = list.contains(document.activeElement) ? document.activeElement : null;
   const kept = new Set([...rows.values()].map((row) => row.node));
   let cursor = list.firstChild;
   const dropStale = () => {
@@ -123,11 +127,27 @@ function renderList(prefix, renderRow) {
     else list.insertBefore(node, cursor);
   }
   dropStale();
-  if (focused && !focused.isConnected) {
-    const selector = [...focused.attributes].filter((a) => a.name.startsWith("data-")).map((a) => `[${a.name}="${CSS.escape(a.value)}"]`).join("");
-    if (selector) list.querySelector(selector)?.focus({ preventScroll: true });
-  }
   refreshTip();
+}
+// patch updates node to match next and returns the node now in place.
+function patch(node, next) {
+  if (node.isEqualNode(next)) return node;
+  if (node.nodeName !== next.nodeName) {
+    node.replaceWith(next);
+    return next;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    node.nodeValue = next.nodeValue;
+    return node;
+  }
+  for (const { name } of [...node.attributes]) if (!next.hasAttribute(name)) node.removeAttribute(name);
+  for (const { name, value } of next.attributes) if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+  // Once clicked, a checkbox no longer follows its checked attribute.
+  if (node instanceof HTMLInputElement) node.checked = next.checked;
+  const children = [...node.childNodes], updates = [...next.childNodes];
+  updates.forEach((update, i) => children[i] ? patch(children[i], update) : node.append(update));
+  for (const child of children.slice(updates.length)) child.remove();
+  return node;
 }
 function rowNode(html) {
   const template = document.createElement("template");
@@ -136,7 +156,7 @@ function rowNode(html) {
 }
 
 function renderPageActions() {
-  $("clear-all").disabled = pending || credentials.every((a) => !a.results.length && !a.fingerprints?.length && !a.modeltraces?.length);
+  $("clear-all").disabled = pending || credentials.every((a) => !a.results.length && !a.fingerprints?.length && !a.modeltraces?.length && !a.pelicans?.length);
   $("refresh").disabled = pending || refreshing;
   $("refresh").setAttribute("aria-busy", refreshing);
 }
@@ -144,10 +164,11 @@ function renderPageActions() {
 function render() {
   renderPageActions();
   setNotice("storage-error", storageError);
-  for (const prefix of ["", "fp-", "mt-"]) fillPlanFilter(prefix);
+  for (const prefix of ["", "fp-", "mt-", "pl-"]) fillPlanFilter(prefix);
   renderCandy();
   renderFingerprints();
   renderModelTrace();
+  renderPelican();
 }
 
 function stopPolling() {
@@ -159,7 +180,7 @@ function stopPolling() {
 function stateCredentials(data) {
   const validRecord = (r) => r !== null && typeof r === "object" && !Array.isArray(r);
   if (!Array.isArray(data.auths) || data.auths.some((a) => !a || typeof a.id !== "string" || !a.id.trim() ||
-    ["results", "fingerprints", "modeltraces"].some((field) => !Array.isArray(a[field]) || !a[field].every(validRecord)))) {
+    ["results", "fingerprints", "modeltraces", "pelicans"].some((field) => !Array.isArray(a[field]) || !a[field].every(validRecord)))) {
     throw new Error("服务器返回的测试记录格式无效。");
   }
   return data.auths;
@@ -193,13 +214,16 @@ async function load({ refresh = false } = {}) {
     const ids = new Set(credentials.map((a) => a.id));
     const usable = new Set(credentials.filter(usableCredential).map((a) => a.id));
     const answers = new Set(credentials.flatMap((a) => a.results.map((r) => answerKey(a.id, r))));
-    for (const expanded of [candyExpanded, fpExpanded, mtExpanded]) {
+    const pages = new Set(credentials.flatMap((a) => a.pelicans.map((r) => pelicanKey(a.id, r.id))));
+    for (const expanded of [candyExpanded, fpExpanded, mtExpanded, plExpanded]) {
       for (const id of expanded) if (!ids.has(id)) expanded.delete(id);
     }
-    for (const selection of [candySelected, fpSelected, mtSelected]) {
+    for (const selection of [candySelected, fpSelected, mtSelected, plSelected]) {
       for (const id of selection) if (!usable.has(id)) selection.delete(id);
     }
     for (const id of candyAnswersExpanded) if (!answers.has(id)) candyAnswersExpanded.delete(id);
+    // Failed page loads retry with the next state.
+    for (const [key, page] of pelicanPages) if (!pages.has(key) || page instanceof Error) pelicanPages.delete(key);
   } catch (err) {
     if (controller.signal.aborted) return;
     if (err instanceof AuthError) return showLogin(err.message);
@@ -252,7 +276,7 @@ function showLogin(message) {
   resetCatalogCache();
   credentials = [];
   loadError = storageError = "";
-  for (const selection of [candySelected, fpSelected, mtSelected, candyExpanded, fpExpanded, mtExpanded, candyAnswersExpanded]) selection.clear();
+  for (const collection of [candySelected, fpSelected, mtSelected, plSelected, candyExpanded, fpExpanded, mtExpanded, plExpanded, candyAnswersExpanded, pelicanPages]) collection.clear();
   for (const id of notices.keys()) setNotice(id, "");
   hideTip();
   document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
@@ -277,7 +301,7 @@ async function start() {
 
 function setMasked(masked) {
   document.body.classList.toggle("masked", masked);
-  for (const id of ["mask", "fp-mask", "mt-mask"]) {
+  for (const id of ["mask", "fp-mask", "mt-mask", "pl-mask"]) {
     $(id).setAttribute("aria-pressed", masked);
     $(id).innerHTML = icon(masked ? "eye" : "eye-off");
     setLabel($(id), masked ? "取消脱敏" : "脱敏");
@@ -293,7 +317,7 @@ function switchTab(name) {
   hideTip();
   store(PREF_STORE + ".tab", name);
 }
-const BUSY_TESTS = [["running", "糖果测试"], ["fingerprint_running", "指纹测试"], ["modeltrace_running", "ModelTrace 测试"]];
+const BUSY_TESTS = [["running", "糖果测试"], ["fingerprint_running", "指纹测试"], ["modeltrace_running", "ModelTrace 测试"], ["pelican_running", "鹈鹕测试"]];
 const busyTest = (a) => BUSY_TESTS.find(([field]) => a[field])?.[1] || "";
 const credentialBusy = (a) => !!busyTest(a);
 const usableCredential = (a) => !a.disabled && !a.unavailable;
@@ -360,13 +384,13 @@ function bindCollectionActions({ type, scope, expanded, renderRows, run, showDet
     if (runID) return run({ auth_ids: [runID] });
     const cancelID = action("cancel");
     if (cancelID) return update(`/${scope}/cancel`, { method: "POST", body: { auth_ids: [cancelID] } }, "停止测试失败");
+    const recordID = action("detail"), credentialID = action("credential");
+    if (recordID && credentialID) return openResultDetail(type, scope, credentialID, recordID, showDetail);
     const toggleID = e.target.closest("[data-row]")?.dataset.row;
     if (toggleID) {
       expanded.has(toggleID) ? expanded.delete(toggleID) : expanded.add(toggleID);
-      return renderRows();
+      renderRows();
     }
-    const recordID = action("detail"), credentialID = action("credential");
-    if (recordID && credentialID) openResultDetail(type, scope, credentialID, recordID, showDetail);
   });
 }
 
@@ -393,22 +417,25 @@ function fillCredentialTypes() {
   // Keep the requested default visible even when there are no Codex files.
   types.set("auth_files:codex", "认证文件 · codex");
   const options = [["all", "全部凭证"], ...[...types].sort(([a], [b]) => a.localeCompare(b))];
-  for (const prefix of ["", "fp-", "mt-"]) fillSelect(prefix + "credential-type", options, $(prefix + "credential-type").value, "auth_files:codex");
+  for (const prefix of ["", "fp-", "mt-", "pl-"]) fillSelect(prefix + "credential-type", options, $(prefix + "credential-type").value, "auth_files:codex");
 }
 
 function initializeLayout() {
-  $("candy-credentials").innerHTML = credentialCard("", ["凭证", "最近一次", "正确率", "最近 20 次"]);
-  $("fp-credentials").innerHTML = credentialCard("fp-", ["凭证", "指纹结果", "模式", "测试时间"]);
-  $("mt-credentials").innerHTML = credentialCard("mt-", ["凭证", "归因结果", "测试模型", "测试时间"]);
+  $("candy-credentials").innerHTML = credentialCard("", "糖果测试", ["凭证", "最近一次", "正确率", "最近 20 次"]);
+  $("fp-credentials").innerHTML = credentialCard("fp-", "指纹测试", ["凭证", "指纹结果", "模式", "测试时间"]);
+  $("mt-credentials").innerHTML = credentialCard("mt-", "ModelTrace 测试", ["凭证", "归因结果", "测试模型", "测试时间"]);
+  $("pl-credentials").innerHTML = credentialCard("pl-", "鹈鹕测试", ["凭证", "最近一次", "动画"]);
   $("notifications").innerHTML = ["flash", "load-error", "catalog-error", "storage-error"].map((id) => `<div id="${id}" class="global-flash" role="alert" hidden><span class="notice-symbol" aria-hidden="true"></span><span class="notice-message"></span><button class="notice-close" type="button" aria-label="隐藏提示" data-tip>${icon("x")}</button></div>`).join("");
 }
 
 // Events and initialization.
 initializeLayout();
 initializeTips();
+initializeCopyButtons();
 initializeCandy();
 initializeFingerprint();
 initializeModelTrace();
+initializePelican();
 document.querySelectorAll("[data-icon]").forEach((el) => { el.outerHTML = icon(el.dataset.icon, el.dataset.class); });
 
 for (const id of ["flash", "load-error", "catalog-error", "storage-error"]) {
@@ -437,9 +464,9 @@ $("mask").addEventListener("click", () => {
   setMasked(masked);
   store(MASK_STORE, masked);
 });
-for (const id of ["fp-mask", "mt-mask"]) $(id).addEventListener("click", () => $("mask").click());
+for (const id of ["fp-mask", "mt-mask", "pl-mask"]) $(id).addEventListener("click", () => $("mask").click());
 
-for (const [id, scope] of [["clear", "candy"], ["fp-clear", "fingerprint"], ["mt-clear", "modeltrace"], ["clear-all", "all"]]) {
+for (const [id, scope] of [["clear", "candy"], ["fp-clear", "fingerprint"], ["mt-clear", "modeltrace"], ["pl-clear", "pelican"], ["clear-all", "all"]]) {
   $(id).addEventListener("click", () => {
     clearScope = scope;
     $("clear-title").textContent = `${$(id).getAttribute("aria-label")}？`;
@@ -470,7 +497,7 @@ for (const name of tabNames) {
 }
 switchTab(tabNames.includes(stored(PREF_STORE + ".tab")) ? stored(PREF_STORE + ".tab") : "candy");
 
-for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint], ["mt-", "mt", mtSelected, runModelTrace]]) {
+for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint], ["mt-", "mt", mtSelected, runModelTrace], ["pl-", "pl", plSelected, runPelican]]) {
   for (const filter of ["credential-type", "credential-plan"]) $(prefix + filter).addEventListener("change", () => { selection.clear(); render(); });
   $(prefix + "toolbar").addEventListener("submit", (e) => {
     e.preventDefault();
