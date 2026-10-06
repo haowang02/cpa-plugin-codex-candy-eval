@@ -18,6 +18,8 @@
   for candy answers.
 - `internal/plugin/data/`: embedded fingerprint probes and baselines.
 - `docs/images/`: README screenshots.
+- `docs/inspection.md`, `examples/inspection.py`: scheduled inspection guide
+  and its standard-library Python script.
 - Root `install.sh` and `install.ps1`: public installation entry points.
 - `scripts/`: one-command deployment (`deploy.sh`) and UI checks (`test-ui.cjs`).
 - `.github/workflows/`: release checks, platform builds, and packaging.

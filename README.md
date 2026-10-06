@@ -78,6 +78,27 @@ plugins:
 - 点击标签栏右侧的垃圾桶可清空全部测试记录；凭证列表右上角的垃圾桶只清空当前测试的记录。
 - 单次请求有时间限制：ModelTrace 和指纹测试 3 分钟，糖果测试和鹈鹕测试 10 分钟。超时的请求会被中断。
 
+### 定时巡检
+
+巡检脚本可以定时测试凭证，发现降智后调低该号的 priority，让 CPA 优先使用正常的号，也可以通过 ntfy 或 Bark 通知。部署方法见 [定时巡检教程](docs/inspection.md)。
+
+也可以补全下面的提示词，发给 Codex、Claude Code 等 AI 助手，让它帮你部署：
+
+```text
+请按照 https://raw.githubusercontent.com/haowang02/cpa-plugin-codex-candy-eval/main/docs/inspection.md 中的教程，在这台机器上部署 Codex 降智测试插件的定时巡检。
+
+我的配置（没写的项保持脚本默认值）：
+- CPA 地址：
+- CPA 管理密钥：
+- 巡检频率：（例如每 30 分钟）
+- 巡检测试和模型：（例如 ModelTrace、gpt-6-luna）
+- 巡检范围：（例如所有 codex- 开头的认证文件）
+- 发现降智后是否调整 priority：（是或否，可指定降智和恢复正常时的 priority）
+- 通知方式：（ntfy 的服务器地址、主题和账号密码，Bark 的推送地址，或不通知）
+
+部署后先手动运行一次，确认巡检能正常完成，再配置 crontab，最后告诉我日志的位置。缺少必要信息时先问我。
+```
+
 ## 致谢
 
 - [codex-candy-eval](https://github.com/haowang02/codex-candy-eval)

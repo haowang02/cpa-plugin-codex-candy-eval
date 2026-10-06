@@ -24,6 +24,7 @@ type credential struct {
 	ProviderName string `json:"provider_name,omitempty"`
 	Email        string `json:"email,omitempty"`
 	PlanType     string `json:"plan_type,omitempty"`
+	Priority     int    `json:"priority"`
 	Disabled     bool   `json:"disabled"`
 	// CPA marks enabled credentials unavailable while they cool down, e.g. after exhausting quota.
 	Unavailable    bool      `json:"unavailable,omitempty"`
@@ -45,6 +46,7 @@ type hostAuthFile struct {
 	AccountType    string    `json:"account_type"`
 	Email          string    `json:"email"`
 	PlanType       string    `json:"plan_type"`
+	Priority       int       `json:"priority"`
 	Disabled       bool      `json:"disabled"`
 	Unavailable    bool      `json:"unavailable"`
 	StatusMessage  string    `json:"status_message"`
@@ -123,7 +125,7 @@ func credentials() ([]credential, error) {
 		if strings.TrimSpace(file.ID) == "" || provider == "" {
 			continue
 		}
-		auth := credential{ID: file.ID, AuthIndex: file.AuthIndex, Name: file.Name, Provider: provider, Email: file.Email, PlanType: file.PlanType, Disabled: file.Disabled, Source: credentialSourceFile}
+		auth := credential{ID: file.ID, AuthIndex: file.AuthIndex, Name: file.Name, Provider: provider, Email: file.Email, PlanType: file.PlanType, Priority: file.Priority, Disabled: file.Disabled, Source: credentialSourceFile}
 		// Like CPA's scheduler, treat a cooldown as over once its retry time passes, even if the flag remains.
 		if file.Unavailable && !file.Disabled && (file.NextRetryAfter.IsZero() || file.NextRetryAfter.After(now)) {
 			auth.Unavailable, auth.StatusMessage, auth.NextRetryAfter = true, strings.TrimSpace(file.StatusMessage), file.NextRetryAfter

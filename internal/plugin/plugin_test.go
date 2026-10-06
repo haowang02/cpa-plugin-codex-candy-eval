@@ -24,6 +24,7 @@ func setupTest(t *testing.T) {
 	previousFPResults, previousFPRunning, previousFPError := fingerprintResults, fingerprintRunning, storageError
 	previousTraceResults, previousTraceRunning := traceResults, traceRunning
 	previousPelicanResults, previousPelicanRunning := pelicanResults, pelicanRunning
+	previousInspections := inspections
 	t.Cleanup(func() {
 		tasks.Wait()
 		configuredCredentials = previousCredentials
@@ -33,6 +34,7 @@ func setupTest(t *testing.T) {
 		fingerprintResults, fingerprintRunning, storageError = previousFPResults, previousFPRunning, previousFPError
 		traceResults, traceRunning = previousTraceResults, previousTraceRunning
 		pelicanResults, pelicanRunning = previousPelicanResults, previousPelicanRunning
+		inspections = previousInspections
 	})
 	statePath, loaded = filepath.Join(t.TempDir(), "state.json"), false
 	stateLoadError, quiescing = nil, false
@@ -40,6 +42,7 @@ func setupTest(t *testing.T) {
 	fingerprintResults, fingerprintRunning, storageError = map[string][]fingerprintResult{}, map[string]*fingerprintProgress{}, ""
 	traceResults, traceRunning = map[string][]traceResult{}, map[string]*traceProgress{}
 	pelicanResults, pelicanRunning = map[string][]pelicanResult{}, map[string]bool{}
+	inspections = map[string]inspection{}
 	hostCall = func(method string, _ any) (json.RawMessage, error) {
 		t.Errorf("unexpected host call: %s", method)
 		return nil, fmt.Errorf("unexpected host call: %s", method)

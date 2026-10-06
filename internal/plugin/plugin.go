@@ -181,6 +181,8 @@ func HandleMethod(method string, request []byte) (response []byte) {
 				{"Method": http.MethodGet, "Path": managementBase + "/pelican/record", "Description": "View a pelican animation"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/pelican/results", "Description": "Clear pelican history"},
 				{"Method": http.MethodDelete, "Path": managementBase + "/all/results", "Description": "Clear all test history"},
+				{"Method": http.MethodPost, "Path": managementBase + "/inspection", "Description": "Inspect credentials with the candy, fingerprint or ModelTrace test"},
+				{"Method": http.MethodGet, "Path": managementBase + "/inspection", "Description": "View the latest inspection of a test"},
 			},
 			"resources": []map[string]string{
 				{"Path": uiPath, "Menu": "Codex 降智测试", "Description": "通过糖果测试、指纹测试、ModelTrace 和鹈鹕测试检测 CPA 凭证"},
@@ -246,6 +248,10 @@ func handleManagement(req managementRequest) managementResponse {
 		return clearHistoryResponse("pelican")
 	case req.Method == http.MethodDelete && path == managementBase+"/all/results":
 		return clearHistoryResponse("all")
+	case req.Method == http.MethodPost && path == managementBase+"/inspection":
+		return inspectionRunResponse(req.Body)
+	case req.Method == http.MethodGet && path == managementBase+"/inspection":
+		return inspectionResponse(req.Query.Get("test"))
 	default:
 		return jsonError(http.StatusNotFound, "Route not found: "+req.Method+" "+req.Path)
 	}
