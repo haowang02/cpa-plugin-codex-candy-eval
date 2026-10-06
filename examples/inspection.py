@@ -21,7 +21,7 @@ OPTIONS = {                          # 各项测试的参数，巡检时只使�
         "concurrency": 2,            # 每凭证并发：1–6
     },
     "candy": {
-        "model": "gpt-6-luna",       # 测试模型
+        "model": "gpt-6.1-sol",      # 测试模型
         "effort": "low",             # 推理强度：none（由 CPA 决定）、low、medium、high、xhigh 或 max
         "runs": 1,                   # 每凭证次数：1–10，答错任意一次即为降智
     },
