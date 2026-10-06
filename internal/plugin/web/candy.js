@@ -32,11 +32,10 @@ function candyHistory(a, r, i) {
   const key = answerKey(a.id, r);
   const answerOpen = candyAnswersExpanded.has(key);
   const bodyID = `answer-${encodeURIComponent(a.id)}-${i}`;
-  return historyCard(r, `${verdict(r)}
-    <div class="answer-preview ${answerOpen ? "expanded" : ""}">
-      <button class="answer-toggle" type="button" data-answer="${esc(key)}" aria-expanded="${answerOpen}" aria-controls="${esc(bodyID)}" aria-label="${answerOpen ? "收起文本" : "展开文本"}">${answerToggle(answerOpen)}</button>
-      <div id="${esc(bodyID)}" class="answer-content ${r.error ? "error" : "markdown"}">${answerHTML(r)}</div>
-    </div>`);
+  return historyCard(r, `<div class="answer ${answerOpen ? "expanded" : ""}">${verdict(r)}
+    <button class="answer-toggle" type="button" data-answer="${esc(key)}" aria-expanded="${answerOpen}" aria-controls="${esc(bodyID)}" aria-label="${answerOpen ? "收起文本" : "展开文本"}">${answerToggle(answerOpen)}</button>
+    <div id="${esc(bodyID)}" class="answer-content ${r.error ? "error" : "markdown"}">${answerHTML(r)}</div>
+  </div>`);
 }
 
 function renderCandyRow(a) {
@@ -132,15 +131,15 @@ function initializeCandy() {
     if (e.target.closest("label")) return;
     const hit = e.target.closest("[data-auth]");
     if (hit) return showTip(hit);
-    const answer = e.target.closest("[data-answer]");
-    if (answer) {
-      const key = answer.dataset.answer;
+    const toggle = e.target.closest("[data-answer]");
+    if (toggle) {
+      const key = toggle.dataset.answer;
       const open = !candyAnswersExpanded.has(key);
       open ? candyAnswersExpanded.add(key) : candyAnswersExpanded.delete(key);
-      answer.closest(".answer-preview").classList.toggle("expanded", open);
-      answer.setAttribute("aria-expanded", open);
-      answer.setAttribute("aria-label", open ? "收起文本" : "展开文本");
-      answer.innerHTML = answerToggle(open);
+      toggle.closest(".answer").classList.toggle("expanded", open);
+      toggle.setAttribute("aria-expanded", open);
+      toggle.setAttribute("aria-label", open ? "收起文本" : "展开文本");
+      toggle.innerHTML = answerToggle(open);
       return;
     }
     const btn = e.target.closest("[data-candy-run]");

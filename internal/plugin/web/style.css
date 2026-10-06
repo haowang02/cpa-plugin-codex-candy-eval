@@ -207,20 +207,20 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .mark-hit { display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px; padding: 2px; border: 0; border-radius: 50%; background: transparent; cursor: help; transition: transform .15s, background .15s, box-shadow .15s; }
 .mark-hit:hover, .mark-hit:focus-visible { position: relative; z-index: 1; background: var(--surface); box-shadow: 0 0 0 2px var(--line); transform: scale(1.2); }
 .mark-hit:hover .mark, .mark-hit:focus-visible .mark { opacity: 1; }
-.answer-preview { display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: 8px; line-height: 1.65; }
-.answer-toggle { display: inline-flex; align-items: center; gap: 2px; flex: none; padding: 0 3px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.answer { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: start; gap: 8px; flex: 1; min-width: 0; line-height: 1.65; }
+.answer-toggle { display: inline-flex; align-items: center; gap: 2px; padding: 0 3px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
 .answer-toggle:hover { color: var(--accent-ink); background: var(--accent-soft); }
-.answer-preview.expanded .chev { transform: rotate(90deg); }
-.answer-content { flex: 1; min-width: 0; overflow: hidden; overflow-wrap: anywhere; }
+.answer.expanded .chev { transform: rotate(90deg); }
+.answer-content { overflow: hidden; overflow-wrap: anywhere; }
 .answer-content.error { color: var(--danger-ink); white-space: pre-wrap; }
 /* Expanded answers are as wide as their longest line, so display formulas center on the text. */
-.answer-preview.expanded .markdown { flex: 0 1 auto; }
+.answer.expanded .markdown { justify-self: start; }
 /* Collapsed answers and result tips flatten to one line of text with formulas kept inline;
    Temml writes display formulas' display inline, hence !important. */
-.answer-preview:not(.expanded) .answer-content { text-overflow: ellipsis; white-space: nowrap; }
-:is(.answer-preview:not(.expanded) .markdown, .tip-text) :not(code, math, math *) { display: inline; margin: 0; padding: 0; border: 0; background: none; font-size: inherit; white-space: inherit; }
-:is(.answer-preview:not(.expanded) .markdown, .tip-text) br { display: none; }
-:is(.answer-preview:not(.expanded) .markdown, .tip-text) math { display: inline !important; display: math !important; }
+.answer:not(.expanded) .answer-content { text-overflow: ellipsis; white-space: nowrap; }
+:is(.answer:not(.expanded) .markdown, .tip-text) :not(code, math, math *) { display: inline; margin: 0; padding: 0; border: 0; background: none; font-size: inherit; white-space: inherit; }
+:is(.answer:not(.expanded) .markdown, .tip-text) br { display: none; }
+:is(.answer:not(.expanded) .markdown, .tip-text) math { display: inline !important; display: math !important; }
 .markdown :is(p, ul, ol, pre, table, blockquote, section) { margin: 0 0 8px; }
 .markdown :is(h1, h2, h3, h4, h5, h6) { margin: 12px 0 6px; font-size: 1em; font-weight: 600; }
 .markdown > :first-child { margin-top: 0; }
@@ -256,7 +256,6 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .history-card { --outcome-size: 30px; min-width: 0; background: var(--history-bg); border: 1px solid var(--control-line); border-radius: 10px; overflow: clip; }
 .history-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 12px; background: var(--history-head-bg); border-bottom: 1px solid var(--control-line); color: var(--muted); font-size: 12px; }
 .history-card-body { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 13px; }
-.history-card-body > .verdict { align-self: flex-start; }
 .history-card-body > .btn { flex: none; }
 .history-card .outcome { flex: 1; }
 .history-card .outcome-title { font-size: 13px; }
@@ -375,6 +374,9 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
   .history-card-body { flex-wrap: wrap; }
   .history-card-body > .btn { margin-left: auto; }
   .history-card .outcome { flex-basis: 100%; }
+  .answer { grid-template-columns: auto minmax(0, 1fr); }
+  .answer-toggle { justify-self: end; }
+  .answer-content { grid-column: 1 / -1; }
   .fp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .result-dialog { --dialog-padding: 16px; }
   #mt-toolbar > .btn { grid-column: 1 / -1; }
