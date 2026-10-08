@@ -216,11 +216,13 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .answer-content.error { color: var(--danger-ink); white-space: pre-wrap; }
 /* Expanded answers are as wide as their longest line, so display formulas center on the text. */
 .answer.expanded .markdown { justify-self: start; }
-/* Collapsed answers and result tips flatten to one line of text with formulas kept inline;
-   Temml writes display formulas' display inline, hence !important. */
+/* Collapsed answers and result tips flatten into running text. Each formula sits in a line-tall box with
+   the text's strut, so short formulas share the baseline and tall ones, such as cases, are clipped instead
+   of stretching the line. Temml writes display formulas' display inline, hence !important. */
 .answer:not(.expanded) .answer-content { text-overflow: ellipsis; white-space: nowrap; }
-:is(.answer:not(.expanded) .markdown, .tip-text) :not(code, math, math *) { display: inline; margin: 0; padding: 0; border: 0; background: none; font-size: inherit; white-space: inherit; }
+:is(.answer:not(.expanded) .markdown, .tip-text) :not(code, eq, eqn, math, math *) { display: inline; margin: 0; padding: 0; border: 0; background: none; font-size: inherit; white-space: inherit; }
 :is(.answer:not(.expanded) .markdown, .tip-text) br { display: none; }
+:is(.answer:not(.expanded) .markdown, .tip-text) :is(eq, eqn) { display: inline-block; height: 1lh; vertical-align: top; overflow: clip; }
 :is(.answer:not(.expanded) .markdown, .tip-text) math { display: inline !important; display: math !important; }
 .markdown :is(p, ul, ol, pre, table, blockquote, section) { margin: 0 0 8px; }
 .markdown :is(h1, h2, h3, h4, h5, h6) { margin: 12px 0 6px; font-size: 1em; font-weight: 600; }
