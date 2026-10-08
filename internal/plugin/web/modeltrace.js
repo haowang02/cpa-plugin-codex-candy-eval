@@ -4,7 +4,7 @@ const mtSelected = new Set();
 const mtExpanded = new Set();
 const mtPercent = (value) => Number.isFinite(value) && value >= 0 && value <= 1 ? `${(value * 100).toFixed(1)}%` : "—";
 const mtConcurrency = () => boundedInput("mt-concurrency", MT_CONFIG.default_concurrency, MT_CONFIG.max_concurrency);
-const mtSavePrefs = () => store(PREF_STORE + ".modeltrace", { model: $("mt-model").value, concurrency: mtConcurrency() });
+const mtSavePrefs = () => store(PREF_STORE + ".modeltrace", { model: $("mt-model").value, language: $("mt-language").value, concurrency: mtConcurrency() });
 
 function mtComparison(r) {
   if (!r?.attribution || !["completed", "partial"].includes(r.status)) return { tone: "neutral", symbol: "chart", label: "" };
@@ -49,7 +49,7 @@ function renderModelTrace() {
 function runModelTrace(body) {
   if (!$("mt-toolbar").reportValidity()) return;
   mtSavePrefs();
-  return update("/modeltrace/run", { method: "POST", body: { ...body, model: $("mt-model").value, concurrency: mtConcurrency() } }, "开始测试失败");
+  return update("/modeltrace/run", { method: "POST", body: { ...body, model: $("mt-model").value, language: $("mt-language").value, concurrency: mtConcurrency() } }, "开始测试失败");
 }
 
 function mtResultHTML(r) {
@@ -76,8 +76,10 @@ function showModelTraceDetail(r) {
 function initializeModelTrace() {
   $("mt-concurrency").max = MT_CONFIG.max_concurrency;
   $("mt-concurrency").value = stored(PREF_STORE + ".modeltrace")?.concurrency || MT_CONFIG.default_concurrency;
+  $("mt-language").value = stored(PREF_STORE + ".modeltrace")?.language || "zh";
   $("mt-concurrency").value = mtConcurrency();
   $("mt-model").addEventListener("change", () => { mtSavePrefs(); renderModelTrace(); });
+  $("mt-language").addEventListener("change", () => { mtSavePrefs(); renderModelTrace(); });
   $("mt-concurrency").addEventListener("change", () => { $("mt-concurrency").value = mtConcurrency(); mtSavePrefs(); });
   bindCollectionActions({ type: "mt", scope: "modeltrace", expanded: mtExpanded, renderRows: renderModelTrace, run: runModelTrace, showDetail: showModelTraceDetail });
 }

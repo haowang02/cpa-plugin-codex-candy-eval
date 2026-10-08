@@ -44,6 +44,28 @@ var fingerprintBaselinesJSON []byte
 var fingerprintProbes = mustDecode[[]fingerprintProbe](fingerprintProbesJSON)
 var fingerprintBaselines = mustDecode[[]fingerprintBaseline](fingerprintBaselinesJSON)
 
+func fingerprintProbesForLanguage(language string) []fingerprintProbe {
+	probes := make([]fingerprintProbe, 0, len(fingerprintProbes)/2)
+	suffix := ":" + language
+	for _, probe := range fingerprintProbes {
+		if strings.HasSuffix(probe.ID, suffix) {
+			probes = append(probes, probe)
+		}
+	}
+	return probes
+}
+
+func fingerprintCellsForLanguage(cells map[string][]string, language string) map[string][]string {
+	filtered := make(map[string][]string)
+	suffix := ":" + language
+	for id, answers := range cells {
+		if strings.HasSuffix(id, suffix) {
+			filtered[id] = answers
+		}
+	}
+	return filtered
+}
+
 func mustDecode[T any](data []byte) T {
 	var value T
 	if err := json.Unmarshal(data, &value); err != nil {
@@ -336,15 +358,20 @@ type fingerprintAttribution struct {
 	Comparisons     []fingerprintComparison `json:"comparisons"`
 }
 
-func attributeFingerprint(model string, valid map[string][]string) fingerprintAttribution {
+func attributeFingerprint(model string, valid map[string][]string, languages ...string) fingerprintAttribution {
+	language := languageChinese
+	if len(languages) > 0 {
+		language, _ = validateLanguage(languages[0])
+	}
 	r := fingerprintAttribution{Status: "insufficient", Message: "有效样本不足", Alpha: .05 / float64(max(1, 2*len(fingerprintBaselines))), SelfJSD: fingerprintSplitHalf(valid), Warnings: []string{}, Comparisons: []fingerprintComparison{}}
 	var sameCells map[string][]string
 	for _, baseline := range fingerprintBaselines {
-		cells, mean := compareFingerprintCells(valid, baseline.Cells)
-		p := fingerprintPermutation(valid, baseline.Cells, model+"|"+baseline.Model)
-		r.Comparisons = append(r.Comparisons, fingerprintComparison{Model: baseline.Model, MeanJSD: mean, PValue: p, Verdict: fingerprintDistanceVerdict(mean), SelfJSD: fingerprintSplitHalf(baseline.Cells), Cells: cells})
+		baselineCells := fingerprintCellsForLanguage(baseline.Cells, language)
+		cells, mean := compareFingerprintCells(valid, baselineCells)
+		p := fingerprintPermutation(valid, baselineCells, model+"|"+baseline.Model+"|"+language)
+		r.Comparisons = append(r.Comparisons, fingerprintComparison{Model: baseline.Model, MeanJSD: mean, PValue: p, Verdict: fingerprintDistanceVerdict(mean), SelfJSD: fingerprintSplitHalf(baselineCells), Cells: cells})
 		if baseline.Model == model {
-			sameCells = baseline.Cells
+			sameCells = baselineCells
 		}
 	}
 	sort.SliceStable(r.Comparisons, func(i, j int) bool {
@@ -387,7 +414,7 @@ func attributeFingerprint(model string, valid map[string][]string) fingerprintAt
 		var bestCells map[string][]string
 		for _, b := range fingerprintBaselines {
 			if b.Model == best.Model {
-				bestCells = b.Cells
+				bestCells = fingerprintCellsForLanguage(b.Cells, language)
 			}
 		}
 		// Restrict reference separation to the probes actually collected in this run.

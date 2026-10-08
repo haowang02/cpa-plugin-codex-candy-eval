@@ -5,10 +5,10 @@ const candyAnswersExpanded = new Set();
 const candySelected = new Set();
 
 const candyPrefs = () => stored(PREF_STORE) || {};
-const candySavePrefs = () => store(PREF_STORE, { model: $("model").value, effort: $("effort").value, runs: candyRuns() });
+const candySavePrefs = () => store(PREF_STORE, { model: $("model").value, effort: $("effort").value, language: $("language").value, runs: candyRuns() });
 const candyRuns = () => boundedInput("runs", 1, 10);
 
-const scopeMatch = (r) => r.model === $("model").value && (r.effort || "none") === $("effort").value;
+const scopeMatch = (r) => r.model === $("model").value && (r.effort || "none") === $("effort").value && (r.language || "zh") === $("language").value;
 const kind = (r) => (r.skipped ? "skip" : r.error ? "err" : r.ok ? "ok" : "bad");
 const VERDICT = { ok: "答对", bad: "答错", err: "出错", skip: "已跳过" };
 const verdict = (r) => statusPill(kind(r), VERDICT[kind(r)]);
@@ -58,7 +58,7 @@ function renderCandyRow(a) {
 function runCandy(body) {
   if (!$("toolbar").reportValidity()) return;
   candySavePrefs();
-  return update("/run", { method: "POST", body: { ...body, model: $("model").value, effort: $("effort").value, runs: candyRuns() } }, "开始测试失败");
+  return update("/run", { method: "POST", body: { ...body, model: $("model").value, effort: $("effort").value, language: $("language").value, runs: candyRuns() } }, "开始测试失败");
 }
 
 function candyTip(target) {
@@ -78,11 +78,15 @@ function renderCandy() {
 function initializeCandy() {
   const saved = candyPrefs();
   fillSelect("effort", DEFAULT_EFFORTS, saved.effort, DEFAULT_EFFORT);
+  $("language").value = saved.language || "zh";
+  $("candy-prompt-en").previousElementSibling.hidden = $("language").value === "en";
+  $("candy-prompt-en").hidden = $("language").value !== "en";
   $("runs").value = saved.runs || 1;
   $("runs").value = candyRuns();
 
   $("model").addEventListener("change", () => { candySavePrefs(); render(); });
   $("effort").addEventListener("change", () => { candySavePrefs(); render(); });
+  $("language").addEventListener("change", () => { candySavePrefs(); $("candy-prompt-en").previousElementSibling.hidden = $("language").value === "en"; $("candy-prompt-en").hidden = $("language").value !== "en"; render(); });
   $("runs").addEventListener("change", () => { $("runs").value = candyRuns(); candySavePrefs(); });
   $("rows").addEventListener("click", (e) => {
     if (e.target.closest("label")) return;

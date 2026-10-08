@@ -1,13 +1,13 @@
 "use strict";
 
 const FP_CONFIG = /*FINGERPRINT_CONFIG*/{};
-const fpModes = Object.fromEntries(FP_CONFIG.modes.map((m) => [m.id, { name: m.name, requests: m.cells * m.samples_per_cell }]));
+const fpModes = Object.fromEntries(FP_CONFIG.modes.map((m) => [m.id, { name: m.name, requests: Math.min(m.cells, FP_CONFIG.probe_cells || m.cells) * m.samples_per_cell }]));
 const fpSelected = new Set();
 const fpExpanded = new Set();
 
 const fpModeName = (mode) => fpModes[mode]?.name || mode || "—";
 const fpConcurrency = () => boundedInput("fp-concurrency", FP_CONFIG.default_concurrency, FP_CONFIG.max_concurrency);
-const fpSavePrefs = () => store(PREF_STORE + ".fingerprint", { model: $("fp-model").value, mode: $("fp-mode").value, concurrency: fpConcurrency() });
+const fpSavePrefs = () => store(PREF_STORE + ".fingerprint", { model: $("fp-model").value, mode: $("fp-mode").value, language: $("fp-language").value, concurrency: fpConcurrency() });
 
 function fpOutcome(r) {
   const status = r.status && r.status !== "completed" ? r.status : r.attribution?.status;
@@ -87,12 +87,13 @@ function renderFingerprints() {
 function runFingerprint(body) {
   if (!$("fp-toolbar").reportValidity()) return;
   fpSavePrefs();
-  return update("/fingerprint/run", { method: "POST", body: { ...body, model: $("fp-model").value, mode: $("fp-mode").value, concurrency: fpConcurrency() } }, "开始采集失败");
+  return update("/fingerprint/run", { method: "POST", body: { ...body, model: $("fp-model").value, mode: $("fp-mode").value, language: $("fp-language").value, concurrency: fpConcurrency() } }, "开始采集失败");
 }
 
 function initializeFingerprint() {
   const saved = stored(PREF_STORE + ".fingerprint") || {};
   fillSelect("fp-mode", Object.entries(fpModes).map(([id, mode]) => [id, `${mode.name} · ${mode.requests} 次`]), saved.mode, "quick");
+  $("fp-language").value = saved.language || "zh";
   $("fp-concurrency").max = FP_CONFIG.max_concurrency;
   $("fp-concurrency").value = saved.concurrency || FP_CONFIG.default_concurrency;
   $("fp-concurrency").value = fpConcurrency();
@@ -100,7 +101,7 @@ function initializeFingerprint() {
   $("fp-detail-body").addEventListener("change", (e) => { if (e.target.id === "fp-detail-baseline") renderFingerprintProbes(); });
   $("fp-detail").addEventListener("close", () => { fpDetailRecord = null; });
 
-  for (const id of ["fp-model", "fp-mode"]) $(id).addEventListener("change", () => { fpSavePrefs(); renderFingerprints(); });
+  for (const id of ["fp-model", "fp-mode", "fp-language"]) $(id).addEventListener("change", () => { fpSavePrefs(); renderFingerprints(); });
   $("fp-concurrency").addEventListener("change", () => { $("fp-concurrency").value = fpConcurrency(); fpSavePrefs(); });
   bindCollectionActions({ type: "fp", scope: "fingerprint", expanded: fpExpanded, renderRows: renderFingerprints, run: runFingerprint, showDetail: showFingerprintDetail });
 }

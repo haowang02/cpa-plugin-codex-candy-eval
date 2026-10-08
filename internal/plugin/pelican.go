@@ -16,11 +16,16 @@ const pelicanPrompt = "不使用任何工具，也不要创建或修改文件，
 	"创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画，你不需要任何测试，不要使用外部资产。\n\n" +
 	"在一个 ```html 代码块中给出完整的 HTML 文件。"
 
+const pelicanPromptEnglish = "Without using any tools and without creating or modifying files, complete the following task directly in your response:\n\n" +
+	"Create an HTML page containing a 2D SVG animation of a pelican riding a bicycle. You do not need tests and must not use external assets.\n\n" +
+	"Provide the complete HTML file in one ```html code block."
+
 type pelicanResult struct {
 	ID              string    `json:"id"`
 	Time            time.Time `json:"time"`
 	Model           string    `json:"model"`
 	Effort          string    `json:"effort"`
+	Language        string    `json:"language,omitempty"`
 	Skipped         bool      `json:"skipped,omitempty"`
 	HTML            string    `json:"html,omitempty"`
 	Error           string    `json:"error,omitempty"`
@@ -42,6 +47,7 @@ type pelicanRunRequest struct {
 	All          bool                `json:"all"`
 	Model        string              `json:"model"`
 	Effort       string              `json:"effort"`
+	Language     string              `json:"language,omitempty"`
 }
 
 var (
@@ -56,23 +62,27 @@ func pelicanRunResponse(body []byte) managementResponse {
 	}
 	req.Model = strings.TrimSpace(req.Model)
 	req.Effort = strings.TrimSpace(req.Effort)
+	language, languageErr := validateLanguage(req.Language)
+	if languageErr != nil {
+		return *languageErr
+	}
 	if !validModelName(req.Model, true) {
 		return jsonError(http.StatusBadRequest, "请选择模型")
 	}
 	return startRuns(req.AuthIDs, req.All, req.ModelCatalog, req.Model,
 		func(id string) {
 			now := time.Now().UTC()
-			pelicanResults[id] = appendRecent(pelicanResults[id], pelicanResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Effort: req.Effort, Skipped: true, Error: unsupportedModelMessage})
+			pelicanResults[id] = appendRecent(pelicanResults[id], pelicanResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Effort: req.Effort, Language: language, Skipped: true, Error: unsupportedModelMessage})
 		},
 		func(auth credential) {
 			pelicanRunning[auth.ID] = true
-			go runPelican(auth, req.Model, req.Effort)
+			go runPelican(auth, req.Model, req.Effort, language)
 		})
 }
 
-func runPelican(auth credential, model, effort string) {
+func runPelican(auth credential, model, effort, language string) {
 	defer tasks.Done()
-	r := evaluatePelican(auth, model, effort)
+	r := evaluatePelican(auth, model, effort, language)
 	mu.Lock()
 	defer mu.Unlock()
 	pelicanResults[auth.ID] = appendRecent(pelicanResults[auth.ID], r)
@@ -80,10 +90,18 @@ func runPelican(auth credential, model, effort string) {
 	_ = saveStateLocked()
 }
 
-func evaluatePelican(auth credential, model, effort string) pelicanResult {
+func evaluatePelican(auth credential, model, effort string, languages ...string) pelicanResult {
+	language := languageChinese
+	if len(languages) > 0 {
+		language, _ = validateLanguage(languages[0])
+	}
 	now := time.Now()
-	r := pelicanResult{ID: fmt.Sprint(now.UnixNano()), Time: now.UTC(), Model: model, Effort: effort}
-	out, elapsed, err := askCodex(auth, model, effort, pelicanPrompt)
+	r := pelicanResult{ID: fmt.Sprint(now.UnixNano()), Time: now.UTC(), Model: model, Effort: effort, Language: language}
+	prompt := pelicanPrompt
+	if language == languageEnglish {
+		prompt = pelicanPromptEnglish
+	}
+	out, elapsed, err := askCodex(auth, model, effort, prompt)
 	r.DurationMS = elapsed.Milliseconds()
 	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if err != nil {

@@ -42,7 +42,7 @@
           <p>让模型解一道糖果题，答出 <b class="mono">21</b> 即为正确。</p>
           <details class="problem">
             <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
-            <div class="problem-body"><pre class="mono"><code><!--CANDY_PROMPT--></code></pre>
+            <div class="problem-body"><pre class="mono"><code><!--CANDY_PROMPT--></code><code id="candy-prompt-en" hidden><!--CANDY_PROMPT_EN--></code></pre>
               <button class="copy-btn" type="button" aria-label="复制题目" data-tip></button>
             </div>
           </details>
@@ -50,6 +50,7 @@
         <form id="toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="model"></select></span></label>
           <label class="field"><span class="field-label">推理强度</span><span class="native-select"><select id="effort" data-tip="none：不指定推理强度，由 CPA 决定；其他强度是否可用由 CPA 或上游判断"></select></span></label>
+          <label class="field"><span class="field-label">提示词语言</span><span class="native-select"><select id="language"><option value="zh">中文</option><option value="en">English</option></select></span></label>
           <label class="field"><span class="field-label">每凭证次数</span><input id="runs" class="mono" type="number" min="1" max="10" step="1" value="1" required></label>
           <button id="run-batch" class="btn" type="submit" disabled>测试全部</button>
         </form>
@@ -80,6 +81,7 @@
         <form id="fp-toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="fp-model"></select></span></label>
           <label class="field"><span class="field-label">采集模式</span><span class="native-select"><select id="fp-mode"></select></span></label>
+          <label class="field"><span class="field-label">提示词语言</span><span class="native-select"><select id="fp-language"><option value="zh">中文</option><option value="en">English</option></select></span></label>
           <label class="field"><span class="field-label">每凭证并发</span><input id="fp-concurrency" class="mono" type="number" min="1" step="1" required></label>
           <button id="fp-run-batch" class="btn" type="submit" disabled>采集全部</button>
         </form>
@@ -100,6 +102,7 @@
         </div>
         <form id="mt-toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="mt-model"></select></span></label>
+          <label class="field"><span class="field-label">提示词语言</span><span class="native-select"><select id="mt-language"><option value="zh">中文</option><option value="en">English</option></select></span></label>
           <label class="field"><span class="field-label">每凭证并发</span><input id="mt-concurrency" class="mono" type="number" min="1" step="1" required></label>
           <button id="mt-run-batch" class="btn" type="submit" disabled>测试全部</button>
         </form>
@@ -111,7 +114,7 @@
           <p>让模型写一个 HTML 页面，用 SVG 绘制鹈鹕骑自行车的动画。</p>
           <details class="problem">
             <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
-            <div class="problem-body"><pre class="mono"><code><!--PELICAN_PROMPT--></code></pre>
+            <div class="problem-body"><pre class="mono"><code><!--PELICAN_PROMPT--></code><code id="pelican-prompt-en" hidden><!--PELICAN_PROMPT_EN--></code></pre>
               <button class="copy-btn" type="button" aria-label="复制题目" data-tip></button>
             </div>
           </details>
@@ -119,6 +122,7 @@
         <form id="pl-toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="pl-model"></select></span></label>
           <label class="field"><span class="field-label">推理强度</span><span class="native-select"><select id="pl-effort" data-tip="none：不指定推理强度，由 CPA 决定；其他强度是否可用由 CPA 或上游判断"></select></span></label>
+          <label class="field"><span class="field-label">提示词语言</span><span class="native-select"><select id="pl-language"><option value="zh">中文</option><option value="en">English</option></select></span></label>
           <button id="pl-run-batch" class="btn" type="submit" disabled>测试全部</button>
         </form>
         <div class="legend"><span>每个凭证 1 次请求</span></div>
