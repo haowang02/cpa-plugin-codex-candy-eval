@@ -1,21 +1,29 @@
-# 定时巡检
+# 定时糖果巡检
 
-巡检脚本用 ModelTrace、指纹测试或糖果测试检查 CPA 凭证，配合 crontab 定时运行。发现降智后，脚本可以：
+[巡检脚本](../examples/inspection.py) 用糖果题检查账号，每次先测一次。默认只记录结果；开启 `ADJUST_PRIORITY` 后，确认账号恢复或降智时自动调整 priority，并通过 ntfy 或 Bark 通知。
 
-- 调低该认证文件的 priority，让 CPA 优先使用正常的号；之后巡检结果恢复正常时再调回来。
-- 通过 ntfy 或 Bark 发送通知。
+## 巡检规则
 
-两者可以都开启，也可以只开一个；都不开时脚本只记录结果。
+以巡检开始时的 priority 为准，默认 `0` 表示降智账号，`99` 表示正常账号：
 
-**降智**指 ModelTrace 或指纹测试判断模型与所测模型不一致，或者糖果测试没有答出 21。认证失效、额度用尽等原因导致请求失败时得不出结论，脚本会忽略，不会调整 priority，也不会发送通知。
+| 原 priority | 首测结果 | 处理 |
+| --- | --- | --- |
+| `0` | 答错 | 保持 `0`，不复测、不通知 |
+| `0` | 答对 | 等待 240 秒，再测两次；三次都答对才调为 `99`，通知恢复正常 |
+| `99` | 答对 | 保持 `99`，不复测、不通知 |
+| `99` | 答错 | 直接再测两次；三次都答错才调为 `0`，通知确认降智 |
 
-## 准备
+三次结果不一致、请求失败或测试记录不完整时，保持 priority，不通知。答对与否以插件判定为准：答案中包含不与其他数字相连的 `21`，即视为答对。
 
-- 插件 v0.3.13 或更高版本。
-- 一台装有 Python 3.8 或更高版本、能使用 crontab 的 Linux 或 macOS 机器，能访问 CPA 管理面板即可，也可以就是运行 CPA 的服务器。脚本只用 Python 标准库，不需要安装依赖。
-- CPA 管理密钥。
+没有设置过 priority 的认证文件视为 `0`。其他 priority 和配置中的 API Key 只测试，不自动调整。priority 只在巡检开始时读取，后续不重复校验；历史答题不计入本次判定。
 
-## 1. 下载脚本
+默认跳过插件已识别的 Free 账号，以及禁用、冷却或正在测试的凭证。插件通过 `/state` 的 `plan_type` 返回订阅类型，来源为 CPA 的订阅字段、认证文件的 `plan_type` 或 ID Token 中的 `chatgpt_plan_type`。订阅未知时仍测试。
+
+## 部署
+
+需要插件 v0.3.13 或更高版本、CPA 管理密钥，以及能访问 CPA 的 Linux 或 macOS 机器。脚本使用 Python 3.8 或更高版本，只依赖标准库。
+
+### 1. 下载脚本
 
 ```sh
 mkdir -p ~/cpa-inspection
@@ -23,111 +31,95 @@ curl -fsSL -o ~/cpa-inspection/inspection.py https://raw.githubusercontent.com/h
 chmod 600 ~/cpa-inspection/inspection.py
 ```
 
-脚本中会写入管理密钥，`chmod 600` 可以防止其他用户读取。
+脚本保存管理密钥和推送配置，文件权限应保持为 `600`。
 
-## 2. 修改配置
+### 2. 配置
 
-打开 `~/cpa-inspection/inspection.py`，修改开头的配置。必须填写的只有两项：
+编辑脚本开头的配置，填写 `CPA_URL` 和 `MANAGEMENT_KEY`。`CPA_URL` 是管理面板网址中 `/management.html` 之前的部分，例如 `https://cpa.example.com`。
 
-- `CPA_URL`：CPA 地址，即打开管理面板时网址中 `/management.html` 之前的部分，例如 `https://cpa.example.com`。
-- `MANAGEMENT_KEY`：CPA 管理密钥。
+| 配置 | 默认值与用途 |
+| --- | --- |
+| `MODEL`、`EFFORT` | `gpt-6.1-sol`、`low`；首测和复测使用相同模型与推理强度 |
+| `INCLUDE`、`EXCLUDE` | `["codex-*"]`、`[]`；按邮箱或名称选择、排除凭证 |
+| `SKIP_FREE` | `True`；跳过已识别的 Free 订阅 |
+| `ADJUST_PRIORITY` | `False`；设为 `True` 后自动调整并通知，否则只记录结果和调整建议 |
+| `DEGRADED_PRIORITY`、`NORMAL_PRIORITY` | `0`、`99`；降智和正常账号的 priority |
+| `RECOVERY_DELAY_SECONDS` | `240`；降智账号首测答对后的复测等待时间 |
+| `MAX_WAIT_MINUTES` | `30`；每轮测试完成的等待上限，不含恢复前的等待时间 |
 
-其余配置项都已写好默认值，说明见各行注释，下面分类介绍。
-
-### 测试
-
-`TEST` 选择巡检使用的测试。`OPTIONS` 中是三项测试各自的参数，包括测试模型，巡检时只使用 `TEST` 对应的一项。
-
-ModelTrace 和指纹测试只能识别各自模型库中的模型。建议先在插件页面上用正常的号测一次，确认结果是「与测试模型一致」，再用该模型巡检。
-
-每次巡检，每个凭证的请求数为：ModelTrace 3 次，糖果测试为 `runs` 的值，指纹测试快速、标准、严格模式分别为 60、200、400 次，失败的请求还会重试。巡检越频繁，消耗的额度越多。
-
-### 范围
-
-脚本只巡检已启用、且没有处于冷却中的凭证，`INCLUDE` 和 `EXCLUDE` 进一步限定范围。规则匹配凭证的邮箱或名称，`*` 匹配任意字符：
-
-- 邮箱就是插件页面上显示的邮箱。
-- 认证文件的名称是文件名，例如 `codex-xxxx@gmail.com-pro.json`，可以在 CPA 管理面板的「认证文件」页面查看。
-- 配置中的 API Key 的名称与插件页面上显示的一致。
-
-默认的 `["codex-*"]` 表示所有 Codex 认证文件。其他写法例如：
+范围规则支持 `*`、`?` 和字符集合，匹配邮箱或凭证名称。`INCLUDE` 留空表示不限范围；`EXCLUDE` 优先排除。例如：
 
 ```python
-INCLUDE = ["alice@gmail.com", "bob@outlook.com"]  # 只巡检这两个账号
-INCLUDE = ["*-pro.json", "*-team.json"]           # 只巡检 Pro 和 Business 账号
-EXCLUDE = ["*@example.com"]                       # 不巡检某个域名的邮箱
+INCLUDE = ["alice@gmail.com", "bob@outlook.com"]
+INCLUDE = ["*-pro.json", "*-team.json"]
+EXCLUDE = ["*@example.com"]
 ```
 
-不支持所测模型的凭证会请求失败、得不出结论，可以用这两项把它们排除。
+每个账号首测一次，需要确认状态变化的认证文件再测两次。请求会消耗账号额度。
 
-### priority
+### 3. 配置通知
 
-CPA 会优先使用 priority 较大的凭证。`ADJUST_PRIORITY` 设为 `True` 后：
+ntfy 填写 `NTFY_SERVER` 和 `NTFY_TOPIC`；需要认证时填写 `NTFY_USERNAME` 和 `NTFY_PASSWORD`，使用访问令牌时用户名留空、密码填令牌。Bark 填写 `BARK_URL`。两个渠道都配置时都会推送，均留空则不推送。
 
-- 降智的认证文件，priority 调为 `DEGRADED_PRIORITY`（默认 `0`）。
-- 结果正常、且 priority 等于 `DEGRADED_PRIORITY` 的认证文件，priority 调为 `NORMAL_PRIORITY`（默认 `99`）。priority 为其他值的不会被改动。
+只有成功调整 priority 的账号才通知。同一轮的恢复和降智分别汇总，文案包含模型、判定和账号的 priority 变化：
 
-没有设置过 priority 的认证文件视为 `0`，所以按默认值开启后，第一次巡检就会把结果正常、没有设置过 priority 的认证文件调为 `99`。如果你已经用 priority 安排了凭证的使用顺序，请按自己的安排修改这两个值。配置中的 API Key 不会被调整。
+```text
+CPA 巡检：账号恢复正常
+糖果测试 · gpt-6.1-sol
+判定：连续 3 次答对
 
-### 通知
+- codex-alice@example.com-pro.json：priority 0 → 99
 
-ntfy 需要填写服务器地址和主题；主题需要登录时再填写账号密码，使用访问令牌时用户名留空、密码填令牌。Bark 填写 App 中的推送地址。两者都配置时会同时发送，都不配置则不发送通知。
+已提高使用优先级。
+```
 
-## 3. 手动运行一次
+降智通知使用「CPA 巡检：账号确认降智」标题，判定为「连续 3 次答错」，列出 `priority 99 → 0`，并说明后续确认恢复后自动提权。
+
+### 4. 手动验证
 
 ```sh
 python3 ~/cpa-inspection/inspection.py
 ```
 
-测试完成后逐个输出结果，调整了 priority 的会一并注明，例如：
+日志逐个记录答题判定和 priority，例如：
 
 ```text
-2026-10-07 12:00:03 ModelTrace · gpt-6-luna：开始测试 3 个凭证
-  codex-xxxx@gmail.com-pro.json：正常
-  codex-yyyy@gmail.com-plus.json：降智，priority 99 → 0
-  codex-zzzz@gmail.com-team.json：没有结论，已忽略
+2026-10-08 12:00:03 糖果巡检 · gpt-6.1-sol：3 个账号，跳过 1 个 Free 账号
+  首测：3 个账号，每个账号 1 次
+  复测：1 个账号，每个账号 2 次
+  codex-alice@example.com-pro.json：首测答对，保持 priority 99
+  codex-bob@example.com-plus.json：三次均答错，priority 99 → 0
+  codex-carol@example.com-team.json：无有效结论，保持 priority 0
 ```
 
-运行失败时脚本会输出原因，例如管理密钥错误或无法连接 CPA。
+### 5. 定时运行
 
-## 4. 配置 crontab
-
-先用 `command -v python3` 查看 Python 的完整路径，然后运行 `crontab -e`，加入一行，例如：
+用 `command -v python3` 确认 Python 路径，再运行 `crontab -e` 添加任务。例如每小时整点运行一次：
 
 ```text
-0 * * * * /usr/bin/python3 $HOME/cpa-inspection/inspection.py >> $HOME/cpa-inspection/inspection.log 2>&1
+0 * * * * /usr/bin/python3 -u $HOME/cpa-inspection/inspection.py >> $HOME/cpa-inspection/inspection.log 2>&1
 ```
 
-把 `/usr/bin/python3` 换成你的路径。开头五项依次是分钟、小时、日、月、星期，上例表示每小时整点运行一次；`*/30 * * * *` 表示每 30 分钟，`0 9 * * *` 表示每天 9 点。两次巡检的间隔最好长于一次巡检所需的时间，否则上一次还在测试的凭证会被跳过。
+将 `/usr/bin/python3` 换成实际路径。巡检间隔应长于一次完整巡检的耗时，包括恢复确认前的 240 秒等待。用 `crontab -l` 查看任务，用 `tail -f ~/cpa-inspection/inspection.log` 查看日志。
 
-用 `crontab -l` 确认已经保存，用 `tail -f ~/cpa-inspection/inspection.log` 查看运行记录。
+## 使用的 API
 
-## API
+以下请求使用 CPA 管理认证：`Authorization: Bearer <管理密钥>`，路径前缀为 `<CPA 地址>/v0/management`。
 
-需要自己编写脚本时，可以直接调用插件的 API。请求地址的前缀是 `<CPA 地址>/v0/management/plugins/cpa-codex-candy-eval`，认证方式与管理面板相同：在请求头中带上 `Authorization: Bearer <管理密钥>`。
+- `GET /plugins/cpa-codex-candy-eval/state`：返回 `auths`，包含凭证 `id`、`name`、`email`、`source`、`priority`、`plan_type`，以及糖果测试的 `running` 进度和 `results` 历史。
+- `POST /plugins/cpa-codex-candy-eval/run`：按凭证 ID 发起糖果测试，返回 `started`。首测 `runs=1`，复测 `runs=2`。
+- `PATCH /auth-files/fields`：修改认证文件的 priority。
 
-### 开始巡检
-
-`POST /inspection`
+糖果测试请求示例：
 
 ```json
-{"test": "modeltrace", "include": ["codex-*"], "exclude": [], "model": "gpt-6-luna", "concurrency": 3}
+{"auth_ids":["<凭证 ID>"],"model":"gpt-6.1-sol","effort":"low","runs":1}
 ```
 
-`test`、`include`、`exclude` 与脚本中的同名配置相同，其余字段是该测试的参数，与脚本 `OPTIONS` 中对应的一项相同。返回的 `started` 是开始测试的凭证数，正在进行其他测试的凭证会被跳过。
+调整 priority 的请求示例：
 
-### 查看结果
+```json
+{"name":"<认证文件名>","priority":99}
+```
 
-`GET /inspection?test=modeltrace`
-
-返回该测试最近一次巡检的结果：`running` 表示是否仍在测试，`credentials` 列出这次巡检的凭证，每个凭证包含：
-
-| 字段 | 说明 |
-| --- | --- |
-| `name`、`email` | 凭证名称和邮箱 |
-| `source` | `auth_files` 为认证文件，`ai_providers` 为配置中的 API Key |
-| `priority` | 凭证在 CPA 中的 priority |
-| `results` | 这次巡检得到的测试记录 |
-| `degraded` | `true` 为降智，`false` 为正常，`null` 为没有结论（如请求失败） |
-
-调整 priority 使用 CPA 自带的 API：`PATCH <CPA 地址>/v0/management/auth-files/fields`，请求体为 `{"name": "<认证文件名>", "priority": 0}`。
+脚本轮询 `/state`，等待所选账号的 `running` 结束，再读取本轮新增且模型、推理强度一致的记录。只有记录数量完整、没有错误或跳过标记时，答题结果才参与判定。
