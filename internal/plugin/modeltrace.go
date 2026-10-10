@@ -25,8 +25,15 @@ type traceChallenge struct {
 	ExpectedCount int    `json:"expected_count"`
 }
 
-// Prompt variants and lengths follow ModelTrace's Chinese browser challenges.
-func traceChallenges() []traceChallenge {
+// Prompt variants and lengths follow ModelTrace's browser challenges.
+func traceChallenges(languages ...string) []traceChallenge {
+	language := languageChinese
+	if len(languages) > 0 {
+		language, _ = validateLanguage(languages[0])
+	}
+	if language == languageEnglish {
+		return traceChallengesEnglish()
+	}
 	openings := []string{"这是一次独立的数值选择记录", "请完成下面的无语义整数选择任务", "执行一次第一反应取值记录", "生成一组不承载语义的整数选择", "进行一轮快速逐项取值"}
 	actions := []string{"为各个位置分别凭第一反应选择", "逐项选择", "每次只决定当前一项，共给出", "分别凭第一反应给出", "逐个直接选择"}
 	endings := []string{"允许某个数字再次出现；每项写出后不要回头排序、去重或替换。", "偶然重复是有效的；不要重新排列或修正已经写出的项目。", "相同值可以再次出现；输出过程中不要整理或改写前面的项目。", "重复值无需删除；不要筛选、重排或补成某种规律。", "不必赋予数字任何含义；已经给出的值保持不变。"}
@@ -40,6 +47,25 @@ func traceChallenges() []traceChallenge {
 			"每个位置都要单独选择；不要从 1 开始计数，不要连续递增或递减，也不要采用等差、循环、重复区块或其他规则化模式。" +
 			"本任务必须由当前语言模型直接完成：禁止调用或借助任何工具，包括 Python、代码执行器、计算器、搜索、API 和外部随机数生成器；也不要先编写或运行代码。" +
 			choose(endings) + choose(separators) + "直接从第一个取值开始输出，不要在序列前重复数量、范围或任务说明。"
+		challenges[i] = traceChallenge{prompt, n}
+	}
+	return challenges
+}
+
+func traceChallengesEnglish() []traceChallenge {
+	openings := []string{"This is an independent numerical choice record", "Complete the following meaningless integer selection task", "Record a first-reaction choice", "Generate a sequence of semantically meaningless integer choices", "Perform a quick item-by-item value selection"}
+	actions := []string{"choose each position by first reaction", "select each item", "decide only the current item and provide", "give a first-reaction value for each item", "choose directly one at a time"}
+	endings := []string{"A number may repeat; do not sort, deduplicate, or replace items after writing them.", "Accidental repeats are valid; do not reorder or correct earlier items.", "The same value may appear again; do not edit previous items while outputting.", "Repeated values need not be removed; do not filter, reorder, or regularize the sequence.", "Do not assign meaning to the numbers; keep values already given unchanged."}
+	separators := []string{"Separate numbers with commas or spaces.", "Use one consistent common separator.", "Commas, spaces, or line breaks are all acceptable.", "Any format is fine as long as each integer boundary is clear."}
+	choose := func(values []string) string { return values[rand.Intn(len(values))] }
+	lengths := rand.Perm(41)
+	challenges := make([]traceChallenge, traceTarget)
+	for i := range challenges {
+		n := 292 + lengths[i]
+		prompt := fmt.Sprintf("%s. %s %d integers from 1 to 355 inclusive.", choose(openings), choose(actions), n) +
+			" Choose every position separately; do not start from 1, count upward or downward consecutively, or use an arithmetic, cyclic, repeated-block, or otherwise regular pattern." +
+			" The current language model must complete this task directly: do not call or use any tool, including Python, code execution, calculators, search, APIs, or external random-number generators; do not write or run code first." +
+			choose(endings) + " " + choose(separators) + " Start outputting from the first value directly; do not repeat the count, range, or task description before the sequence."
 		challenges[i] = traceChallenge{prompt, n}
 	}
 	return challenges
@@ -59,6 +85,7 @@ type traceResult struct {
 	ID              string            `json:"id"`
 	Time            time.Time         `json:"time"`
 	Model           string            `json:"model"`
+	Language        string            `json:"language,omitempty"`
 	Concurrency     int               `json:"concurrency,omitempty"`
 	Status          string            `json:"status"`
 	Error           string            `json:"error,omitempty"`
@@ -93,6 +120,7 @@ type traceRunRequest struct {
 	AuthIDs      []string            `json:"auth_ids"`
 	All          bool                `json:"all"`
 	Model        string              `json:"model"`
+	Language     string              `json:"language,omitempty"`
 	Concurrency  int                 `json:"concurrency"`
 	ModelCatalog map[string][]string `json:"model_catalog,omitempty"`
 }
@@ -109,6 +137,10 @@ func traceRunResponse(body []byte) managementResponse {
 		return jsonError(http.StatusBadRequest, "请求格式错误")
 	}
 	req.Model = strings.TrimSpace(req.Model)
+	language, languageErr := validateLanguage(req.Language)
+	if languageErr != nil {
+		return *languageErr
+	}
 	if !validModelName(req.Model, false) {
 		return jsonError(http.StatusBadRequest, "请选择不含推理强度后缀的模型")
 	}
@@ -121,12 +153,13 @@ func traceRunResponse(body []byte) managementResponse {
 	return startRuns(req.AuthIDs, req.All, req.ModelCatalog, req.Model,
 		func(id string) {
 			now := time.Now().UTC()
-			appendTraceResult(id, traceResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Status: "skipped", Error: unsupportedModelMessage})
+			appendTraceResult(id, traceResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Language: language, Status: "skipped", Error: unsupportedModelMessage})
 		},
 		func(auth credential) {
 			ctx, cancel := context.WithCancel(context.Background())
 			p := &traceProgress{Model: req.Model, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
 			traceRunning[auth.ID] = p
+			req.Language = language
 			go runModelTrace(ctx, auth, req, p)
 		})
 }
@@ -140,7 +173,7 @@ func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p 
 	defer tasks.Done()
 	started := time.Now()
 	done := 0
-	r := traceResult{ID: fmt.Sprint(started.UnixNano()), Time: started.UTC(), Model: req.Model, Concurrency: req.Concurrency, Status: "completed"}
+	r := traceResult{ID: fmt.Sprint(started.UnixNano()), Time: started.UTC(), Model: req.Model, Language: req.Language, Concurrency: req.Concurrency, Status: "completed"}
 	defer func() {
 		if ctx.Err() != nil && done < traceTarget {
 			r.Status = "cancelled"
@@ -156,7 +189,7 @@ func runModelTrace(ctx context.Context, auth credential, req traceRunRequest, p 
 		delete(traceRunning, auth.ID)
 		_ = saveStateLocked()
 	}()
-	challenges := traceChallenges()
+	challenges := traceChallenges(req.Language)
 	type event struct {
 		index  int
 		sample traceSample

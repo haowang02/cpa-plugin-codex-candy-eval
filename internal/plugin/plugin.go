@@ -77,7 +77,7 @@ var modelTraceScript string
 var pelicanScript string
 
 var uiHTML = func() []byte {
-	config, _ := json.Marshal(map[string]any{"modes": fingerprintModes, "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
+	config, _ := json.Marshal(map[string]any{"modes": fingerprintModes, "probe_cells": len(fingerprintProbesForLanguage(languageChinese)), "default_concurrency": fingerprintDefaultConcurrency, "max_concurrency": fingerprintMaxConcurrency})
 	fpScript := strings.Replace(fingerprintScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
 	traceConfig, _ := json.Marshal(map[string]any{"requests": traceTarget, "default_concurrency": traceDefaultConcurrency, "max_concurrency": traceMaxConcurrency})
 	traceScript := strings.Replace(modelTraceScript, `/*MODELTRACE_CONFIG*/{}`, string(traceConfig), 1)
@@ -85,7 +85,9 @@ var uiHTML = func() []byte {
 		"/*APP_STYLES*/", temmlStyles+"\n"+uiThemes+"\n"+uiStyles,
 		"<!--PLUGIN_VERSION-->", pluginVersion,
 		"<!--CANDY_PROMPT-->", html.EscapeString(candyPrompt),
+		"<!--CANDY_PROMPT_EN-->", html.EscapeString(candyPromptEnglish),
 		"<!--PELICAN_PROMPT-->", html.EscapeString(pelicanPrompt),
+		"<!--PELICAN_PROMPT_EN-->", html.EscapeString(pelicanPromptEnglish),
 		"<!--MODELTRACE_LICENSE-->", "<!-- ModelTrace\n"+modelTraceLicense+"-->",
 		"/*MARKDOWN_SCRIPT*/", markdownScript,
 		"/*CJK_FRIENDLY_SCRIPT*/", cjkFriendlyScript,

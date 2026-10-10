@@ -23,11 +23,21 @@ const candyPrompt = `不使用任何外部工具回答以下问题：
 五角星形   7      6      4
 `
 
+const candyPromptEnglish = `Answer the following question without using any external tools:
+
+A black bag contains candies with three flavors, and each flavor comes in two shapes (round and pentagonal; the shapes can be distinguished by touch). The following table gives the counts of each flavor and shape. Before the activity, a participant must decide how many candies to draw. What is the minimum number of candies that guarantees having both round and pentagonal apple-flavored and peach-flavored candies in hand? (It is enough to have round apple with pentagonal peach, or round peach with pentagonal apple.)
+
+                 Apple  Peach  Watermelon
+Round               7      9           8
+Pentagonal          7      6           4
+`
+
 type candyResult struct {
 	Skipped         bool      `json:"skipped,omitempty"`
 	Time            time.Time `json:"time"`
 	Model           string    `json:"model"`
 	Effort          string    `json:"effort"`
+	Language        string    `json:"language,omitempty"`
 	OK              bool      `json:"ok"`
 	Answer          string    `json:"answer,omitempty"`
 	Error           string    `json:"error,omitempty"`
@@ -48,6 +58,7 @@ type candyRunRequest struct {
 	All          bool                `json:"all"`
 	Model        string              `json:"model"`
 	Effort       string              `json:"effort"`
+	Language     string              `json:"language,omitempty"`
 	Runs         int                 `json:"runs"`
 }
 
@@ -58,22 +69,26 @@ func candyRunResponse(body []byte) managementResponse {
 	}
 	req.Model = strings.TrimSpace(req.Model)
 	req.Effort = strings.TrimSpace(req.Effort)
+	language, languageErr := validateLanguage(req.Language)
+	if languageErr != nil {
+		return *languageErr
+	}
 	if !validModelName(req.Model, true) {
 		return jsonError(http.StatusBadRequest, "请选择模型")
 	}
 	req.Runs = min(max(req.Runs, 1), candyMaxRuns)
 	return startRuns(req.AuthIDs, req.All, req.ModelCatalog, req.Model,
 		func(id string) {
-			candyResults[id] = appendRecent(candyResults[id], candyResult{Time: time.Now().UTC(), Model: req.Model, Effort: req.Effort, Skipped: true, Error: unsupportedModelMessage})
+			candyResults[id] = appendRecent(candyResults[id], candyResult{Time: time.Now().UTC(), Model: req.Model, Effort: req.Effort, Language: language, Skipped: true, Error: unsupportedModelMessage})
 		},
 		func(auth credential) {
 			candyRunning[auth.ID] = &candyProgress{Total: req.Runs}
-			go runCandy(auth, req.Model, req.Effort, req.Runs)
+			go runCandy(auth, req.Model, req.Effort, language, req.Runs)
 		})
 }
 
 // Each credential runs serially; different credentials run in parallel.
-func runCandy(auth credential, model, effort string, runs int) {
+func runCandy(auth credential, model, effort, language string, runs int) {
 	id := auth.ID
 	defer tasks.Done()
 	defer func() {
@@ -88,7 +103,7 @@ func runCandy(auth credential, model, effort string, runs int) {
 		if stopping {
 			return
 		}
-		r := evaluateCandy(auth, model, effort)
+		r := evaluateCandy(auth, model, effort, language)
 		mu.Lock()
 		candyResults[id] = appendRecent(candyResults[id], r)
 		candyRunning[id].Done++
@@ -97,9 +112,17 @@ func runCandy(auth credential, model, effort string, runs int) {
 	}
 }
 
-func evaluateCandy(auth credential, model, effort string) candyResult {
-	r := candyResult{Time: time.Now().UTC(), Model: model, Effort: effort}
-	out, elapsed, err := askCodex(auth, model, effort, candyPrompt)
+func evaluateCandy(auth credential, model, effort string, languages ...string) candyResult {
+	language := languageChinese
+	if len(languages) > 0 {
+		language, _ = validateLanguage(languages[0])
+	}
+	r := candyResult{Time: time.Now().UTC(), Model: model, Effort: effort, Language: language}
+	prompt := candyPrompt
+	if language == languageEnglish {
+		prompt = candyPromptEnglish
+	}
+	out, elapsed, err := askCodex(auth, model, effort, prompt)
 	r.DurationMS = elapsed.Milliseconds()
 	r.InputTokens, r.OutputTokens, r.ReasoningTokens = out.InputTokens, out.OutputTokens, out.ReasoningTokens
 	if err != nil {

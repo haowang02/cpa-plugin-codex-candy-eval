@@ -39,6 +39,7 @@ type fingerprintResult struct {
 	ID              string                 `json:"id"`
 	Time            time.Time              `json:"time"`
 	Model           string                 `json:"model"`
+	Language        string                 `json:"language,omitempty"`
 	Mode            string                 `json:"mode"`
 	Concurrency     int                    `json:"concurrency,omitempty"`
 	Effort          string                 `json:"effort"`
@@ -80,6 +81,7 @@ type fingerprintRunRequest struct {
 	Model        string              `json:"model"`
 	Mode         string              `json:"mode"`
 	Concurrency  int                 `json:"concurrency"`
+	Language     string              `json:"language,omitempty"`
 }
 
 var (
@@ -94,6 +96,10 @@ func fingerprintRunResponse(body []byte) managementResponse {
 		return jsonError(http.StatusBadRequest, "请求格式错误："+err.Error())
 	}
 	req.Model = strings.TrimSpace(req.Model)
+	language, languageErr := validateLanguage(req.Language)
+	if languageErr != nil {
+		return *languageErr
+	}
 	if !validModelName(req.Model, false) {
 		return jsonError(http.StatusBadRequest, "请选择不含推理强度后缀的模型")
 	}
@@ -115,22 +121,29 @@ func fingerprintRunResponse(body []byte) managementResponse {
 	return startRuns(req.AuthIDs, req.All, req.ModelCatalog, req.Model,
 		func(id string) {
 			now := time.Now().UTC()
-			fingerprintResults[id] = appendRecent(fingerprintResults[id], fingerprintResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Mode: mode.ID, Effort: "low", Status: "skipped", Error: unsupportedModelMessage})
+			fingerprintResults[id] = appendRecent(fingerprintResults[id], fingerprintResult{ID: fmt.Sprint(now.UnixNano()), Time: now, Model: req.Model, Language: language, Mode: mode.ID, Effort: "low", Status: "skipped", Error: unsupportedModelMessage})
 		},
 		func(auth credential) {
 			ctx, cancel := context.WithCancel(context.Background())
-			p := &fingerprintProgress{Model: req.Model, Mode: mode.ID, Total: mode.Cells * mode.Samples, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
+			cells := min(mode.Cells, len(fingerprintProbesForLanguage(language)))
+			p := &fingerprintProgress{Model: req.Model, Mode: mode.ID, Total: cells * mode.Samples, Phase: "collecting", Concurrency: req.Concurrency, cancel: cancel}
 			fingerprintRunning[auth.ID] = p
-			go runFingerprint(ctx, auth, req.Model, mode, p)
+			go runFingerprintLanguage(ctx, auth, req.Model, language, mode, p)
 		})
 }
 
 func runFingerprint(ctx context.Context, auth credential, model string, mode fingerprintMode, p *fingerprintProgress) {
+	runFingerprintLanguage(ctx, auth, model, languageChinese, mode, p)
+}
+
+func runFingerprintLanguage(ctx context.Context, auth credential, model, language string, mode fingerprintMode, p *fingerprintProgress) {
 	id := auth.ID
 	defer tasks.Done()
 	started := time.Now()
 	var inputTokens, outputTokens, reasoningTokens int64
-	r := fingerprintResult{ID: fmt.Sprintf("%d", started.UnixNano()), Time: started.UTC(), Model: model, Mode: mode.ID, Concurrency: p.Concurrency, Effort: "low", Status: "completed", Total: mode.Cells * mode.Samples}
+	probes := fingerprintProbesForLanguage(language)
+	cells := min(mode.Cells, len(probes))
+	r := fingerprintResult{ID: fmt.Sprintf("%d", started.UnixNano()), Time: started.UTC(), Model: model, Language: language, Mode: mode.ID, Concurrency: p.Concurrency, Effort: "low", Status: "completed", Total: cells * mode.Samples}
 	r.InputTokens, r.OutputTokens, r.ReasoningTokens = &inputTokens, &outputTokens, &reasoningTokens
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -148,7 +161,7 @@ func runFingerprint(ctx context.Context, auth credential, model string, mode fin
 		mu.Unlock()
 	}()
 	jobs := make([]fingerprintProbe, 0, r.Total)
-	for _, probe := range fingerprintProbes[:mode.Cells] {
+	for _, probe := range probes[:cells] {
 		for range mode.Samples {
 			jobs = append(jobs, probe)
 		}
@@ -205,7 +218,7 @@ func runFingerprint(ctx context.Context, auth credential, model string, mode fin
 		p.Phase = "comparing"
 	}
 	mu.Unlock()
-	r.Attribution = attributeFingerprint(model, valid)
+	r.Attribution = attributeFingerprint(model, valid, language)
 }
 
 func collectFingerprintSample(ctx context.Context, auth credential, model string, probe fingerprintProbe) (sample fingerprintSample) {
