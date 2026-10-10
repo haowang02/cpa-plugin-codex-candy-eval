@@ -187,6 +187,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
 .history-panel > .history-title, .history-panel > .result-history { grid-column: 2 / -1; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: var(--heading-padding, 14px var(--list-padding)); border-bottom: 1px solid var(--line); }
 .section-head h2 { margin: 0; font-size: var(--heading-size, 14px); font-weight: 600; }
+.credential-enabled-filter { flex: none; white-space: nowrap; }
 .credential-filters { display: flex; flex: 1; gap: 10px; min-width: 0; }
 .credential-filter { flex: 0 1 160px; }
 .credential-filter > select { height: 32px; font-size: 12px; }
@@ -380,6 +381,9 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
   .row-meta > .switch { align-self: flex-end; margin-left: auto; }
   .row-meta > .switch::before { content: "启用"; }
   .row-meta > .marks { flex: 1; }
+  .credential-head { flex-wrap: wrap; row-gap: 10px; }
+  .credential-enabled-filter { margin-right: auto; }
+  .credential-filters { order: 1; flex-basis: 100%; }
   .credential-filter { flex: 1 1 0; }
   .rate { display: flex; flex-basis: 100%; align-items: baseline; gap: 5px; white-space: nowrap; }
   .rate::before { content: "正确率"; color: var(--muted); font-size: 12px; }
@@ -403,10 +407,6 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
   .mt-summary > div:first-child { grid-column: 1 / -1; }
   .mt-rank { grid-template-columns: 18px minmax(0, 1fr) 58px; gap: 8px; padding-inline: 6px; }
   .mt-rank .mt-bar { display: none; }
-}
-@media (max-width: 520px) {
-  .credential-head { flex-wrap: wrap; row-gap: 10px; }
-  .credential-filters { order: 1; flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .spin, #refresh[aria-busy="true"] .icon { animation: none; }

@@ -402,8 +402,9 @@ const typedCredentials = (prefix) => credentials.filter((a) => $(prefix + "crede
 const PRO_ALL = "Pro ALL";
 function visibleCredentials(prefix) {
   const filter = $(prefix + "credential-plan").value;
+  const enabledOnly = $(prefix + "enabled-only").checked;
   const matches = (plan) => filter === "all" || (filter === PRO_ALL ? plan?.pro : plan?.label === filter);
-  return typedCredentials(prefix).filter((a) => matches(credentialPlan(a))).sort((a, b) => planRank(a) - planRank(b));
+  return typedCredentials(prefix).filter((a) => (!enabledOnly || !a.disabled) && matches(credentialPlan(a))).sort((a, b) => planRank(a) - planRank(b));
 }
 function fillPlanFilter(prefix) {
   const plans = [...new Map(typedCredentials(prefix).map(credentialPlan).filter(Boolean).map((plan) => [plan.label, plan])).values()]
@@ -498,7 +499,7 @@ for (const name of tabNames) {
 switchTab(tabNames.includes(stored(PREF_STORE + ".tab")) ? stored(PREF_STORE + ".tab") : "candy");
 
 for (const [prefix, type, selection, submit] of [["", "candy", candySelected, runCandy], ["fp-", "fp", fpSelected, runFingerprint], ["mt-", "mt", mtSelected, runModelTrace], ["pl-", "pl", plSelected, runPelican]]) {
-  for (const filter of ["credential-type", "credential-plan"]) $(prefix + filter).addEventListener("change", () => { selection.clear(); render(); });
+  for (const filter of ["credential-type", "credential-plan", "enabled-only"]) $(prefix + filter).addEventListener("change", () => { selection.clear(); render(); });
   $(prefix + "toolbar").addEventListener("submit", (e) => {
     e.preventDefault();
     const ids = batchCredentials(prefix, selection).map((a) => a.id);

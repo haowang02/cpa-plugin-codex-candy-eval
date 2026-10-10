@@ -103,12 +103,12 @@ async function configuredCredentials(config, providerGroups) {
     if (index < 0) index = keys.findIndex((key) => key.identity === id && !key.baseURL);
     return index < 0 ? "" : keys.splice(index, 1)[0].name;
   }
-  async function add(kind, parts, provider, disabled, apiKey, baseURL, providerName) {
+  async function add(kind, parts, provider, disabled, apiKey, baseURL, providerName, priority) {
     const digest = await sha256Hex(kind + parts.map((part) => "\0" + text(part)).join(""));
     const base = kind + ":" + digest.slice(0, 12), collision = counters.get(base) || 0;
     counters.set(base, collision + 1);
     const id = collision ? base + "-" + collision : base;
-    credentials.push({ id, provider, name: previewCredential(apiKey) || provider + " · " + id.slice(kind.length + 1), base_url: text(baseURL), provider_name: text(providerName), disabled });
+    credentials.push({ id, provider, name: previewCredential(apiKey) || provider + " · " + id.slice(kind.length + 1), base_url: text(baseURL), provider_name: text(providerName), disabled, priority: priority ?? 0 });
   }
   for (const [field, provider] of [
     ["gemini-api-key", "gemini"], ["interactions-api-key", "gemini-interactions"],
@@ -117,7 +117,7 @@ async function configuredCredentials(config, providerGroups) {
     const groups = groupKeys(field);
     for (const entry of entries(field)) {
       if (!text(entry["api-key"]) && !text(entry["base-url"])) continue;
-      await add(provider + ":apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"], entry.prefix, headers(entry)], provider, excludesAll(entry), entry["api-key"], entry["base-url"], groupName(groups, entry));
+      await add(provider + ":apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"], entry.prefix, headers(entry)], provider, excludesAll(entry), entry["api-key"], entry["base-url"], groupName(groups, entry), entry.priority);
     }
   }
   for (const entry of entries("openai-compatibility")) {
@@ -126,12 +126,12 @@ async function configuredCredentials(config, providerGroups) {
     const name = text(entry.name).toLowerCase() || "openai-compatibility";
     const provider = name === "openai-compatibility" || name.startsWith("openai-compatible-") ? name : "openai-compatible-" + name;
     const keys = entries("api-key-entries", entry["api-key-entries"]);
-    if (!keys.length) await add("openai-compatibility:" + name, [entry["base-url"]], provider, false, "", entry["base-url"], entry.name);
-    for (const entryKey of keys) await add("openai-compatibility:" + name, [entryKey["api-key"], entry["base-url"], entryKey["proxy-url"]], provider, false, entryKey["api-key"], entry["base-url"], entry.name);
+    if (!keys.length) await add("openai-compatibility:" + name, [entry["base-url"]], provider, false, "", entry["base-url"], entry.name, entry.priority);
+    for (const entryKey of keys) await add("openai-compatibility:" + name, [entryKey["api-key"], entry["base-url"], entryKey["proxy-url"]], provider, false, entryKey["api-key"], entry["base-url"], entry.name, entry.priority);
   }
   const vertexGroups = groupKeys("vertex-api-key");
   for (const entry of entries("vertex-api-key")) {
-    await add("vertex:apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"]], "vertex", excludesAll(entry), entry["api-key"], entry["base-url"], groupName(vertexGroups, entry));
+    await add("vertex:apikey", [entry["api-key"], entry["base-url"], entry["proxy-url"]], "vertex", excludesAll(entry), entry["api-key"], entry["base-url"], groupName(vertexGroups, entry), entry.priority);
   }
   return credentials;
 }

@@ -66,11 +66,11 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   }
   const key = 'synthetic-private-api-key';
   const config = {
-    'codex-api-key': [{ 'api-key': key, prefix: 'prefix', headers: { Z: 'z', A: 'a' }, weight: 0 }, { 'api-key': key, prefix: 'prefix', headers: { A: 'a', Z: 'z' }, 'excluded-models': ['gpt-test', ' * '] }],
+    'codex-api-key': [{ 'api-key': key, prefix: 'prefix', headers: { Z: 'z', A: 'a' }, weight: 0, priority: 99 }, { 'api-key': key, prefix: 'prefix', headers: { A: 'a', Z: 'z' }, 'excluded-models': ['gpt-test', ' * '] }],
     'claude-api-key': [{ 'base-url': 'https://example.test' }],
     'meta-api-key': [{ 'api-key': 'meta-test-key' }],
-    'vertex-api-key': [{ 'api-key': 'vertex-key', 'excluded-models': ['*'] }],
-    'openai-compatibility': [{ name: 'Demo', disabled: true, 'api-key-entries': [{ 'api-key': key }] }, { name: 'Demo', 'api-key-entries': [{ 'api-key': key }] }, { name: 'No-key', 'base-url': 'https://example.test' }],
+    'vertex-api-key': [{ 'api-key': 'vertex-key', 'excluded-models': ['*'], priority: -3 }],
+    'openai-compatibility': [{ name: 'Demo', disabled: true, 'api-key-entries': [{ 'api-key': key }] }, { name: 'Demo', priority: 7, 'api-key-entries': [{ 'api-key': key, priority: 100 }] }, { name: 'No-key', priority: 9, 'base-url': 'https://example.test' }],
   };
   const credentials = plain(await run(`configuredCredentials(${JSON.stringify(config)})`));
   const codexID = stableID('codex:apikey', [key, '', '', 'prefix', 'A\0a\0Z\0z\0']);
@@ -81,6 +81,10 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`previewCredential('  1234567890123  ')`), '123456…0123');
   assert.equal(codex[1].id, codexID + '-1');
   assert.deepEqual(codex.map(x => x.disabled), [false, true], 'only the exclude-all rule disables a config key');
+  assert.deepEqual(codex.map(x => x.priority), [99, 0]);
+  assert.equal(credentials.find(x => x.provider === 'vertex').priority, -3);
+  assert.equal(credentials.find(x => x.provider === 'openai-compatible-demo').priority, 7, 'OpenAI-compatible keys inherit the provider priority');
+  assert.equal(credentials.find(x => x.provider === 'openai-compatible-no-key').priority, 9);
   assert.equal(credentials.find(x => x.provider === 'claude').id, stableID('claude:apikey', ['', 'https://example.test', '', '', '']));
   assert.equal(credentials.find(x => x.provider === 'openai-compatible-demo').id, stableID('openai-compatibility:demo', [key, '', '']));
   assert.equal(credentials.find(x => x.provider === 'openai-compatible-no-key').id, stableID('openai-compatibility:no-key', ['https://example.test']));
@@ -262,6 +266,10 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(planTag('lite'), '<span class="tag plan-premium"><span>Pro 100');
   assert.equal(planTag('k12'), '<span class="tag "><span>k12');
   assert(!run(`credentialView(credentials.at(-1), false)`).includes('plan-'));
+  for (const priority of [0, 99, -3]) {
+    assert(run(`credentialView({id:'priority',source:'auth_files',provider:'codex',priority:${priority}}, false)`).includes(`<span class="tag"><span>P${priority}</span></span>`));
+  }
+  assert(run(`credentialView({id:'default-priority',source:'ai_providers',provider:'codex'}, false)`).includes('<span class="tag"><span>P0</span></span>'));
   const cooling = {id:'cooling',source:'auth_files',provider:'codex',plan_type:'promax',unavailable:true,status_message:'quota exhausted',next_retry_after:'2026-10-01T08:00:00Z'};
   const coolingView = run(`credentialView(${JSON.stringify(cooling)}, false)`);
   assert(coolingView.includes('<span class="tag plan-elite"><span>Pro 500'));
@@ -295,6 +303,31 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.deepEqual(plain(run(`visibleCredentials('').map(a => a.id)`)), ['config']);
   assert.equal(element('fp-credential-type').value, 'auth_files:codex');
   assert.equal(element('mt-credential-type').value, 'auth_files:codex');
+  const filterCredentials = [
+    {id:'enabled',source:'auth_files',provider:'codex',plan_type:'plus'},
+    {id:'disabled',source:'auth_files',provider:'codex',plan_type:'plus',disabled:true},
+    {id:'cooling',source:'auth_files',provider:'codex',plan_type:'plus',unavailable:true},
+    {id:'other-plan',source:'auth_files',provider:'codex',plan_type:'free'},
+    {id:'provider',source:'ai_providers',provider:'codex'},
+  ];
+  run(`var unfilteredCredentials = credentials; credentials = ${JSON.stringify(filterCredentials)}`);
+  for (const prefix of ['', 'fp-', 'mt-', 'pl-']) {
+    const card = run(`credentialCard('${prefix}', '测试', ['凭证'])`);
+    assert(card.indexOf(`id="${prefix}enabled-only"`) < card.indexOf(`id="${prefix}credential-type"`));
+    element(prefix + 'credential-type').value = 'all';
+    element(prefix + 'credential-plan').value = 'all';
+    assert.equal(run(`visibleCredentials('${prefix}').length`), 5, 'enabled-only defaults off');
+    element(prefix + 'enabled-only').checked = true;
+    assert.deepEqual(plain(run(`visibleCredentials('${prefix}').map(a => a.id)`)), ['enabled','cooling','other-plan','provider']);
+    element(prefix + 'credential-type').value = 'auth_files:codex';
+    element(prefix + 'credential-plan').value = 'Plus';
+    assert.deepEqual(plain(run(`visibleCredentials('${prefix}').map(a => a.id)`)), ['enabled','cooling'], 'enabled filter combines with type and plan without hiding cooldowns');
+    element(prefix + 'enabled-only').checked = false;
+    assert.deepEqual(plain(run(`visibleCredentials('${prefix}').map(a => a.id)`)), ['enabled','disabled','cooling']);
+    element(prefix + 'credential-type').value = 'auth_files:codex';
+    element(prefix + 'credential-plan').value = 'all';
+  }
+  run(`credentials = unfilteredCredentials`);
   assert.equal(run(`kind({skipped:true,error:'unsupported'})`), 'skip');
   element('credential-type').value = 'all';
   run(`candySelected.clear(); candySelected.add('codex'); credentials[0].running = {done:0,total:1}`);

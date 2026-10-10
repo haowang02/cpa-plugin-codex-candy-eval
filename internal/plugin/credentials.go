@@ -93,7 +93,7 @@ func syncCredentialsResponse(body []byte) managementResponse {
 		}
 		next[auth.ID] = credential{
 			ID: auth.ID, Name: auth.Name, Provider: auth.Provider, Source: credentialSourceProvider, Disabled: auth.Disabled,
-			BaseURL: strings.TrimSpace(auth.BaseURL), ProviderName: strings.TrimSpace(auth.ProviderName),
+			BaseURL: strings.TrimSpace(auth.BaseURL), ProviderName: strings.TrimSpace(auth.ProviderName), Priority: auth.Priority,
 		}
 	}
 	mu.Lock()

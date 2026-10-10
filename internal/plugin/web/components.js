@@ -100,7 +100,7 @@ function credentialView(a, open) {
   const label = configured ? a.base_url?.replace(/^https:\/\//i, "") || "默认地址" : a.email || a.name;
   return `<div class="credential"><button class="toggle" type="button" data-toggle="${esc(a.id)}" aria-expanded="${open}">${icon("chevron-right", "chev")}<span class="name">${esc(label)}</span></button>
     ${configured ? `<div class="api-key name mono">${esc(a.name)}</div>` : ""}
-    <div class="tags"><span class="tag" aria-label="${esc(credentialTypeLabel(a))}" data-tip>${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(providerType(a))}</span></span>${a.provider_name ? `<span class="tag"><span>${esc(a.provider_name)}</span></span>` : ""}${plan ? `<span class="tag ${plan.badge ? "plan-" + plan.badge : ""}"><span>${esc(plan.label)}</span></span>` : ""}${a.unavailable ? `<span class="tag warn" data-tip="${esc(unavailableReason(a))}"><span>不可用</span></span>` : ""}</div></div>`;
+    <div class="tags"><span class="tag" aria-label="${esc(credentialTypeLabel(a))}" data-tip>${icon(a.source === "auth_files" ? "file-key" : "key")}<span>${esc(providerType(a))}</span></span>${a.provider_name ? `<span class="tag"><span>${esc(a.provider_name)}</span></span>` : ""}${plan ? `<span class="tag ${plan.badge ? "plan-" + plan.badge : ""}"><span>${esc(plan.label)}</span></span>` : ""}<span class="tag"><span>P${esc(a.priority ?? 0)}</span></span>${a.unavailable ? `<span class="tag warn" data-tip="${esc(unavailableReason(a))}"><span>不可用</span></span>` : ""}</div></div>`;
 }
 function unavailableReason(a) {
   const retry = a.next_retry_after && `预计 ${fmtTime(a.next_retry_after, false)} 恢复`;
@@ -265,7 +265,7 @@ function initializeTips() {
 
 function credentialCard(prefix, test, columns) {
   const clearLabel = `清空${test}记录`;
-  return `<div class="section-head credential-head"><h2>凭证</h2><div class="credential-filters"><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span><span id="${prefix}plan-filter" class="native-select credential-filter" hidden><select id="${prefix}credential-plan" aria-label="订阅类型"><option value="all">所有订阅类型</option></select></span></div>
+  return `<div class="section-head credential-head"><h2>凭证</h2><label class="switch credential-enabled-filter"><input id="${prefix}enabled-only" type="checkbox" role="switch"><span>仅启用</span></label><div class="credential-filters"><span class="native-select credential-filter"><select id="${prefix}credential-type" aria-label="凭证类型"><option value="all">全部凭证</option><option value="auth_files:codex" selected>认证文件 · codex</option></select></span><span id="${prefix}plan-filter" class="native-select credential-filter" hidden><select id="${prefix}credential-plan" aria-label="订阅类型"><option value="all">所有订阅类型</option></select></span></div>
     <div class="list-actions"><button id="${prefix}mask" class="btn ghost icon-button" type="button" aria-label="脱敏" data-tip></button><button id="${prefix}clear" class="btn ghost icon-button" type="button" aria-label="${clearLabel}" data-tip disabled>${icon("trash-2")}</button></div></div>
     <div class="list-head"><input id="${prefix}select-all" type="checkbox" aria-label="选择全部可测试凭证">${[...columns, "启用", ""].map((label) => `<div>${label}</div>`).join("")}</div>
     <div id="${prefix}rows"><div class="empty">正在加载…</div></div>`;
