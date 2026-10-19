@@ -76,7 +76,7 @@ func TestRunModelValidation(t *testing.T) {
 		return nil, nil
 	}
 	for _, model := range []string{"", strings.Repeat("m", 201), "model\x00name", "model\nname"} {
-		body, _ := json.Marshal(map[string]any{"model": model})
+		body, _ := json.Marshal(map[string]any{"model": model, "variant": "original"})
 		for _, run := range []func([]byte) managementResponse{candyRunResponse, fingerprintRunResponse, pelicanRunResponse} {
 			if response := run(body); response.StatusCode != http.StatusBadRequest {
 				t.Fatalf("accepted invalid model %q: %s", model, response.Body)

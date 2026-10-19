@@ -10,11 +10,12 @@ import (
 
 // stateSchemaVersion is the layout of the state file the plugin writes. Files without schema_version are
 // version 0.
-const stateSchemaVersion = 1
+const stateSchemaVersion = 2
 
 // stateMigrations[v] upgrades the raw JSON of a state file from schema v to v+1.
 var stateMigrations = []func(file map[string]json.RawMessage) error{
 	migrateUnversionedState,
+	addPelicanVariants,
 }
 
 // readState decodes a state file of the current or an older schema, and returns the file's own version.
@@ -91,6 +92,16 @@ func setStatus(r map[string]any, answered string) {
 		r["status"] = answered
 	}
 	delete(r, "skipped")
+}
+
+// addPelicanVariants marks the pelican records of plugin 0.4.1 and earlier, drawn before the test had
+// variants, as drawn by the original variant.
+func addPelicanVariants(file map[string]json.RawMessage) (err error) {
+	file["pelicans"], err = mapRecords(file["pelicans"], func(r map[string]any) error {
+		r["variant"] = "original"
+		return nil
+	})
+	return err
 }
 
 // mapRecords applies change to every record of a history in raw JSON, keeping numbers as written.

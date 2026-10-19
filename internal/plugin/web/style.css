@@ -141,7 +141,7 @@ details.problem[open] summary .chev, .row.open .toggle .chev { transform: rotate
    any remaining space is spread evenly across the gaps. */
 #candy-panel { --toolbar-columns: 200px 120px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) 56px var(--marks-width) var(--switch-width) var(--action-width); }
 #fingerprint-panel { --toolbar-columns: 200px 84px minmax(0, 1fr); --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) minmax(104px, 160px) 84px var(--switch-width) var(--action-width); }
-#pelican-panel { --toolbar-columns: 200px 120px minmax(0, 1fr); --preview-scale: .15; --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) calc(800px * var(--preview-scale)) var(--switch-width) var(--action-width); }
+#pelican-panel { --toolbar-columns: 200px 120px 120px minmax(0, 1fr); --preview-scale: .15; --list-columns: var(--list-checkbox) var(--credential-track) var(--result-track) calc(800px * var(--preview-scale)) var(--switch-width) var(--action-width); }
 .list-head, .list-row, .history-panel { display: grid; grid-template-columns: var(--list-columns); justify-content: space-between; align-items: center; gap: var(--list-gap); padding-inline: var(--list-padding); }
 .list-head { padding-block: 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .list-head > :nth-child(2) { padding-left: var(--credential-indent); }

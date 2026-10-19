@@ -86,10 +86,10 @@
       </section>
       <section id="pelican-panel" role="tabpanel" aria-labelledby="tab-pelican" hidden>
         <div class="panel-intro">
-          <p>让模型写一个 HTML 页面，用 SVG 绘制鹈鹕骑自行车的动画。</p>
+          <p>让模型用 SVG 画鹈鹕骑自行车。原版写一个动画 HTML 页面，多合一版在一张图片里加入孙悟空、秦始皇和北极熊，并让鹈鹕喊出糖果题的答案。</p>
           <details class="problem">
             <summary><i data-icon="chevron-right" data-class="chev"></i>查看题目</summary>
-            <div class="problem-body"><pre class="mono"><code><!--PELICAN_PROMPT--></code></pre>
+            <div class="problem-body"><pre class="mono"><code id="pelican-prompt"></code></pre>
               <button class="copy-btn" type="button" aria-label="复制题目" data-tip></button>
             </div>
           </details>
@@ -97,9 +97,10 @@
         <form id="pelican-toolbar" class="card toolbar">
           <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="pelican-model"></select></span></label>
           <label class="field"><span class="field-label">推理强度</span><span class="native-select"><select id="pelican-effort"></select></span></label>
+          <label class="field"><span class="field-label">版本</span><span class="native-select"><select id="pelican-variant"></select></span></label>
           <button id="pelican-run-batch" class="btn" type="submit" disabled>测试全部</button>
         </form>
-        <div class="legend"><span>每个凭证 1 次请求（失败或没有 HTML 时重试）</span></div>
+        <div class="legend"><span>每个凭证 1 次请求（失败或回答中没有代码时重试）</span></div>
         <section id="pelican-credentials" class="card"></section>
       </section>
     </div>
@@ -119,7 +120,7 @@
       <div id="fingerprint-detail-body" class="result-dialog-body"></div>
     </dialog>
     <dialog id="pelican-detail" class="result-dialog" aria-labelledby="pelican-detail-title">
-      <div class="section-head result-dialog-head"><h2 id="pelican-detail-title">鹈鹕动画</h2><button id="pelican-detail-close" class="btn ghost icon-button" type="button" aria-label="关闭动画"><i data-icon="x"></i></button></div>
+      <div class="section-head result-dialog-head"><h2 id="pelican-detail-title">鹈鹕画面</h2><button id="pelican-detail-close" class="btn ghost icon-button" type="button" aria-label="关闭画面"><i data-icon="x"></i></button></div>
       <div id="pelican-detail-body" class="result-dialog-body"></div>
     </dialog>
     <div id="tip" class="tip" role="tooltip" hidden></div>

@@ -71,7 +71,8 @@ func TestRegistration(t *testing.T) {
 // The page inlines its template parts, and an inline script ends at the first "</script" anywhere in its text.
 func TestPage(t *testing.T) {
 	page := string(uiHTML)
-	for _, want := range []string{"版本 v" + pluginVersion, "<code>" + html.EscapeString(candyPrompt) + "</code>", "<code>" + html.EscapeString(pelicanPrompt) + "</code>",
+	variants, _ := json.Marshal(pelicanVariants)
+	for _, want := range []string{"版本 v" + pluginVersion, "<code>" + html.EscapeString(candyPrompt) + "</code>", "PELICAN_VARIANTS = " + string(variants) + ";",
 		`"requests":3`, `"gpt-6.1-sol":"gpt-6-astra"`, detectorLicense} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page lacks %q", want)

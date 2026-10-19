@@ -46,6 +46,7 @@ const context = vm.createContext({
 let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'pelican.js', 'app.js']
   .map(file => webFile(file).split('// Events and initialization.')[0]).join('\n');
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({requests:3,aliases:{'gpt-6.1-sol':'gpt-6-astra'}}));
+source = source.replace('/*PELICAN_VARIANTS*/[]', JSON.stringify([{id:'original',label:'原版',prompt:'p'},{id:'all-in-one',label:'多合一版',prompt:'q'}]));
 vm.runInContext(source, context);
 const run = code => vm.runInContext(code, context);
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -169,6 +170,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert(answer.includes('<strong>答案：</strong>21 &lt;img') && answer.includes('<math') && !/<(img|a)\b|\shref=/.test(answer), 'answers render Markdown and TeX, never HTML, links or images');
   const frame = run(`pelicanFrame('<script>top.location = "x"</script>')`);
   assert(frame.startsWith('<iframe sandbox="allow-scripts" srcdoc="&lt;script&gt;top.location = &quot;x&quot;'), 'model pages run in an opaque origin, inside their srcdoc');
+  assert(run(`pelicanHistory({id:'cred'}, {id:'drawn',time:'2026-09-28T00:00:00Z',model:'m',variant:'all-in-one',status:'failed',error:'e'})`).includes('aria-label="版本 多合一版"'), 'pelican records show their variant');
   const fingerprintRecord = {...historyRecord,id:'fingerprint',status:'completed'};
   const historyCredential = {id:'history',name:'Test',source:'auth_files',provider:'codex',candies:[historyRecord,{...historyRecord,id:'second'}],fingerprints:[fingerprintRecord,{...fingerprintRecord,id:'second'}],pelicans:[]};
   run(`candyExpanded.add('history'); fingerprintExpanded.add('history')`);

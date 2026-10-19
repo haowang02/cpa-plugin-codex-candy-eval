@@ -69,13 +69,13 @@ func TestStateMigration(t *testing.T) {
 				}
 				candy, pelicans := records.Candies["a"][0], records.Pelicans["a"]
 				if strings.Join(statuses, " ") != "correct wrong failed skipped" || candy.ID != "1792385374427144308" || candy.InputTokens != 14125 ||
-					records.Fingerprints["a"][0].Status != "partial" || pelicans[0].Status != "completed" || pelicans[1].Status != "skipped" {
+					records.Fingerprints["a"][0].Status != "partial" || pelicans[0].Status != "completed" || pelicans[1].Status != "skipped" || pelicans[1].Variant != "original" {
 					t.Fatalf("migrated records: %+v", records)
 				}
 			}
 			saved, _ := os.ReadFile(statePath)
 			backup, _ := os.ReadFile(strings.TrimSuffix(statePath, ".json") + ".v0.json")
-			if !bytes.Contains(saved, []byte(`"schema_version":1`)) || bytes.Contains(saved, []byte(`"results"`)) || string(backup) != file {
+			if !bytes.Contains(saved, []byte(fmt.Sprintf(`"schema_version":%d`, stateSchemaVersion))) || bytes.Contains(saved, []byte(`"results"`)) || string(backup) != file {
 				t.Fatalf("saved %s, backup %s", saved, backup)
 			}
 		})
@@ -83,7 +83,7 @@ func TestStateMigration(t *testing.T) {
 }
 
 func TestUnreadableStateIsPreserved(t *testing.T) {
-	for _, input := range []string{`{"candies":`, `null`, `{"schema_version":"1"}`, `{"schema_version":2}`} {
+	for _, input := range []string{`{"candies":`, `null`, `{"schema_version":"1"}`, fmt.Sprintf(`{"schema_version":%d}`, stateSchemaVersion+1)} {
 		t.Run(input, func(t *testing.T) {
 			setupTest(t)
 			data := []byte(input)

@@ -78,11 +78,12 @@ var pelicanScript string
 var uiHTML = func() []byte {
 	config, _ := json.Marshal(map[string]any{"requests": fingerprintTarget, "aliases": fingerprintAliases})
 	fingerprint := strings.Replace(fingerprintScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
+	variants, _ := json.Marshal(pelicanVariants)
+	pelican := strings.Replace(pelicanScript, `/*PELICAN_VARIANTS*/[]`, string(variants), 1)
 	return []byte(strings.NewReplacer(
 		"/*APP_STYLES*/", temmlStyles+"\n"+uiThemes+"\n"+uiStyles,
 		"<!--PLUGIN_VERSION-->", pluginVersion,
 		"<!--CANDY_PROMPT-->", html.EscapeString(candyPrompt),
-		"<!--PELICAN_PROMPT-->", html.EscapeString(pelicanPrompt),
 		"<!--DETECTOR_LICENSE-->", "<!-- LM Fingerpoint Detector\n"+detectorLicense+"-->",
 		"/*MARKDOWN_SCRIPT*/", markdownScript,
 		"/*CJK_FRIENDLY_SCRIPT*/", cjkFriendlyScript,
@@ -93,7 +94,7 @@ var uiHTML = func() []byte {
 		"/*COMPONENTS_SCRIPT*/", componentsScript,
 		"/*CANDY_SCRIPT*/", candyScript,
 		"/*FINGERPRINT_SCRIPT*/", fingerprint,
-		"/*PELICAN_SCRIPT*/", pelicanScript,
+		"/*PELICAN_SCRIPT*/", pelican,
 		"/*APP_SCRIPT*/", appScript,
 	).Replace(uiTemplate))
 }()
