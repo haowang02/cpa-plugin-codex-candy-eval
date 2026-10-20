@@ -387,7 +387,7 @@ dialog::backdrop { background: rgb(0 0 0 / 35%); }
   .answer-toggle { justify-self: end; }
   .answer-content { grid-column: 1 / -1; }
   .result-dialog { --dialog-padding: 16px; }
-  :is(#fingerprint-toolbar, #pelican-toolbar) > .btn { grid-column: 1 / -1; }
+  #fingerprint-toolbar > .btn { grid-column: 1 / -1; }
   .fingerprint-summary { grid-template-columns: 1fr 1fr; }
   .fingerprint-summary > div:first-child { grid-column: 1 / -1; }
   .fingerprint-rank { grid-template-columns: 18px minmax(0, 1fr) 58px; gap: 8px; padding-inline: 6px; }
