@@ -33,10 +33,12 @@ function panelValue(name) {
   try {
     let raw = localStorage.getItem(name);
     if (!raw) return null;
-    const prefix = "enc::v1::";
-    if (raw.startsWith(prefix)) {
-      const secret = new TextEncoder().encode("cli-proxy-api-webui::secure-storage|" + location.host + "|" + navigator.userAgent);
-      const bin = atob(raw.slice(prefix.length));
+    // CPAMC writes enc::v1:: (keyed by host and user agent), CPAMP enc::v2:: (keyed by host).
+    const prefix = /^enc::v([12])::/.exec(raw);
+    if (prefix) {
+      const scope = prefix[1] === "2" ? "v2|" + location.host : location.host + "|" + navigator.userAgent;
+      const secret = new TextEncoder().encode("cli-proxy-api-webui::secure-storage|" + scope);
+      const bin = atob(raw.slice(prefix[0].length));
       const bytes = Uint8Array.from(bin, (c, i) => c.charCodeAt(0) ^ secret[i % secret.length]);
       raw = new TextDecoder().decode(bytes);
     }

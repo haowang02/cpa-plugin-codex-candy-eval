@@ -30,7 +30,8 @@ function element(id) {
   return elements.get(id);
 }
 const context = vm.createContext({
-  TextEncoder, Uint8Array, Uint32Array, DataView, atob, console, AbortController, AbortSignal, URLSearchParams,
+  TextEncoder, TextDecoder, Uint8Array, Uint32Array, DataView, atob, console, AbortController, AbortSignal, URLSearchParams,
+  location: { host: 'cpa.test' }, navigator: { userAgent: 'test-agent' },
   addEventListener() {},
   Date: class extends Date { static now() { return now; } },
   setTimeout(callback, delay) { const id = ++timerID; noticeTimers.set(id, { callback, delay }); return id; },
@@ -66,6 +67,16 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   for (const input of ['', 'abc', '中文配置', 'a'.repeat(1000)]) {
     assert.equal(await run(`sha256Hex(${JSON.stringify(input)})`), crypto.createHash('sha256').update(input).digest('hex'));
   }
+  const panelAuth = (version, managementKey) => {
+    const secret = Buffer.from('cli-proxy-api-webui::secure-storage|' + (version === 2 ? 'v2|cpa.test' : 'cpa.test|test-agent'));
+    const data = Buffer.from(JSON.stringify({ state: { managementKey } }));
+    return `enc::v${version}::` + data.map((byte, i) => byte ^ secret[i % secret.length]).toString('base64');
+  };
+  for (const version of [1, 2]) {
+    browserStorage.set('cli-proxy-auth', panelAuth(version, ' panel-key '));
+    assert.equal(run(`panelKey()`), 'panel-key', `the panel login stored as enc::v${version}:: must be reused`);
+  }
+  browserStorage.delete('cli-proxy-auth');
   const key = 'synthetic-private-api-key';
   const config = {
     'codex-api-key': [{ 'api-key': key, prefix: 'prefix', headers: { Z: 'z', A: 'a' }, weight: 0, priority: 99 }, { 'api-key': key, prefix: 'prefix', headers: { A: 'a', Z: 'z' }, 'excluded-models': ['gpt-test', ' * '] }],
