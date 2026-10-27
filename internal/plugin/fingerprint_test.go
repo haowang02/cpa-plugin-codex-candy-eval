@@ -27,7 +27,8 @@ var fingerprintAnswer = func() string {
 
 func TestFingerprintUpstreamParity(t *testing.T) {
 	// Golden results come from the pinned upstream analyzeSharedOutputs with allowPartial, as its page runs it:
-	// two calibrated rankings, a partial ranking and answers that do not move like a model's.
+	// calibrated rankings (one for kimi-k3.1-pro answers whose small-step share alone exceeds its limit),
+	// a partial ranking and answers that do not move like a model's.
 	raw, err := os.ReadFile("testdata/lm-detector-golden.json")
 	if err != nil {
 		t.Fatal(err)

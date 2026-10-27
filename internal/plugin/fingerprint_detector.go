@@ -275,9 +275,10 @@ func analyzeFingerprint(outputs []fingerprintOutput) (fingerprintAttribution, er
 	return r, nil
 }
 
-// sequenceShape checks how consecutive numbers move. Language-model answers jump between distant values:
-// a strongly negative lag-1 autocorrelation and almost no steps of 20 or less. Program output and sorted or
-// shuffled lists do not. The limits are 99.5% quantiles over the reference bank's three-answer groups.
+// sequenceShape checks how consecutive numbers move. Language-model answers tend to jump between distant values:
+// a negative lag-1 autocorrelation and few steps of 20 or less. Only answers that exceed both limits are not
+// ranked, since a model's answer can miss one of them. The limits are 99.5% quantiles over the reference
+// bank's three-answer groups.
 func sequenceShape(answers [][]int) *fingerprintSequence {
 	var autocorrelations, smallSteps []float64
 	for _, numbers := range answers {
@@ -302,7 +303,7 @@ func sequenceShape(answers [][]int) *fingerprintSequence {
 		smallSteps = append(smallSteps, small/float64(len(x)-1))
 	}
 	s := &fingerprintSequence{Autocorrelation: median(autocorrelations), SmallStepShare: median(smallSteps)}
-	s.ModelLike = s.Autocorrelation <= -0.23 && s.SmallStepShare <= 0.05
+	s.ModelLike = s.Autocorrelation <= -0.23 || s.SmallStepShare <= 0.05
 	return s
 }
 

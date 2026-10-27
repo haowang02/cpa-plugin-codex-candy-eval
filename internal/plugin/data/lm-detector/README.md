@@ -5,7 +5,7 @@ Source: https://github.com/Ikaleio/lm-detector (MIT)
 The ranker, sequence check and calibration are Go ports of upstream
 `shared/shared-detector.ts`, `shared/positional.ts` and
 `shared/fingerprint-core.js`, pinned at
-`654c8334bb53951aaf04cbd61252d163649e1369`. The license is embedded in the plugin.
+`a4ef212df06817e8071acd05f00219f4c9eb2f9a`. The license is embedded in the plugin.
 
 - `shared_detector.bin`: the frozen ranker and calibration, copied unchanged.
 - `enrollment-suite.json`: the 36 fixed challenges the reference answers were

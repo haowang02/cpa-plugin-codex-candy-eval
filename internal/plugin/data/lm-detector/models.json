@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-10-17T09:36:07.798950+00:00",
+  "built_at": "2026-10-27T05:02:50.758637+00:00",
   "models": [
     {
       "id": "claude-haiku-4.5",
@@ -419,6 +419,34 @@
       "display_name": "deepseek-v4.1-flash-1017",
       "family": "deepseek",
       "family_name": "DeepSeek",
+      "response_count": 36
+    },
+    {
+      "id": "kimi-k3.1-pro",
+      "display_name": "kimi-k3.1-pro",
+      "family": "kimi",
+      "family_name": "Kimi",
+      "response_count": 36
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "display_name": "gemini-3.5-flash-lite",
+      "family": "gemini",
+      "family_name": "Gemini",
+      "response_count": 36
+    },
+    {
+      "id": "minimax-m3.1-flash",
+      "display_name": "minimax-m3.1-flash",
+      "family": "minimax",
+      "family_name": "MiniMax",
+      "response_count": 36
+    },
+    {
+      "id": "gpt-6.1-terra",
+      "display_name": "gpt-6.1-terra",
+      "family": "gpt",
+      "family_name": "GPT",
       "response_count": 36
     }
   ]
