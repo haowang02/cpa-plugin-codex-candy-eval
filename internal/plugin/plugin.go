@@ -16,7 +16,7 @@ import (
 
 const (
 	pluginID      = "cpa-codex-candy-eval"
-	pluginVersion = "0.4.3"
+	pluginVersion = "0.4.4"
 	ABIVersion    = 1
 	// rpcSchemaVersion is the version of CPA's plugin RPC contract, not of the state file.
 	rpcSchemaVersion = 6
