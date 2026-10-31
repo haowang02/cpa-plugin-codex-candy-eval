@@ -33,14 +33,19 @@ function panelValue(name) {
   try {
     let raw = localStorage.getItem(name);
     if (!raw) return null;
-    // CPAMC writes enc::v1:: (keyed by host and user agent), CPAMP enc::v2:: (keyed by host).
+    // CPAMC v2 uses the host; CPAMP v2 adds "v2|". CPAMC v1 also uses the user agent.
     const prefix = /^enc::v([12])::/.exec(raw);
     if (prefix) {
-      const scope = prefix[1] === "2" ? "v2|" + location.host : location.host + "|" + navigator.userAgent;
-      const secret = new TextEncoder().encode("cli-proxy-api-webui::secure-storage|" + scope);
+      const scopes = prefix[1] === "2" ? [location.host, "v2|" + location.host] : [location.host + "|" + navigator.userAgent];
       const bin = atob(raw.slice(prefix[0].length));
-      const bytes = Uint8Array.from(bin, (c, i) => c.charCodeAt(0) ^ secret[i % secret.length]);
-      raw = new TextDecoder().decode(bytes);
+      for (const scope of scopes) {
+        try {
+          const secret = new TextEncoder().encode("cli-proxy-api-webui::secure-storage|" + scope);
+          const bytes = Uint8Array.from(bin, (c, i) => c.charCodeAt(0) ^ secret[i % secret.length]);
+          return JSON.parse(new TextDecoder().decode(bytes));
+        } catch (_) {}
+      }
+      return null;
     }
     return JSON.parse(raw);
   } catch (_) { return null; }
