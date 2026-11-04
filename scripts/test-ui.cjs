@@ -40,11 +40,11 @@ const context = vm.createContext({
   document: { compatMode: 'CSS1Compat', getElementById: element, querySelectorAll: () => [], createElement: () => ({ set innerHTML(html) { this.content = { firstElementChild: fakeNode(html) }; } }) },
   sessionStorage: { getItem: () => null },
   localStorage: {
-    getItem: key => browserStorage.get(key) || null,
+    getItem(key) { if (storageBlocked) throw new Error('Storage unavailable'); return browserStorage.get(key) || null; },
     setItem(key, value) { if (storageBlocked) throw new Error('Storage unavailable'); storageWrites++; browserStorage.set(key, value); },
   },
 });
-let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'pelican.js', 'app.js']
+let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'storage.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'pelican.js', 'app.js']
   .map(file => webFile(file).split('// Events and initialization.')[0]).join('\n');
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({requests:3,aliases:{'gpt-6.1-sol':'gpt-6-astra'}}));
 source = source.replace('/*PELICAN_VARIANTS*/[]', JSON.stringify([{id:'original',label:'原版',prompt:'p'},{id:'all-in-one',label:'多合一版',prompt:'q'}]));
@@ -67,9 +67,9 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   for (const input of ['', 'abc', '中文配置', 'a'.repeat(1000)]) {
     assert.equal(await run(`sha256Hex(${JSON.stringify(input)})`), crypto.createHash('sha256').update(input).digest('hex'));
   }
-  const panelAuth = (version, scope, managementKey) => {
+  const panelRecord = (version, scope, state) => {
     const secret = Buffer.from('cli-proxy-api-webui::secure-storage|' + scope);
-    const data = Buffer.from(JSON.stringify({ state: { managementKey } }));
+    const data = Buffer.from(JSON.stringify({ state }));
     return `enc::v${version}::` + data.map((byte, i) => byte ^ secret[i % secret.length]).toString('base64');
   };
   for (const [panel, version, scope] of [
@@ -77,10 +77,24 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     ['CPAMC v2', 2, 'cpa.test'],
     ['CPAMP v2', 2, 'v2|cpa.test'],
   ]) {
-    browserStorage.set('cli-proxy-auth', panelAuth(version, scope, ' panel-key '));
-    assert.equal(run(`panelKey()`), 'panel-key', `${panel} saved login must be reused`);
+    const managementKey = ' 面板-key-' + 'x'.repeat(64);
+    browserStorage.set('cli-proxy-auth', panelRecord(version, scope, { managementKey }));
+    assert.equal(run(`panelKey()`), managementKey.trim(), `${panel} saved login must be reused`);
+    browserStorage.set('cli-proxy-theme', panelRecord(version, scope, { theme: 'dark' }));
+    assert.equal(run(`panelValue('cli-proxy-theme').state.theme`), 'dark', `${panel} theme uses the same storage format`);
   }
+  browserStorage.set('cli-proxy-auth', JSON.stringify({ state: { managementKey: ' plain-key ' } }));
+  assert.equal(run(`panelKey()`), 'plain-key');
+  for (const invalid of ['not JSON', 'enc::v2::!', 'enc::v2::e30=', JSON.stringify({ state: { managementKey: 123 } })]) {
+    browserStorage.set('cli-proxy-auth', invalid);
+    assert.equal(run(`panelKey()`), '', 'unreadable panel logins must fall back to manual login');
+  }
+  storageBlocked = true;
+  assert.equal(run(`panelKey()`), '', 'blocked storage must not prevent manual login');
+  storageBlocked = false;
   browserStorage.delete('cli-proxy-auth');
+  browserStorage.delete('cli-proxy-theme');
+  assert.equal(run(`panelKey()`), '');
   const key = 'synthetic-private-api-key';
   const config = {
     'codex-api-key': [{ 'api-key': key, prefix: 'prefix', headers: { Z: 'z', A: 'a' }, weight: 0, priority: 99 }, { 'api-key': key, prefix: 'prefix', headers: { A: 'a', Z: 'z' }, 'excluded-models': ['gpt-test', ' * '] }],

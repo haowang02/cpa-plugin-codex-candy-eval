@@ -1,7 +1,6 @@
 "use strict";
 const BASE = "/v0/management/plugins/cpa-codex-candy-eval";
 const KEY_STORE = "cpa-codex-candy-eval.key";
-const VIEW_STORE = "cpa-codex-candy-eval.view.v1.";
 const DEFAULT_MODEL = "gpt-6.1-sol";
 const DEFAULT_EFFORT = "low";
 const DEFAULT_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"];
@@ -28,38 +27,11 @@ const credentialFilter = {
   plan: preference("credential-filter.plan", "all"),
 };
 
-// The CPA management panel keeps its state in same-origin localStorage, optionally obfuscated.
-function panelValue(name) {
-  try {
-    let raw = localStorage.getItem(name);
-    if (!raw) return null;
-    // CPAMC v2 uses the host; CPAMP v2 adds "v2|". CPAMC v1 also uses the user agent.
-    const prefix = /^enc::v([12])::/.exec(raw);
-    if (prefix) {
-      const scopes = prefix[1] === "2" ? [location.host, "v2|" + location.host] : [location.host + "|" + navigator.userAgent];
-      const bin = atob(raw.slice(prefix[0].length));
-      for (const scope of scopes) {
-        try {
-          const secret = new TextEncoder().encode("cli-proxy-api-webui::secure-storage|" + scope);
-          const bytes = Uint8Array.from(bin, (c, i) => c.charCodeAt(0) ^ secret[i % secret.length]);
-          return JSON.parse(new TextDecoder().decode(bytes));
-        } catch (_) {}
-      }
-      return null;
-    }
-    return JSON.parse(raw);
-  } catch (_) { return null; }
-}
-
 // Panels resolve their "auto" theme to white or dark; CPAMC also has a light (paper) theme.
 function applyTheme() {
   const theme = panelValue("cli-proxy-theme")?.state?.theme;
   document.documentElement.dataset.theme = ["light", "white", "dark"].includes(theme) ? theme
     : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "white";
-}
-function panelKey() {
-  const k = panelValue("cli-proxy-auth")?.state?.managementKey;
-  return typeof k === "string" ? k.trim() : "";
 }
 
 class AuthError extends Error {}
@@ -92,20 +64,6 @@ async function api(path, { method = "GET", body, apiKey, signal } = {}) {
   return data;
 }
 
-function stored(name) {
-  try { return JSON.parse(localStorage.getItem(name)); } catch (_) { return null; }
-}
-function store(name, value) {
-  try { localStorage.setItem(name, JSON.stringify(value)); } catch (_) {}
-}
-// Page choices are kept across visits; a saved value replaces its default only when the types match.
-function preference(name, fallback) {
-  const value = stored(VIEW_STORE + name);
-  return value !== null && typeof value === typeof fallback ? value : fallback;
-}
-function savePreference(name, value) {
-  store(VIEW_STORE + name, value);
-}
 function fillModels() {
   const ids = [...new Set(catalogCache.models?.ids || [])].sort(compareModels);
   const unsuffixed = ids.filter((id) => !/[()]/.test(id));

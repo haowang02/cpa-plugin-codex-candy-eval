@@ -16,7 +16,7 @@ import (
 
 const (
 	pluginID      = "cpa-codex-candy-eval"
-	pluginVersion = "0.4.4"
+	pluginVersion = "0.4.5"
 	ABIVersion    = 1
 	// rpcSchemaVersion is the version of CPA's plugin RPC contract, not of the state file.
 	rpcSchemaVersion = 6
@@ -54,6 +54,9 @@ var temmlScript string
 //go:embed web/vendor/temml.css
 var temmlStyles string
 
+//go:embed web/storage.js
+var storageScript string
+
 //go:embed web/credentials.js
 var credentialScript string
 
@@ -89,6 +92,7 @@ var uiHTML = func() []byte {
 		"/*CJK_FRIENDLY_SCRIPT*/", cjkFriendlyScript,
 		"/*TEXMATH_SCRIPT*/", texmathScript,
 		"/*TEMML_SCRIPT*/", temmlScript,
+		"/*STORAGE_SCRIPT*/", storageScript,
 		"/*CREDENTIALS_SCRIPT*/", credentialScript,
 		"/*CATALOG_SCRIPT*/", catalogScript,
 		"/*COMPONENTS_SCRIPT*/", componentsScript,
