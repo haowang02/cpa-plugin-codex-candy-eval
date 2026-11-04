@@ -67,14 +67,18 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   for (const input of ['', 'abc', '中文配置', 'a'.repeat(1000)]) {
     assert.equal(await run(`sha256Hex(${JSON.stringify(input)})`), crypto.createHash('sha256').update(input).digest('hex'));
   }
-  const panelAuth = (version, managementKey) => {
-    const secret = Buffer.from('cli-proxy-api-webui::secure-storage|' + (version === 2 ? 'v2|cpa.test' : 'cpa.test|test-agent'));
+  const panelAuth = (version, scope, managementKey) => {
+    const secret = Buffer.from('cli-proxy-api-webui::secure-storage|' + scope);
     const data = Buffer.from(JSON.stringify({ state: { managementKey } }));
     return `enc::v${version}::` + data.map((byte, i) => byte ^ secret[i % secret.length]).toString('base64');
   };
-  for (const version of [1, 2]) {
-    browserStorage.set('cli-proxy-auth', panelAuth(version, ' panel-key '));
-    assert.equal(run(`panelKey()`), 'panel-key', `the panel login stored as enc::v${version}:: must be reused`);
+  for (const [panel, version, scope] of [
+    ['CPAMC v1', 1, 'cpa.test|test-agent'],
+    ['CPAMC v2', 2, 'cpa.test'],
+    ['CPAMP v2', 2, 'v2|cpa.test'],
+  ]) {
+    browserStorage.set('cli-proxy-auth', panelAuth(version, scope, ' panel-key '));
+    assert.equal(run(`panelKey()`), 'panel-key', `${panel} saved login must be reused`);
   }
   browserStorage.delete('cli-proxy-auth');
   const key = 'synthetic-private-api-key';
