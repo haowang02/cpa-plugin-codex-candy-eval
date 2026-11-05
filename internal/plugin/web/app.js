@@ -1,6 +1,5 @@
 "use strict";
 const BASE = "/v0/management/plugins/cpa-codex-candy-eval";
-const KEY_STORE = "cpa-codex-candy-eval.key";
 const DEFAULT_MODEL = "gpt-6.1-sol";
 const DEFAULT_EFFORT = "low";
 const DEFAULT_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"];
@@ -9,7 +8,7 @@ const HIDDEN_MODEL = (id) => id.toLowerCase().includes("image");
 const TESTS = ["candy", "fingerprint", "pelican"];
 const TEST_LABELS = { candy: "糖果测试", fingerprint: "指纹检测", pelican: "鹈鹕测试" };
 
-let key = "";
+let key = initialKey();
 let credentials = [];
 let pollTimer = 0;
 let loadError = "";
@@ -27,19 +26,13 @@ const credentialFilter = {
   plan: preference("credential-filter.plan", "all"),
 };
 
-// Panels resolve their "auto" theme to white or dark; CPAMC also has a light (paper) theme.
-function applyTheme() {
-  const theme = panelValue("cli-proxy-theme")?.state?.theme;
-  document.documentElement.dataset.theme = ["light", "white", "dark"].includes(theme) ? theme
-    : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "white";
-}
-
 class AuthError extends Error {}
 
 async function api(path, { method = "GET", body, apiKey, signal } = {}) {
   const timeout = AbortSignal.timeout(30000);
   const requestKey = apiKey ?? key;
-  const init = { method, cache: "no-store", signal: signal ? AbortSignal.any([signal, timeout]) : timeout, headers: { Authorization: "Bearer " + requestKey } };
+  const init = { method, cache: "no-store", signal: signal ? AbortSignal.any([signal, timeout]) : timeout, headers: {} };
+  if (requestKey !== null) init.headers.Authorization = "Bearer " + requestKey;
   if (body !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(body);
@@ -55,7 +48,7 @@ async function api(path, { method = "GET", body, apiKey, signal } = {}) {
   let data = null;
   try { data = JSON.parse(text); } catch (_) {}
   // A 401 for a key replaced by a newer login must not sign that login out.
-  if (resp.status === 401 && apiKey === undefined && requestKey === key) throw new AuthError("管理密钥无效，请重新输入。");
+  if (resp.status === 401 && apiKey === undefined && requestKey === key) throw new AuthError(requestKey === null ? "面板登录已过期，请返回面板重新登录。" : "管理密钥无效，请重新输入。");
   if (!resp.ok) {
     const err = data?.error;
     throw Object.assign(new Error(String((typeof err === "string" ? err : err?.message) || text || "HTTP " + resp.status).slice(0, 500)), { status: resp.status });
@@ -249,8 +242,10 @@ function startTest(test, body) {
 
 function showLogin(message) {
   stopPolling();
-  key = "";
-  try { sessionStorage.removeItem(KEY_STORE); } catch (_) {}
+  if (key !== null) {
+    key = "";
+    try { sessionStorage.removeItem(KEY_STORE); } catch (_) {}
+  }
   resetCatalogCache();
   credentials = [];
   loadError = storageError = "";
@@ -263,7 +258,9 @@ function showLogin(message) {
   $("login").hidden = false;
   $("login-error").hidden = !message;
   $("login-error").textContent = message || "";
-  $("login-key").focus();
+  $("login-form").hidden = key === null;
+  $("login-hint").hidden = key === null;
+  if (key !== null) $("login-key").focus();
 }
 
 async function start() {
@@ -445,9 +442,7 @@ $("refresh").addEventListener("click", async () => {
   }
 });
 
-applyTheme();
-addEventListener("storage", applyTheme);
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+followPanelTheme();
 
 // Masking and credential filters apply to every tab, whichever card changes them.
 setMasked(preference("masked", false));
@@ -521,6 +516,4 @@ for (const [test, selection, submit] of [["candy", candySelected, runCandy], ["f
     render();
   });
 }
-key = panelKey();
-if (!key) { try { key = sessionStorage.getItem(KEY_STORE) || ""; } catch (_) {} }
-key ? start() : showLogin("");
+key !== "" ? start() : showLogin("");

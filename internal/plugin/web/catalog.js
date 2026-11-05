@@ -28,9 +28,9 @@ function resetCatalogCache(next = { owner: catalogCache.owner, revision: "", mod
 }
 
 async function openCatalogCache(managementKey) {
-  const owner = await sha256Hex(CATALOG_STORE + "\0" + managementKey);
+  const owner = managementKey ? await sha256Hex(CATALOG_STORE + "\0" + managementKey) : "";
   if (key !== managementKey) return;
-  const saved = stored(CATALOG_STORE);
+  const saved = owner ? stored(CATALOG_STORE) : null;
   const next = { owner, revision: "", models: null, credentials: Object.create(null) };
   if (saved?.owner === owner && typeof saved.revision === "string") {
     next.revision = saved.revision;

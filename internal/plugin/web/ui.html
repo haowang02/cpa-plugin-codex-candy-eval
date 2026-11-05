@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-host="cpamc">
 <!--DETECTOR_LICENSE-->
 <head>
   <meta charset="utf-8">
@@ -15,7 +15,7 @@
 
     <section id="login" class="card login" hidden>
       <h2>连接 CPA</h2>
-      <p>请输入 CPA 管理密钥。登录 CPA 管理面板时勾选「记住密码」，本页会自动使用该密钥。</p>
+      <p id="login-hint">请输入 CPA 管理密钥。在 CPAMC 或 CPAMP 中勾选「记住密码」后，本页会自动使用该密钥。</p>
       <form id="login-form">
         <input id="login-key" type="password" autocomplete="current-password" placeholder="管理密钥" aria-label="管理密钥" required>
         <button class="btn" type="submit">连接</button>
@@ -136,6 +136,7 @@
   <script>/*TEXMATH_SCRIPT*/</script>
   <script>/*TEMML_SCRIPT*/</script>
   <script>/*STORAGE_SCRIPT*/</script>
+  <script>/*HOST_SCRIPT*/</script>
   <script>/*CREDENTIALS_SCRIPT*/</script>
   <script>/*CATALOG_SCRIPT*/</script>
   <script>/*COMPONENTS_SCRIPT*/</script>

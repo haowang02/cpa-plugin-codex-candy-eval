@@ -14,10 +14,10 @@
 html { background: var(--bg-image) fixed var(--bg); }
 body {
   margin: 0; padding: 0 var(--page-inline); color: var(--ink);
-  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+  font: 14px/1.55 var(--font-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif);
   -webkit-font-smoothing: antialiased;
 }
-.mono, .markdown code { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.mono, .markdown code { font-family: var(--font-mono, ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace); font-variant-numeric: tabular-nums; }
 main { display: flow-root; min-height: 100dvh; max-width: var(--page-width); margin: 0 auto; padding-top: var(--page-top); }
 .page-footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 0; padding: 24px 12px max(32px, env(safe-area-inset-bottom)); color: var(--faint); font-size: 11px; }
 .page-footer span { white-space: nowrap; }

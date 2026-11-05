@@ -30,8 +30,8 @@ function element(id) {
   return elements.get(id);
 }
 const context = vm.createContext({
-  TextEncoder, TextDecoder, Uint8Array, Uint32Array, DataView, atob, console, AbortController, AbortSignal, URLSearchParams,
-  location: { host: 'cpa.test' }, navigator: { userAgent: 'test-agent' },
+  TextEncoder, TextDecoder, Uint8Array, Uint32Array, DataView, atob, console, AbortController, AbortSignal, URL, URLSearchParams,
+  location: { host: 'cpa.test', href: 'https://cpa.test/v0/resource/plugins/cpa-codex-candy-eval/ui' }, navigator: { userAgent: 'test-agent' },
   addEventListener() {},
   Date: class extends Date { static now() { return now; } },
   setTimeout(callback, delay) { const id = ++timerID; noticeTimers.set(id, { callback, delay }); return id; },
@@ -44,7 +44,7 @@ const context = vm.createContext({
     setItem(key, value) { if (storageBlocked) throw new Error('Storage unavailable'); storageWrites++; browserStorage.set(key, value); },
   },
 });
-let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'storage.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'pelican.js', 'app.js']
+let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'storage.js', 'host.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'pelican.js', 'app.js']
   .map(file => webFile(file).split('// Events and initialization.')[0]).join('\n');
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({requests:3,aliases:{'gpt-6.1-sol':'gpt-6-astra'}}));
 source = source.replace('/*PELICAN_VARIANTS*/[]', JSON.stringify([{id:'original',label:'原版',prompt:'p'},{id:'all-in-one',label:'多合一版',prompt:'q'}]));
@@ -79,22 +79,83 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   ]) {
     const managementKey = ' 面板-key-' + 'x'.repeat(64);
     browserStorage.set('cli-proxy-auth', panelRecord(version, scope, { managementKey }));
-    assert.equal(run(`panelKey()`), managementKey.trim(), `${panel} saved login must be reused`);
+    assert.equal(run(`initialKey()`), managementKey.trim(), `${panel} saved login must be reused`);
     browserStorage.set('cli-proxy-theme', panelRecord(version, scope, { theme: 'dark' }));
     assert.equal(run(`panelValue('cli-proxy-theme').state.theme`), 'dark', `${panel} theme uses the same storage format`);
   }
   browserStorage.set('cli-proxy-auth', JSON.stringify({ state: { managementKey: ' plain-key ' } }));
-  assert.equal(run(`panelKey()`), 'plain-key');
+  assert.equal(run(`initialKey()`), 'plain-key');
   for (const invalid of ['not JSON', 'enc::v2::!', 'enc::v2::e30=', JSON.stringify({ state: { managementKey: 123 } })]) {
     browserStorage.set('cli-proxy-auth', invalid);
-    assert.equal(run(`panelKey()`), '', 'unreadable panel logins must fall back to manual login');
+    assert.equal(run(`initialKey()`), '', 'unreadable panel logins must fall back to manual login');
   }
   storageBlocked = true;
-  assert.equal(run(`panelKey()`), '', 'blocked storage must not prevent manual login');
+  assert.equal(run(`initialKey()`), '', 'blocked storage must not prevent manual login');
   storageBlocked = false;
   browserStorage.delete('cli-proxy-auth');
   browserStorage.delete('cli-proxy-theme');
-  assert.equal(run(`panelKey()`), '');
+  assert.equal(run(`initialKey()`), '');
+  const nativeURL = context.location.href;
+  context.location.href = 'https://cpa.test/console/api/v1/plugin-host/v0/resource/plugins/cpa-codex-candy-eval/ui';
+  browserStorage.set('cli-proxy-auth', JSON.stringify({ state: { managementKey: 'stale-panel-key' } }));
+  context.sessionStorage = { getItem: () => 'stale-plugin-key' };
+  assert.equal(run(`key = initialKey()`), null, 'OMC uses its session even when saved CPA logins exist');
+  const requests = [];
+  context.fetch = async (url, init) => { requests.push({url, ...init}); return {ok:true, status:200, text:async () => '{}'}; };
+  await run(`api(BASE + '/state')`);
+  await run(`api('/v1/models', {apiKey:'client-key'})`);
+  assert.equal(requests[0].headers.Authorization, undefined, 'OMC management requests must not send an explicit key');
+  assert.equal(requests[1].headers.Authorization, 'Bearer client-key', 'model discovery still uses the client key');
+  const writesBeforeSession = storageWrites;
+  await run(`openCatalogCache(key)`);
+  run(`saveCatalogCache()`);
+  assert.equal(storageWrites, writesBeforeSession, 'session catalog data must not persist across logins');
+  context.fetch = async () => ({ok:false, status:401, text:async () => '{}'});
+  await assert.rejects(run(`api(BASE + '/state')`), /面板登录已过期/);
+  run(`showLogin('Expired')`);
+  assert.equal(element('login-form').hidden, true, 'an expired host session must not prompt for a management key');
+  delete context.fetch;
+  context.location.href = nativeURL;
+  context.sessionStorage = { getItem: () => null };
+  browserStorage.delete('cli-proxy-auth');
+  run(`key = initialKey()`);
+
+  const themeRoot = (dataset = {}, values = {}) => {
+    const props = new Map(Object.entries(values));
+    return { dataset, style: { getPropertyValue: key => props.get(key) || '', setProperty: (key, value) => props.set(key, value), removeProperty: key => props.delete(key) },
+      hasAttribute(name) { return name === 'data-cpamp-plugin-host' && this.cpamp; },
+      ownerDocument: { defaultView: { getComputedStyle: element => element.style }, fonts: new Set() } };
+  };
+  const root = themeRoot(), shell = themeRoot({theme:'light'});
+  const omc = themeRoot({theme:'paper', themeMode:'light'}, {'--bg':'#fff', '--fg':'#222', '--font-ui':'Custom Sans'});
+  const font = {}; omc.ownerDocument.fonts.add(font);
+  const top = { document: {documentElement:omc} }; top.parent = top;
+  const media = { matches:false, addEventListener() {} };
+  let syncTheme;
+  const theming = vm.createContext({ ...context,
+    window: { parent: { document: {documentElement:shell}, parent:top } },
+    document: {documentElement:root, fonts:new Set()}, matchMedia: () => media,
+    MutationObserver: class { constructor(callback) { syncTheme = callback; } observe() {} },
+  });
+  vm.runInContext(webFile('host.js') + '\nfollowPanelTheme();', theming);
+  assert.equal(root.dataset.host, 'omc', 'the theme shell must not hide the outer OMC palette');
+  assert(theming.document.fonts.has(font), 'custom font faces must be available in the plugin document');
+  omc.dataset.themeMode = 'dark'; omc.style.setProperty('--bg', '#111'); omc.style.setProperty('--font-ui', 'Other Sans'); syncTheme();
+  assert.equal(root.dataset.theme, 'dark', 'OMC mode takes precedence over a stale intermediate shell');
+  assert.equal(root.style.getPropertyValue('--omc-bg'), '#111');
+  assert.equal(root.style.getPropertyValue('--omc-font-ui'), 'Other Sans');
+  delete omc.dataset.themeMode; root.cpamp = true; shell.dataset.theme = 'dark'; syncTheme();
+  assert.equal(root.dataset.host, 'cpamp');
+  assert.equal(root.dataset.theme, 'dark');
+  assert.equal(root.style.getPropertyValue('--omc-bg'), '', 'detached OMC tokens must not leak into other panels');
+  root.cpamp = false; delete shell.dataset.theme;
+  browserStorage.set('cli-proxy-theme', panelRecord(2, 'cpa.test', {theme:'light'})); syncTheme();
+  assert.equal(root.dataset.host, 'cpamc');
+  assert.equal(root.dataset.theme, 'light', 'CPAMC retains its paper theme');
+  browserStorage.delete('cli-proxy-theme'); media.matches = true; syncTheme();
+  assert.equal(root.dataset.theme, 'dark', 'standalone pages follow the system when no panel theme exists');
+  theming.window = { get parent() { throw new Error('Cross-origin frame'); } };
+  assert.doesNotThrow(() => vm.runInContext('followPanelTheme()', theming));
   const key = 'synthetic-private-api-key';
   const config = {
     'codex-api-key': [{ 'api-key': key, prefix: 'prefix', headers: { Z: 'z', A: 'a' }, weight: 0, priority: 99 }, { 'api-key': key, prefix: 'prefix', headers: { A: 'a', Z: 'z' }, 'excluded-models': ['gpt-test', ' * '] }],
@@ -516,6 +577,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(run(`credentials.length + candySelected.size + fingerprintSelected.size + fingerprintExpanded.size`), 0);
   assert.equal(element('app').hidden, true);
   assert.equal(element('login-error').textContent, 'Expired');
+  assert.equal(element('login-form').hidden, false, 'an expired management key returns to manual login');
   assert(!element('fingerprint-rows').innerHTML.includes('data-fingerprint-run'));
-  console.log('UI checks passed: identities, filters, plans, enable switches, catalog recovery, fingerprint detection results and controls, refresh, login reset, notices, metrics.');
+  console.log('UI checks passed: identities, filters, plans, enable switches, catalog recovery, fingerprint detection results and controls, refresh, panel authentication and themes, login reset, notices, metrics.');
 })().catch(err => { console.error(err); process.exitCode = 1; });
