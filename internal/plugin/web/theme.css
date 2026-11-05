@@ -22,7 +22,7 @@
 
 /* CPAMC, also used when the page is opened directly: paper (default), white and dark themes.
    Frame from .main-content; the band copies .top-gradient-blur as CPAMC's build renders it, without blur. */
-:root:not([data-cpamp-plugin-host]) {
+:root:not([data-cpamp-plugin-host]):not([data-plugin-panel="cpamp"]):not([data-plugin-panel="omc"]) {
   --page-top: 70px; --page-inline: clamp(20px, 3vw, 48px); --section-gap: 24px;
   --bg: #faf9f5; --bg-image: none; --surface: #f0eee8; --sunken: #e9e6df; --field: #faf9f5; --line: #e3e1db; --card-line: var(--line);
   --ink: #2d2a26; --muted: #6d6760; --faint: #a29c95;
@@ -71,7 +71,7 @@
 /* CPAMP, which marks the pages it embeds: light and dark themes.
    Frame from .main-content with its pages' 16px card gaps, glass cards from .card, background and drifting
    blobs from AppBackground. */
-:root[data-cpamp-plugin-host] {
+:root:is([data-cpamp-plugin-host], [data-plugin-panel="cpamp"]):not([data-plugin-panel="omc"]) {
   --page-top: 20px; --page-inline: 20px; --section-gap: 16px;
   --bg: #eff2f7; --bg-image: linear-gradient(120deg, #f0f7ff 0%, #e7f2ff 50%, #edf7ff 100%);
   --surface: #ffffff; --sunken: #f6faff; --field: rgb(255 255 255 / 62%); --line: rgb(15 23 42 / 8%); --card-line: rgb(255 255 255 / 60%);
@@ -129,3 +129,47 @@
   }
 }
 @keyframes drift { 50% { transform: translate(30px, 20px) rotate(10deg); } }
+
+/* OMC exposes its active palette and typography on the outer console root.
+   Prefix copied values so a plugin token can never be mistaken for a host token. */
+:root[data-plugin-panel="omc"] {
+  --page-top: 16px; --page-inline: 24px; --section-gap: 20px;
+  --bg: var(--panel-bg, #ffffff); --bg-image: none;
+  --surface: var(--panel-surface, #f1f1f3); --sunken: var(--surface); --field: var(--bg);
+  --ink: var(--panel-fg, #1c1c1e); --muted: var(--panel-fg-2, #505055); --faint: var(--panel-muted, #787880);
+  --line: var(--panel-border, #dcdce1); --card-line: var(--line);
+  --control-bg: var(--bg); --control-line: var(--line);
+  --control-hover: var(--panel-hover, #f3f3f3); --control-hover-line: var(--accent);
+  --history-bg: var(--bg); --history-head-bg: var(--surface);
+  --tag-neutral-bg: var(--surface); --tag-neutral-ink: var(--muted); --tag-neutral-line: var(--line);
+  --accent: var(--panel-accent, #005d8f); --accent-ink: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+  --accent-soft-hover: color-mix(in srgb, var(--accent) 16%, transparent); --action-line: var(--line);
+  --success: var(--panel-success, #059669); --success-ink: var(--success);
+  --success-soft: color-mix(in srgb, var(--success) 10%, transparent);
+  --danger: var(--panel-danger, #dc2626); --danger-ink: var(--danger);
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, transparent);
+  --danger-soft-hover: color-mix(in srgb, var(--danger) 16%, transparent);
+  --danger-line: color-mix(in srgb, var(--danger) 30%, var(--line));
+  --warning-ink: var(--panel-warn, #b45309);
+  --warning-soft: color-mix(in srgb, var(--warning-ink) 10%, transparent);
+  --warning-line: color-mix(in srgb, var(--warning-ink) 30%, var(--line));
+  --radius: var(--panel-radius-surface, 10px); --shadow: none;
+  --float: var(--panel-shadow-float, 0 12px 32px rgb(0 0 0 / 14%)); --glass: none;
+  --tip-bg: var(--panel-elevated, var(--bg)); --tip-ink: var(--muted); --tip-line: var(--line);
+  --tip-shadow: var(--float); --tip-radius: var(--panel-radius-control, 6px); --tip-padding: 6px 10px;
+  --popover-bg: var(--tip-bg); --popover-line: var(--line); --popover-shadow: var(--float); --dialog-bg: var(--tip-bg);
+
+  & body { font-family: var(--panel-font-ui); }
+  & .mono, & .markdown code { font-family: var(--panel-font-mono, var(--panel-font-ui)); }
+  & header { display: none; }
+  & .btn, & .field input, & .native-select > select, & .login input {
+    border-radius: var(--panel-radius-control, 6px);
+  }
+  & .btn:not(.ghost, .danger, :disabled) {
+    --button-bg: var(--accent); --button-hover: var(--panel-accent-hover, var(--accent));
+    --button-ink: var(--panel-accent-on, #ffffff); --button-line: var(--accent);
+  }
+  & dialog::backdrop { background: var(--panel-overlay-mask, rgb(0 0 0 / 35%)); }
+  @media (max-width: 768px) { --page-inline: 12px; --section-gap: 16px; }
+}
