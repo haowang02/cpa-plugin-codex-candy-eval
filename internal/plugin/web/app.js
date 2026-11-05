@@ -27,13 +27,6 @@ const credentialFilter = {
   plan: preference("credential-filter.plan", "all"),
 };
 
-// Panels resolve their "auto" theme to white or dark; CPAMC also has a light (paper) theme.
-function applyTheme() {
-  const theme = panelValue("cli-proxy-theme")?.state?.theme;
-  document.documentElement.dataset.theme = ["light", "white", "dark"].includes(theme) ? theme
-    : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "white";
-}
-
 class AuthError extends Error {}
 
 async function api(path, { method = "GET", body, apiKey, signal } = {}) {
@@ -444,10 +437,6 @@ $("refresh").addEventListener("click", async () => {
     renderPageActions();
   }
 });
-
-applyTheme();
-addEventListener("storage", applyTheme);
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
 // Masking and credential filters apply to every tab, whichever card changes them.
 setMasked(preference("masked", false));

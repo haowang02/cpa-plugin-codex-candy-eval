@@ -3,6 +3,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+require('./test-theme.cjs');
 
 const webFile = name => fs.readFileSync(path.join(__dirname, '../internal/plugin/web', name), 'utf8');
 const elements = new Map();

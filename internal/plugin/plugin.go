@@ -39,6 +39,9 @@ var uiStyles string
 //go:embed web/theme.css
 var uiThemes string
 
+//go:embed web/theme.js
+var themeScript string
+
 //go:embed web/vendor/markdown-it.min.js
 var markdownScript string
 
@@ -93,6 +96,7 @@ var uiHTML = func() []byte {
 		"/*TEXMATH_SCRIPT*/", texmathScript,
 		"/*TEMML_SCRIPT*/", temmlScript,
 		"/*STORAGE_SCRIPT*/", storageScript,
+		"/*THEME_SCRIPT*/", themeScript,
 		"/*CREDENTIALS_SCRIPT*/", credentialScript,
 		"/*CATALOG_SCRIPT*/", catalogScript,
 		"/*COMPONENTS_SCRIPT*/", componentsScript,
