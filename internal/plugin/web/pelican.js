@@ -96,5 +96,5 @@ function initializePelican() {
   // Closing the dialog also stops its animation.
   $("pelican-detail").addEventListener("close", () => { $("pelican-detail-body").innerHTML = ""; });
   addEventListener("resize", fitPelicanStage);
-  bindCollectionActions({ test: "pelican", expanded: pelicanExpanded, renderRows: renderPelican, run: runPelican, showDetail: showPelicanDetail });
+  bindTestActions({ test: "pelican", expanded: pelicanExpanded, renderRows: renderPelican, run: runPelican, showDetail: showPelicanDetail });
 }

@@ -89,5 +89,5 @@ function initializeFingerprint() {
   $("fingerprint-concurrency").value = fingerprintConcurrency();
   $("fingerprint-model").addEventListener("change", renderFingerprint);
   $("fingerprint-concurrency").addEventListener("change", () => { $("fingerprint-concurrency").value = fingerprintConcurrency(); });
-  bindCollectionActions({ test: "fingerprint", expanded: fingerprintExpanded, renderRows: renderFingerprint, run: runFingerprint, showDetail: showFingerprintDetail });
+  bindTestActions({ test: "fingerprint", expanded: fingerprintExpanded, renderRows: renderFingerprint, run: runFingerprint, showDetail: showFingerprintDetail });
 }

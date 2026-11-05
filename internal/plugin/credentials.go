@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -26,6 +27,8 @@ type credential struct {
 	PlanType     string `json:"plan_type,omitempty"`
 	Priority     int    `json:"priority"`
 	Disabled     bool   `json:"disabled"`
+	SIWCBound    bool   `json:"siwc_bound"`
+	UseSIWC      bool   `json:"use_siwc"`
 	// CPA marks enabled credentials unavailable while they cool down, e.g. after exhausting quota.
 	Unavailable    bool      `json:"unavailable,omitempty"`
 	StatusMessage  string    `json:"status_message,omitempty"`
@@ -204,30 +207,61 @@ func credentialSupportsModel(catalog map[string][]string, id, model string) (kno
 	return true, false
 }
 
-func authPlanType(auth credential) string {
-	if plan := strings.TrimSpace(auth.PlanType); plan != "" {
-		return plan
+type codexMetadata struct {
+	PlanType string          `json:"plan_type"`
+	IDToken  string          `json:"id_token"`
+	UseSIWC  json.RawMessage `json:"use_siwc"`
+	SIWC     struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ClientID     string `json:"client_id"`
+	} `json:"siwc"`
+}
+
+func readCodexMetadata(auth credential) (codexMetadata, error) {
+	var file struct {
+		JSON *codexMetadata `json:"json"`
 	}
-	if auth.AuthIndex == "" {
-		return ""
+	if auth.Source != credentialSourceFile || auth.Provider != "codex" || auth.AuthIndex == "" {
+		return codexMetadata{}, fmt.Errorf("无法读取 Codex 认证文件")
 	}
 	raw, err := hostCall("host.auth.get", map[string]string{"auth_index": auth.AuthIndex})
 	if err != nil {
-		return ""
+		return codexMetadata{}, fmt.Errorf("读取 Codex 认证文件失败，请刷新后重试")
 	}
-	var file struct {
-		JSON struct {
-			PlanType string `json:"plan_type"`
-			IDToken  string `json:"id_token"`
-		} `json:"json"`
+	if json.Unmarshal(raw, &file) != nil || file.JSON == nil {
+		return codexMetadata{}, fmt.Errorf("Codex 认证文件格式无效")
 	}
-	if json.Unmarshal(raw, &file) != nil {
-		return ""
+	return *file.JSON, nil
+}
+
+func (m codexMetadata) siwcState() (bound, enabled bool) {
+	bound = strings.TrimSpace(m.SIWC.AccessToken) != "" && strings.TrimSpace(m.SIWC.RefreshToken) != "" && strings.TrimSpace(m.SIWC.ClientID) != ""
+	var value string
+	if json.Unmarshal(m.UseSIWC, &enabled) != nil && json.Unmarshal(m.UseSIWC, &value) == nil {
+		enabled, _ = strconv.ParseBool(strings.TrimSpace(value))
 	}
-	if plan := strings.TrimSpace(file.JSON.PlanType); plan != "" {
+	return
+}
+
+func enrichCodexCredential(auth credential) credential {
+	auth.PlanType = strings.TrimSpace(auth.PlanType)
+	metadata, err := readCodexMetadata(auth)
+	if err != nil {
+		return auth
+	}
+	auth.SIWCBound, auth.UseSIWC = metadata.siwcState()
+	if strings.TrimSpace(auth.PlanType) == "" {
+		auth.PlanType = metadata.planType()
+	}
+	return auth
+}
+
+func (m codexMetadata) planType() string {
+	if plan := strings.TrimSpace(m.PlanType); plan != "" {
 		return plan
 	}
-	parts := strings.Split(file.JSON.IDToken, ".")
+	parts := strings.Split(m.IDToken, ".")
 	if len(parts) != 3 {
 		return ""
 	}

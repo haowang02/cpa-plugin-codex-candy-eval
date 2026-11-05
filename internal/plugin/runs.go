@@ -44,6 +44,10 @@ func startRuns(test string, req runRequest, total int, skip func(id string), run
 	if err != nil {
 		return jsonError(http.StatusBadGateway, err.Error())
 	}
+	return startCredentialRuns(test, req, auths, total, skip, run)
+}
+
+func startCredentialRuns(test string, req runRequest, auths []credential, total int, skip func(string), run func(context.Context, credential, *progress)) managementResponse {
 	if len(auths) == 0 {
 		return jsonError(http.StatusBadRequest, "没有可测试的已启用凭证")
 	}

@@ -47,7 +47,7 @@ function credentialSignature(id) {
 }
 
 function pruneCredentialCatalog() {
-  credentialSignatures = new Map(credentials.map((entry) => [entry.id, JSON.stringify([entry.source, entry.provider, entry.plan_type, entry.disabled])]));
+  credentialSignatures = new Map(credentials.map((entry) => [entry.id, JSON.stringify([entry.source, entry.provider, entry.plan_type, entry.disabled, entry.use_siwc])]));
   let changed = false;
   for (const [id, entry] of Object.entries(catalogCache.credentials)) {
     if (!credentialSignatures.has(id) || !freshCatalog(entry, CREDENTIAL_CATALOG_TTL) || entry.signature !== credentialSignature(id)) {

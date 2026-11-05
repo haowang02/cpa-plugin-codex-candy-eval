@@ -44,7 +44,7 @@ const context = vm.createContext({
     setItem(key, value) { if (storageBlocked) throw new Error('Storage unavailable'); storageWrites++; browserStorage.set(key, value); },
   },
 });
-let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'storage.js', 'host.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'fingerprint.js', 'pelican.js', 'app.js']
+let source = ['vendor/markdown-it.min.js', 'vendor/markdown-it-cjk-friendly.min.js', 'vendor/texmath.js', 'vendor/temml.min.js', 'storage.js', 'host.js', 'providers.js', 'credentials.js', 'catalog.js', 'components.js', 'candy.js', 'siwc.js', 'fingerprint.js', 'pelican.js', 'app.js']
   .map(file => webFile(file).split('// Events and initialization.')[0]).join('\n');
 source = source.replace('/*FINGERPRINT_CONFIG*/{}', JSON.stringify({requests:3,aliases:{'gpt-6.1-sol':'gpt-6-astra'}}));
 source = source.replace('/*PELICAN_VARIANTS*/[]', JSON.stringify([{id:'original',label:'原版',prompt:'p'},{id:'all-in-one',label:'多合一版',prompt:'q'}]));
@@ -268,7 +268,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     const markup = run(`${renderer}(${JSON.stringify(historyCredential)})`);
     assert.equal((markup.match(/<article class="history-card">/g) || []).length, 2);
     assert(markup.includes('aria-label="推理 Token 89"') && !markup.includes('<model>'));
-    assert(run(`${renderer}(${JSON.stringify({...historyCredential,candies:[],fingerprints:[]})})`).includes('暂无记录'));
+    assert(run(`${renderer}(${JSON.stringify({...historyCredential,siwc:[],candies:[],fingerprints:[]})})`).includes('暂无记录'));
   }
   const historyMarkup = (r) => run(`historyCard(${JSON.stringify(r)}, '')`);
   assert(historyMarkup({duration_ms:1200,input_tokens:null}).includes('输入 Token —'));
@@ -316,15 +316,15 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert(coolingView.includes('<span class="tag plan-elite"><span>Pro 500'));
   assert(/class="tag warn" data-tip="quota exhausted\n预计 \d\d-\d\d \d\d:\d\d 恢复"><span>不可用/.test(coolingView));
   assert.equal(run(`availableCredential(${JSON.stringify(cooling)})`), false, 'unavailable credentials cannot be tested');
-  const enableSwitchInput = (a) => run(`enableSwitch(${JSON.stringify(a)})`).match(/<input[^>]*>/)[0];
+  const enableSwitchInput = (a) => run(`credentialSwitch(${JSON.stringify(a)}, "disabled")`).match(/<input[^>]*>/)[0];
   assert.match(enableSwitchInput({id:'on',source:'auth_files',provider:'codex'}), /checked(?! disabled)/);
-  assert.doesNotMatch(enableSwitchInput({id:'off',source:'auth_files',provider:'codex',disabled:true}), /checked|disabled/, 'disabled files must be re-enabled');
-  assert.match(enableSwitchInput({id:'busy',source:'auth_files',provider:'codex',running:{test:'fingerprint'}}), /disabled/);
+  assert.doesNotMatch(enableSwitchInput({id:'off',source:'auth_files',provider:'codex',disabled:true}), /checked|\sdisabled(?=[ >])/, 'disabled files must be re-enabled');
+  assert.match(enableSwitchInput({id:'busy',source:'auth_files',provider:'codex',running:{test:'fingerprint'}}), /\sdisabled(?=[ >])/);
   assert.equal(run(`unavailableReason({status_message:'{"error":{"message":"The usage limit has been reached"}}'})`), 'The usage limit has been reached', 'upstream JSON errors show only their message');
-  assert.doesNotMatch(enableSwitchInput({id:'claude:apikey:1',source:'ai_providers',provider:'claude'}), /disabled/, 'config API keys are switchable');
-  assert.match(enableSwitchInput({id:'openai-compatibility:demo:1',source:'ai_providers',provider:'openai-compatible-demo'}), /disabled/);
+  assert.doesNotMatch(enableSwitchInput({id:'claude:apikey:1',source:'ai_providers',provider:'claude'}), /\sdisabled(?=[ >])/, 'config API keys are switchable');
+  assert.match(enableSwitchInput({id:'openai-compatibility:demo:1',source:'ai_providers',provider:'openai-compatible-demo'}), /\sdisabled(?=[ >])/);
   for (const [renderer, rows, expanded] of [['renderCandyRow','candy-rows','candyExpanded'], ['renderFingerprintRow','fingerprint-rows','fingerprintExpanded']]) {
-    assert(run(`${renderer}({...credentials[0], candies:[], fingerprints:[], pelicans:[]})`).includes('data-enable="free"'));
+    assert(run(`${renderer}({...credentials[0], siwc:[],candies:[], fingerprints:[], pelicans:[]})`).includes('data-credential="free" data-credential-field="disabled"'));
     if (rows === 'fingerprint-rows') run(`initializeFingerprint()`);
     element(rows).listeners.click({target:{closest: (selector) => selector === 'label' ? {} : selector === '[data-row]' ? {dataset:{row:'free'}} : null}});
     assert.equal(run(`${expanded}.has('free')`), false, 'row controls must not expand history');
@@ -334,7 +334,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
     {id:'codex',source:'auth_files',provider:'codex'},
     {id:'claude',source:'ai_providers',provider:'claude'},
     {id:'config',source:'ai_providers',provider:'codex'}
-  ].map(a => ({...a, candies:[], fingerprints:[], pelicans:[]})); renderCredentialFilters(); candySelected.add('claude'); candySelected.add('codex')`);
+  ].map(a => ({...a, siwc:[],candies:[], fingerprints:[], pelicans:[]})); renderCredentialFilters(); candySelected.add('claude'); candySelected.add('codex')`);
   assert(element('candy-credential-type').innerHTML.startsWith('<option value="all">全部凭证'));
   assert.equal(element('candy-credential-type').value, 'auth_files:codex');
   assert.deepEqual(plain(run(`selectedCredentials(candySelected).map(a => a.id)`)), ['codex']);
@@ -378,6 +378,42 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   assert.equal(element('candy-select-all').checked, false);
   run(`candySelected.clear()`);
   assert.deepEqual(plain(run(`batchCredentials(candySelected).map(a => a.id)`)), ['claude', 'config']);
+  const priorCredentials = run(`credentials`);
+  run(`credentials = [
+    {id:'on',provider:'codex',source:'auth_files',siwc_bound:true,use_siwc:true,siwc:[]},
+    {id:'off',provider:'codex',source:'auth_files',siwc_bound:true,use_siwc:false,siwc:[]},
+    {id:'unbound',provider:'codex',source:'auth_files',siwc_bound:false,use_siwc:true,siwc:[]},
+    {id:'other',provider:'claude',source:'auth_files',siwc_bound:true,use_siwc:true,siwc:[]}
+  ]; credentialFilter.siwcPlan = 'all'`);
+  filter({type:'auth_files:claude',plan:'Business',enabledOnly:false});
+  assert.deepEqual(plain(run(`visibleCredentials('siwc').map(a => a.id)`)), ['on','off','unbound'], 'SIWC lists all Codex auth files independently of the other tab filters');
+  assert.deepEqual(plain(run(`batchCredentials(siwcSelected, 'siwc').map(a => a.id)`)), ['on']);
+  assert.match(run(`runBlocker('siwc', credentials[1])`), /使用 SIWC/);
+  run(`renderCredentialFilters()`);
+  assert.equal(element('siwc-type-filter').hidden, true);
+  assert.equal(element('candy-type-filter').hidden, false);
+  assert.match(run(`renderSIWCRow(credentials[1])`), /data-credential="off" data-credential-field="use_siwc"/);
+  assert.match(run(`renderSIWCRow(credentials[1])`), /data-credential="off" data-credential-field="disabled"/);
+  assert.match(run(`renderSIWCRow(credentials[2])`), /需先绑定 SIWC/);
+  assert.match(run(`credentialSwitch(credentials[2], "use_siwc")`), /\sdisabled(?=[ >])/);
+  const savedRender = run(`render`);
+  run(`render = () => {}; var switchWrites = []; api = async (path, options) => switchWrites.push({path,...options})`);
+  element('app').hidden = true;
+  await run(`setCredentialField('off', 'use_siwc', true)`);
+  assert.equal(run(`credentials[1].use_siwc`), true);
+  assert.deepEqual(plain(run(`switchWrites[0]`)), {path:'/v0/management/auth-files/fields',method:'PATCH',body:{name:'off',use_siwc:true}});
+  run(`api = async () => { throw new Error('Save failed'); }`);
+  await run(`setCredentialField('off', 'use_siwc', false)`);
+  assert.equal(run(`credentials[1].use_siwc`), true, 'a failed switch must retain the persisted value');
+  run(`credentials[1].running = {test:'siwc'}; switchWrites = []; api = async () => switchWrites.push(1)`);
+  await run(`setCredentialField('off', 'use_siwc', false)`);
+  assert.equal(run(`switchWrites.length`), 0, 'cannot switch a credential while testing');
+  await run(`setCredentialField('unbound', 'use_siwc', false)`);
+  assert.equal(run(`switchWrites.length`), 0, 'cannot switch an unbound credential');
+  context.savedRender = savedRender; context.priorCredentials = priorCredentials;
+  run(`render = savedRender; credentials = priorCredentials`);
+  filter({type:'all',plan:'all'});
+
   for (const malformed of [[], {'codex-api-key': [null]}, {'openai-compatibility': [{'api-key-entries': [null]}]}]) {
     await assert.rejects(run(`configuredCredentials(${JSON.stringify(malformed)})`), /CPA 凭证配置格式无效/);
   }
@@ -495,7 +531,7 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
   run(`setNotice('flash', 'Started', 'info')`);
   assert.equal(element('flash').role, 'status');
 
-  const validState = {credentials:[{id:'valid-state',name:'Test',source:'auth_files',provider:'codex',candies:[],fingerprints:[],pelicans:[]}],storage_error:''};
+  const validState = {credentials:[{id:'valid-state',name:'Test',source:'auth_files',provider:'codex',siwc:[],candies:[],fingerprints:[],pelicans:[]}],storage_error:''};
   run(`resetCatalogCache(); let finishModels, finishSync, modelsStarted, syncStarted;
     const modelsWaiting = new Promise(resolve => {modelsStarted=resolve});
     const syncWaiting = new Promise(resolve => {syncStarted=resolve});
@@ -554,22 +590,24 @@ const stableID = (kind, parts) => kind + ':' + crypto.createHash('sha256').updat
       return {status:'ok'};
     }`);
   element('app').hidden = false;
-  await run(`setCredentialEnabled('valid-state', false)`);
+  await run(`setCredentialField('valid-state', 'disabled', true)`);
   assert.deepEqual(plain(run(`statusCalls`)), [['/v0/management/auth-files/status','PATCH',{name:'valid-state',disabled:true}]]);
   assert.equal(run(`credentials[0].disabled`), true);
-  await run(`setCredentialEnabled('valid-state', true)`);
+  await run(`setCredentialField('valid-state', 'disabled', false)`);
   assert.equal(run(`credentials[0].disabled`), true, 'a rejected change must reload the CPA state');
-  assert(element('flash .notice-message').textContent.includes('启用凭证失败：Denied'));
+  assert(element('flash .notice-message').textContent.includes('保存凭证设置失败：Denied'));
   run(`let finishStatus; api = (path) => path.endsWith('/state') ? Promise.resolve(JSON.parse(JSON.stringify(statusServer)))
     : new Promise(resolve => { finishStatus = () => { statusServer.credentials[0].disabled = false; resolve({status:'ok'}); }; })`);
-  const enabling = run(`setCredentialEnabled('valid-state', true)`);
+  const enabling = run(`setCredentialField('valid-state', 'disabled', false)`);
   assert.equal(run(`pending`), false, 'switching one credential must not lock the page');
   await run(`load()`);
-  assert.equal(run(`credentials[0].disabled`), false, 'reloads keep a requested state until CPA applies it');
-  assert.match(run(`enableSwitch(credentials[0])`), /aria-busy="true"[^>]*disabled/);
+  assert.equal(run(`credentials[0].disabled`), true, 'in-flight changes do not alter confirmed credential state');
+  assert.match(run(`credentialSwitch(credentials[0], 'disabled')`), /checked/, 'the switch displays its requested state while saving');
+  assert.equal(run(`availableCredential(credentials[0])`), false, 'pending changes block model requests');
+  assert.match(run(`credentialSwitch(credentials[0], "disabled")`), /aria-busy="true"[^>]*disabled/);
   run(`finishStatus()`);
   await enabling;
-  assert.equal(run(`credentials[0].disabled || switching.has('valid-state')`), false);
+  assert.equal(run(`credentials[0].disabled || credentialChanges.has('valid-state')`), false);
   element('app').hidden = true;
   assert.equal(run(`fmtPercent(undefined)`), '—');
   assert(!run(`fingerprintResultHTML({status:'completed',model:'test',attribution:{prediction:'test',prediction_name:'test',probability:0.5,used_outputs:1,results:null}})`).includes('NaN'));

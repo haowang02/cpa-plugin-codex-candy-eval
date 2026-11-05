@@ -29,6 +29,7 @@
           <button id="tab-candy" class="tab" role="tab" aria-selected="true" aria-controls="candy-panel" type="button">糖果题</button>
           <button id="tab-fingerprint" class="tab" role="tab" aria-selected="false" aria-controls="fingerprint-panel" tabindex="-1" type="button">指纹检测</button>
           <button id="tab-pelican" class="tab" role="tab" aria-selected="false" aria-controls="pelican-panel" tabindex="-1" type="button">画鹈鹕</button>
+          <button id="tab-siwc" class="tab" role="tab" aria-selected="false" aria-controls="siwc-panel" tabindex="-1" type="button">SIWC 检测</button>
         </div>
         <div class="page-actions">
           <button id="clear-all" type="button" aria-label="清空全部测试记录" data-tip disabled><i data-icon="trash-2"></i></button>
@@ -103,6 +104,18 @@
         <div class="legend"><span>每个凭证 1 次请求（失败或回答中没有代码时重试）</span></div>
         <section id="pelican-credentials" class="card"></section>
       </section>
+      <section id="siwc-panel" role="tabpanel" aria-labelledby="tab-siwc" hidden>
+        <div class="panel-intro">
+          <p>据社区反馈，部分受风控账号在使用 SIWC 时会返回 403 错误。检测结果可作为判断账号是否受到风控的参考。</p>
+          <p>未绑定的凭证需先在 CPA 的 OAuth 登录中绑定 SIWC，再开启「使用 SIWC」进行检测。</p>
+        </div>
+        <form id="siwc-toolbar" class="card toolbar">
+          <label class="field"><span class="field-label">模型</span><span class="native-select"><select id="siwc-model"></select></span></label>
+          <button id="siwc-run-batch" class="btn" type="submit" disabled>检测全部</button>
+        </form>
+        <div class="legend"><span>每个凭证 1 次简短请求，插件不重试。</span></div>
+        <section id="siwc-credentials" class="card"></section>
+      </section>
     </div>
 
     <dialog id="confirm-clear" class="confirm">
@@ -137,10 +150,12 @@
   <script>/*TEMML_SCRIPT*/</script>
   <script>/*STORAGE_SCRIPT*/</script>
   <script>/*HOST_SCRIPT*/</script>
+  <script>/*PROVIDERS_SCRIPT*/</script>
   <script>/*CREDENTIALS_SCRIPT*/</script>
   <script>/*CATALOG_SCRIPT*/</script>
   <script>/*COMPONENTS_SCRIPT*/</script>
   <script>/*CANDY_SCRIPT*/</script>
+  <script>/*SIWC_SCRIPT*/</script>
   <script>/*FINGERPRINT_SCRIPT*/</script>
   <script>/*PELICAN_SCRIPT*/</script>
   <script>/*APP_SCRIPT*/</script>

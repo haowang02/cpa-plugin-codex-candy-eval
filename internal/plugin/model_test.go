@@ -14,9 +14,8 @@ import (
 	"time"
 )
 
-// streamHost fakes the host's model streams on top of host: host.model.execute_stream streams the
-// Responses object that host returns for it as one response.completed event. A nil object streams nothing
-// until the stream is closed, like a stalled upstream.
+// streamHost wraps response fixtures in terminal events; explicit events pass through.
+// A nil fixture stalls until the stream is closed.
 func streamHost(host func(method string, payload any) (json.RawMessage, error)) func(string, any) (json.RawMessage, error) {
 	var mu sync.Mutex
 	var next int
@@ -48,7 +47,19 @@ func streamHost(host func(method string, payload any) (json.RawMessage, error)) 
 		id := strconv.Itoa(next)
 		streams[id], closed[id] = nil, make(chan struct{})
 		if raw != nil {
-			streams[id] = fmt.Appendf(nil, `data: {"type":"response.completed","response":%s}`, raw)
+			var event struct {
+				Type   string `json:"type"`
+				Status string `json:"status"`
+			}
+			_ = json.Unmarshal(raw, &event)
+			if event.Type != "" {
+				streams[id] = append([]byte("data: "), raw...)
+			} else {
+				if event.Status == "" {
+					event.Status = "completed"
+				}
+				streams[id] = fmt.Appendf(nil, `data: {"type":"response.%s","response":%s}`, event.Status, raw)
+			}
 		}
 		mu.Unlock()
 		return json.Marshal(map[string]any{"stream_id": id})
@@ -175,6 +186,8 @@ func TestExecuteModel(t *testing.T) {
 		{"failed", "", []string{final("response.failed", "failed", "")}, "", true},
 		{"blank", "", []string{final("response.completed", "completed", answer(` \n`))}, "", true},
 		{"error_event", "", []string{`data: {"type":"error","message":"quota exhausted"}`}, "", false},
+		{"null terminal", "", []string{`data: {"type":"response.completed","response":null}`}, "", false},
+		{"conflicting terminal", "", []string{final("response.failed", "completed", answer("21"))}, "", false},
 		{"unfinished", "", []string{`data: {"type":"response.output_text.delta","delta":"21"}`}, "", false},
 		{"interrupted", "", []string{`data: {"type":"response.created"}`}, "upstream reset", false},
 	} {

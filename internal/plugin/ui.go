@@ -37,6 +37,9 @@ var storageScript string
 //go:embed web/host.js
 var hostScript string
 
+//go:embed web/providers.js
+var providerScript string
+
 //go:embed web/credentials.js
 var credentialScript string
 
@@ -51,6 +54,9 @@ var componentsScript string
 
 //go:embed web/candy.js
 var candyScript string
+
+//go:embed web/siwc.js
+var siwcScript string
 
 //go:embed web/fingerprint.js
 var fingerprintScript string
@@ -74,10 +80,12 @@ var uiHTML = func() []byte {
 		"/*TEMML_SCRIPT*/", temmlScript,
 		"/*STORAGE_SCRIPT*/", storageScript,
 		"/*HOST_SCRIPT*/", hostScript,
+		"/*PROVIDERS_SCRIPT*/", providerScript,
 		"/*CREDENTIALS_SCRIPT*/", credentialScript,
 		"/*CATALOG_SCRIPT*/", catalogScript,
 		"/*COMPONENTS_SCRIPT*/", componentsScript,
 		"/*CANDY_SCRIPT*/", candyScript,
+		"/*SIWC_SCRIPT*/", siwcScript,
 		"/*FINGERPRINT_SCRIPT*/", fingerprint,
 		"/*PELICAN_SCRIPT*/", pelican,
 		"/*APP_SCRIPT*/", appScript,

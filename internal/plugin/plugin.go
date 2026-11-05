@@ -14,7 +14,7 @@ import (
 
 const (
 	pluginID      = "cpa-codex-candy-eval"
-	pluginVersion = "0.4.5"
+	pluginVersion = "0.4.6"
 	ABIVersion    = 1
 	// rpcSchemaVersion is the version of CPA's plugin RPC contract, not of the state file.
 	rpcSchemaVersion = 6
@@ -140,6 +140,8 @@ var routes = func() []route {
 		{http.MethodPost, "/pelican/run", "Run the pelican test on credentials", withBody(pelicanRunResponse)},
 		{http.MethodGet, "/pelican/record", "View a pelican test record", viewRecord("pelican")},
 		{http.MethodDelete, "/pelican/records", "Clear pelican test records", clearRecords("pelican")},
+		{http.MethodPost, "/siwc/run", "Check SIWC on Codex credentials", withBody(siwcRunResponse)},
+		{http.MethodDelete, "/siwc/records", "Clear SIWC test records", clearRecords("siwc")},
 		{http.MethodPost, "/inspection", "Inspect credentials with the candy test or fingerprint detection", withBody(inspectionRunResponse)},
 		{http.MethodGet, "/inspection", "View the latest inspection of a test", func(req managementRequest) managementResponse { return inspectionResponse(req.Query.Get("test")) }},
 	}
@@ -174,6 +176,7 @@ type credentialView struct {
 	Candies      []candyRecord       `json:"candies"`
 	Fingerprints []fingerprintRecord `json:"fingerprints"`
 	Pelicans     []pelicanRecord     `json:"pelicans"`
+	SIWC         []siwcRecord        `json:"siwc"`
 }
 
 func stateResponse() managementResponse {
@@ -184,7 +187,7 @@ func stateResponse() managementResponse {
 	// Host calls must stay outside the records lock.
 	for i := range auths {
 		if auths[i].Source == credentialSourceFile && auths[i].Provider == "codex" {
-			auths[i].PlanType = authPlanType(auths[i])
+			auths[i] = enrichCodexCredential(auths[i])
 		}
 	}
 	mu.Lock()
@@ -197,6 +200,7 @@ func stateResponse() managementResponse {
 			Candies:      append([]candyRecord{}, records.Candies[auth.ID]...),
 			Fingerprints: summaries(records.Fingerprints[auth.ID]),
 			Pelicans:     summaries(records.Pelicans[auth.ID]),
+			SIWC:         append([]siwcRecord{}, records.SIWC[auth.ID]...),
 		}
 	}
 	return jsonResponse(http.StatusOK, map[string]any{"credentials": views, "storage_error": storageError})

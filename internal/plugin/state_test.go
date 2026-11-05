@@ -14,6 +14,7 @@ func TestStatePersistence(t *testing.T) {
 	setupTest(t)
 	for i := range historyLimit + 5 {
 		records.Candies.add("a", candyRecord{record: record{ID: fmt.Sprint(i), Status: "correct"}})
+		records.SIWC.add("a", siwcRecord{record: record{ID: fmt.Sprint(i), Status: "available"}})
 	}
 	if err := saveStateLocked(); err != nil {
 		t.Fatal(err)
@@ -22,6 +23,12 @@ func TestStatePersistence(t *testing.T) {
 	loadState()
 	if history := records.Candies["a"]; len(history) != historyLimit || history[0].ID != "5" || records.SchemaVersion != stateSchemaVersion {
 		t.Fatalf("restored history must keep the latest %d records: %+v", historyLimit, history)
+	}
+	if history := records.SIWC["a"]; len(history) != historyLimit || history[0].ID != "5" {
+		t.Fatal("SIWC history did not survive reload")
+	}
+	if response := clearRecordsResponse("siwc"); response.StatusCode != 200 || len(records.SIWC) != 0 || len(records.Candies["a"]) != historyLimit {
+		t.Fatal("clearing SIWC history affected another test")
 	}
 	running["a"] = &progress{Done: 1, Total: 2}
 	clearCandies := managementRequest{Method: http.MethodDelete, Path: managementBase + "/candy/records"}
@@ -50,7 +57,8 @@ func TestStateMigration(t *testing.T) {
 				{"time":"` + at + `","model":"m","skipped":true,"error":"unsupported"}]},
 			"detections":{"a":[{"id":"1","time":"` + at + `","model":"m","status":"partial"}]},
 			"pelicans":{"a":[{"id":"2","time":"` + at + `","html":"<svg></svg>"},{"id":"3","time":"` + at + `","skipped":true,"error":"unsupported"}]}}`,
-		"0.3": `{"results":{},"fingerprints":{"a":[{"id":"probe","mode":"probe","attribution":{"results":{}}}]},"modeltraces":{"a":[{}]}}`,
+		"0.4.5": `{"schema_version":2,"candies":{"a":[{"id":"old","status":"correct"}]}}`,
+		"0.3":   `{"results":{},"fingerprints":{"a":[{"id":"probe","mode":"probe","attribution":{"results":{}}}]},"modeltraces":{"a":[{}]}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			setupTest(t)
@@ -58,7 +66,13 @@ func TestStateMigration(t *testing.T) {
 				t.Fatal(err)
 			}
 			loadState()
-			if name == "0.3" {
+			version := 0
+			if name == "0.4.5" {
+				version = 2
+				if records.SIWC == nil || len(records.Candies["a"]) != 1 {
+					t.Fatal("SIWC migration lost existing history")
+				}
+			} else if name == "0.3" {
 				if storageError != "" || len(records.Candies) != 0 || len(records.Fingerprints) != 0 {
 					t.Fatalf("legacy probe records must be dropped: %+v %s", records, storageError)
 				}
@@ -74,7 +88,7 @@ func TestStateMigration(t *testing.T) {
 				}
 			}
 			saved, _ := os.ReadFile(statePath)
-			backup, _ := os.ReadFile(strings.TrimSuffix(statePath, ".json") + ".v0.json")
+			backup, _ := os.ReadFile(strings.TrimSuffix(statePath, ".json") + fmt.Sprintf(".v%d.json", version))
 			if !bytes.Contains(saved, []byte(fmt.Sprintf(`"schema_version":%d`, stateSchemaVersion))) || bytes.Contains(saved, []byte(`"results"`)) || string(backup) != file {
 				t.Fatalf("saved %s, backup %s", saved, backup)
 			}

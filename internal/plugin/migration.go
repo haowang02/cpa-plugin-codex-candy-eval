@@ -10,12 +10,16 @@ import (
 
 // stateSchemaVersion is the layout of the state file the plugin writes. Files without schema_version are
 // version 0.
-const stateSchemaVersion = 2
+const stateSchemaVersion = 3
 
 // stateMigrations[v] upgrades the raw JSON of a state file from schema v to v+1.
 var stateMigrations = []func(file map[string]json.RawMessage) error{
 	migrateUnversionedState,
 	addPelicanVariants,
+	func(file map[string]json.RawMessage) error {
+		file["siwc"] = json.RawMessage(`{}`)
+		return nil
+	},
 }
 
 // readState decodes a state file of the current or an older schema, and returns the file's own version.
@@ -45,6 +49,7 @@ func readState(data []byte) (s state, version int, err error) {
 	}
 	s.SchemaVersion = stateSchemaVersion
 	s.Candies, s.Fingerprints, s.Pelicans = recent(s.Candies), recent(s.Fingerprints), recent(s.Pelicans)
+	s.SIWC = recent(s.SIWC)
 	return s, version, err
 }
 

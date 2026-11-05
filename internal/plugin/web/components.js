@@ -121,19 +121,11 @@ function statusText(text) {
 
 const disabledFor = (reason) => reason ? `disabled data-tip="${esc(reason)}"` : "";
 
-// CPA toggles auth files and config API keys (IDs "<provider>:apikey:…");
-// OpenAI-compatible providers can only be switched as a whole in CPA.
-const switchable = (a) => a.source === "auth_files" || a.id.startsWith(a.provider + ":apikey:");
-function enableSwitch(a) {
-  const locked = !switchable(a) ? "请在 CPA 中启用或停用此凭证" : credentialBusy(a) ? `${busyTest(a)}进行中，结束后才能切换` : switching.has(a.id) ? "正在保存…" : "";
-  return `<label class="switch"><input type="checkbox" role="switch" data-enable="${esc(a.id)}" aria-label="启用此凭证" aria-busy="${switching.has(a.id)}" ${a.disabled ? "" : "checked"} ${disabledFor(locked)}></label>`;
-}
-
 // Row details are separate columns on wide screens and one footer line on narrow ones.
 function credentialRow({ test, credential: a, selected, open, selectable, result, meta, tested, button, history }) {
   return `<div class="row ${open ? "open" : ""}"><div class="list-row row-main" data-row="${esc(a.id)}">
     <label class="select-cell"><input type="checkbox" data-${test}-select="${esc(a.id)}" aria-label="选择此凭证" ${selected ? "checked" : ""} ${selectable ? "" : "disabled"}></label>
-    ${credentialView(a, open)}<div class="latest">${result}</div><div class="row-meta ${tested ? "" : "untested"}">${meta}${enableSwitch(a)}</div>${button}</div>
+    ${credentialView(a, open)}<div class="latest">${result}</div><div class="row-meta ${tested ? "" : "untested"}">${meta}${credentialSwitch(a, "disabled")}</div>${button}</div>
     ${open ? historyPanel(history()) : ""}</div>`;
 }
 
@@ -267,7 +259,7 @@ function initializeTips() {
 
 function credentialCard(test, columns) {
   const p = test + "-";
-  return `<div class="section-head credential-head"><h2>凭证</h2><label class="switch credential-enabled-filter"><input id="${p}enabled-only" type="checkbox" role="switch"><span>仅启用</span></label><div class="credential-filters"><span class="native-select credential-filter"><select id="${p}credential-type" aria-label="凭证类型"></select></span><span id="${p}plan-filter" class="native-select credential-filter" hidden><select id="${p}credential-plan" aria-label="订阅类型"></select></span></div>
+  return `<div class="section-head credential-head"><h2>凭证</h2><label class="switch credential-enabled-filter"><input id="${p}enabled-only" type="checkbox" role="switch"><span>仅启用</span></label><div class="credential-filters"><span id="${p}type-filter" class="native-select credential-filter" ${test === "siwc" ? "hidden" : ""}><select id="${p}credential-type" aria-label="凭证类型"></select></span><span id="${p}plan-filter" class="native-select credential-filter" hidden><select id="${p}credential-plan" aria-label="订阅类型"></select></span></div>
     <div class="list-actions"><button id="${p}mask" class="btn ghost icon-button" type="button" aria-label="脱敏" data-tip></button><button id="${p}clear" class="btn ghost icon-button" type="button" aria-label="清空${TEST_LABELS[test]}记录" data-tip disabled>${icon("trash-2")}</button></div></div>
     <div class="list-head"><input id="${p}select-all" type="checkbox" aria-label="选择全部可测试凭证">${[...columns, "启用", ""].map((label) => `<div>${label}</div>`).join("")}</div>
     <div id="${p}rows"><div class="empty">正在加载…</div></div>`;
@@ -310,4 +302,29 @@ function initializeCopyButtons() {
       timer = setTimeout(reset, 1600);
     });
   }
+}
+
+function bindTestActions({ test, expanded, renderRows, run, showDetail }) {
+  const rows = $(test + "-rows"), dialog = $(test + "-detail");
+  if (showDetail) {
+    $(test + "-detail-close").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => {
+      rows.querySelector(`[data-${test}-detail="${CSS.escape(dialog.dataset.record)}"][data-${test}-credential="${CSS.escape(dialog.dataset.credential)}"]`)?.focus();
+    });
+  }
+  rows.addEventListener("click", (e) => {
+    if (e.target.closest("label")) return;
+    const action = (name) => e.target.closest(`[data-${test}-${name}]`)?.getAttribute(`data-${test}-${name}`);
+    const runID = action("run");
+    if (runID) return run({ credential_ids: [runID] });
+    const cancelID = action("cancel");
+    if (cancelID) return update("停止测试失败", () => api(`${BASE}/cancel`, { method: "POST", body: { credential_ids: [cancelID] } }));
+    const recordID = action("detail"), credentialID = action("credential");
+    if (recordID && credentialID) return openResultDetail(test, credentialID, recordID, showDetail);
+    const toggleID = e.target.closest("[data-row]")?.dataset.row;
+    if (toggleID) {
+      expanded.has(toggleID) ? expanded.delete(toggleID) : expanded.add(toggleID);
+      renderRows();
+    }
+  });
 }

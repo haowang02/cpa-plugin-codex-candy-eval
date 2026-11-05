@@ -38,10 +38,11 @@ type state struct {
 	Candies       history[candyRecord]       `json:"candies"`
 	Fingerprints  history[fingerprintRecord] `json:"fingerprints"`
 	Pelicans      history[pelicanRecord]     `json:"pelicans"`
+	SIWC          history[siwcRecord]        `json:"siwc"`
 }
 
 func emptyState() state {
-	return state{SchemaVersion: stateSchemaVersion, Candies: history[candyRecord]{}, Fingerprints: history[fingerprintRecord]{}, Pelicans: history[pelicanRecord]{}}
+	return state{SchemaVersion: stateSchemaVersion, Candies: history[candyRecord]{}, Fingerprints: history[fingerprintRecord]{}, Pelicans: history[pelicanRecord]{}, SIWC: history[siwcRecord]{}}
 }
 
 // record is what the records of every test have.
@@ -174,6 +175,8 @@ func clearRecordsResponse(test string) managementResponse {
 	defer mu.Unlock()
 	previous := records
 	switch test {
+	case "siwc":
+		records.SIWC = history[siwcRecord]{}
 	case "candy":
 		records.Candies = history[candyRecord]{}
 	case "fingerprint":
