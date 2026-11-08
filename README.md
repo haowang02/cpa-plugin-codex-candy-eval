@@ -1,8 +1,14 @@
-# Codex 降智测试（CLIProxyAPI 插件）
-
-在 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 管理面板中用**糖果题**、**指纹检测**、**画鹈鹕**和 **SIWC 检测**测试 Codex 凭证。
-
-![example](docs/images/example.png)
+<div align="center">
+  <h1>Codex 降智测试（CLIProxyAPI 插件）</h1>
+  <p>在 <a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI</a> 管理面板中用<strong>糖果题</strong>、<strong>指纹检测</strong>、<strong>画鹈鹕</strong>和 <strong>SIWC 检测</strong>测试 Codex 凭证。</p>
+  <p>
+    <a href="https://github.com/haowang02/cpa-plugin-codex-candy-eval/releases/latest"><img src="https://img.shields.io/github/v/release/haowang02/cpa-plugin-codex-candy-eval?label=release" alt="Latest release"></a>
+    <a href="https://github.com/haowang02/cpa-plugin-codex-candy-eval/releases"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/haowang02/cpa-plugin-codex-candy-eval/badges/downloads.json" alt="Plugin package downloads"></a>
+    <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platforms: Windows, macOS, and Linux">
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+  </p>
+</div>
+<img src="docs/images/example.png" alt="example" width="100%" />
 
 ## 安装
 
