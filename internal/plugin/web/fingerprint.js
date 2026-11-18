@@ -28,7 +28,7 @@ function fingerprintOutcome(r) {
     return resultOutcome({ tone, symbol, titleHTML: title, detailHTML: detail });
   }
   const { tone, symbol, label } = fingerprintComparison(r);
-  if (a.decision === "not_model") return resultOutcome({ tone, symbol, titleHTML: label, detailHTML: "相邻数字的变化方式与语言模型不同，未生成排名" });
+  if (a.decision === "not_model") return resultOutcome({ tone, symbol, titleHTML: label, detailHTML: "数字序列的变化方式与语言模型不同，未生成排名" });
   const probability = a.probability != null ? `<span class="fingerprint-probability mono">${fmtPercent(a.probability)}</span>` : "";
   return resultOutcome({
     tone, symbol,
@@ -62,7 +62,7 @@ function runFingerprint(body) {
 
 function fingerprintResultHTML(r) {
   const a = r.attribution, comparison = fingerprintComparison(r), scored = a.probability != null;
-  if (a.decision === "not_model") return `${fingerprintOutcome(r)}<p class="detail-note">相邻数字的变化方式与参考库中的语言模型回答不同，常见于程序生成、排序或打乱顺序的数字，因此未生成排名。</p>`;
+  if (a.decision === "not_model") return `${fingerprintOutcome(r)}<p class="detail-note">评分会检查相邻数字的变化，以及最多相隔三位的数字有多接近。程序生成、排序或打乱顺序的数字可能触发这项判定。</p>`;
   return `<dl class="fingerprint-summary ${comparison.tone}"><div><dt>${comparison.label ? `${icon(comparison.symbol)}${comparison.label}` : "最接近的模型"}</dt><dd class="mono">${esc(a.prediction_name)}${scored ? `<small>${fmtPercent(a.probability)}</small>` : ""}</dd></div><div><dt>模型家族</dt><dd>${esc(a.family_prediction_name)}</dd></div><div><dt>有效回答</dt><dd class="mono">${a.used_outputs} / ${FINGERPRINT_CONFIG.requests}</dd></div></dl>
     <div class="fingerprint-heading"><h3>候选模型排行</h3><span class="meta">${scored ? "归因概率" : "有效回答不足三条，不计算归因概率"}</span></div>
     <div class="fingerprint-ranking">${(a.results || []).map((c, i) => `<div class="fingerprint-rank"><span class="meta mono">${String(i + 1).padStart(2, "0")}</span><span class="mono fingerprint-rank-name">${esc(c.display_name)}</span><div class="fingerprint-bar" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, (c.probability || 0) * 100))}%"></span></div><span class="mono">${fmtPercent(c.probability)}</span></div>`).join("")}</div>`;

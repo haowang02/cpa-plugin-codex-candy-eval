@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-10-27T05:02:50.758637+00:00",
+  "built_at": "2026-11-17T19:37:59.839365+00:00",
   "models": [
     {
       "id": "claude-haiku-4.5",
@@ -408,13 +408,6 @@
       "response_count": 36
     },
     {
-      "id": "gemini-4-argon",
-      "display_name": "gemini-4-argon",
-      "family": "gemini",
-      "family_name": "Gemini",
-      "response_count": 36
-    },
-    {
       "id": "deepseek-v4.1-flash-1017",
       "display_name": "deepseek-v4.1-flash-1017",
       "family": "deepseek",
@@ -445,6 +438,69 @@
     {
       "id": "gpt-6.1-terra",
       "display_name": "gpt-6.1-terra",
+      "family": "gpt",
+      "family_name": "GPT",
+      "response_count": 36
+    },
+    {
+      "id": "openpangu-2.0-flash",
+      "display_name": "openpangu-2.0-flash",
+      "family": "openpangu",
+      "family_name": "openPangu",
+      "response_count": 36
+    },
+    {
+      "id": "openpangu-2.0-pro",
+      "display_name": "openpangu-2.0-pro",
+      "family": "openpangu",
+      "family_name": "openPangu",
+      "response_count": 36
+    },
+    {
+      "id": "muse-ember",
+      "display_name": "muse-ember",
+      "family": "muse",
+      "family_name": "Muse",
+      "response_count": 36
+    },
+    {
+      "id": "claude-fable-5.2",
+      "display_name": "claude-fable-5.2",
+      "family": "claude",
+      "family_name": "Claude",
+      "response_count": 36
+    },
+    {
+      "id": "gemini-4-carbon",
+      "display_name": "gemini-4-carbon",
+      "family": "gemini",
+      "family_name": "Gemini",
+      "response_count": 36
+    },
+    {
+      "id": "gemini-4-argon",
+      "display_name": "gemini-4-argon",
+      "family": "gemini",
+      "family_name": "Gemini",
+      "response_count": 36
+    },
+    {
+      "id": "gemini-4-hydrogen",
+      "display_name": "gemini-4-hydrogen",
+      "family": "gemini",
+      "family_name": "Gemini",
+      "response_count": 36
+    },
+    {
+      "id": "gpt-6.2-sol",
+      "display_name": "gpt-6.2-sol",
+      "family": "gpt",
+      "family_name": "GPT",
+      "response_count": 36
+    },
+    {
+      "id": "gpt-6.2-astra",
+      "display_name": "gpt-6.2-astra",
       "family": "gpt",
       "family_name": "GPT",
       "response_count": 36

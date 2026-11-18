@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"cpa-codex-candy-eval/internal/fingerprint"
 )
 
 func TestInspection(t *testing.T) {
@@ -35,7 +37,7 @@ func TestInspection(t *testing.T) {
 	}
 
 	// b is out of scope; an earlier result of a, from before the inspection, must not count.
-	records.Fingerprints.add("a", fingerprintRecord{record: record{Model: "test-model", Status: "completed"}, Attribution: &fingerprintAttribution{Prediction: "test-model"}})
+	records.Fingerprints.add("a", fingerprintRecord{record: record{Model: "test-model", Status: "completed"}, Attribution: &fingerprint.Attribution{Prediction: "test-model"}})
 	if r := inspectionRunResponse([]byte(`{"test":"fingerprint","model":"test-model","exclude":["*@y.com"]}`)); r.StatusCode != 200 {
 		t.Fatalf("run: %s", r.Body)
 	}

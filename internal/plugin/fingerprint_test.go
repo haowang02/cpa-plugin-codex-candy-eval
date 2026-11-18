@@ -4,112 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"net/url"
-	"os"
-	"reflect"
 	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"cpa-codex-candy-eval/internal/fingerprint"
 )
-
-// fingerprintAnswer is a gpt-6.1-sol reference answer from the golden cases, so it moves like a model's answer.
-var fingerprintAnswer = func() string {
-	raw, err := os.ReadFile("testdata/lm-detector-golden.json")
-	if err != nil {
-		panic(err)
-	}
-	return mustDecode[[]struct{ Outputs []fingerprintOutput }](raw)[0].Outputs[0].Text
-}()
-
-func TestFingerprintUpstreamParity(t *testing.T) {
-	// Golden results come from the pinned upstream analyzeSharedOutputs with allowPartial, as its page runs it:
-	// calibrated rankings (one for kimi-k3.1-pro answers whose small-step share alone exceeds its limit),
-	// a partial ranking and answers that do not move like a model's.
-	raw, err := os.ReadFile("testdata/lm-detector-golden.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var cases []struct {
-		Outputs  []fingerprintOutput
-		Expected fingerprintAttribution
-	}
-	if err = json.Unmarshal(raw, &cases); err != nil {
-		t.Fatal(err)
-	}
-	close := func(a, b *float64) {
-		t.Helper()
-		if (a == nil) != (b == nil) || a != nil && !(math.Abs(*a-*b) <= 1e-9) {
-			t.Fatalf("got %v, want %v", a, b)
-		}
-	}
-	for _, tt := range cases {
-		got, err := analyzeFingerprint(tt.Outputs)
-		if err != nil {
-			t.Fatal(err)
-		}
-		want := tt.Expected
-		if got.Decision != want.Decision || got.Prediction != want.Prediction || got.PredictionName != want.PredictionName || got.FamilyPrediction != want.FamilyPrediction ||
-			got.Used != want.Used || got.Sequence.ModelLike != want.Sequence.ModelLike || !reflect.DeepEqual(got.Diagnostics, want.Diagnostics) || len(got.Results) != len(want.Results) {
-			t.Fatalf("attribution mismatch: %+v", got)
-		}
-		close(got.Probability, want.Probability)
-		close(&got.Sequence.Autocorrelation, &want.Sequence.Autocorrelation)
-		close(&got.Sequence.SmallStepShare, &want.Sequence.SmallStepShare)
-		for i, r := range got.Results {
-			w := want.Results[i]
-			if r.Model != w.Model || r.DisplayName != w.DisplayName || r.Family != w.Family || r.FamilyName != w.FamilyName {
-				t.Fatalf("rank %d: %+v, want %+v", i, r, w)
-			}
-			close(r.Probability, w.Probability)
-			close(&r.Score, &w.Score)
-		}
-	}
-}
-
-func TestFingerprintParseAndChallenges(t *testing.T) {
-	for text, want := range map[string][]int{
-		"生成 300 个：1, 22, 355, 0, 356, 99。完成 4": {1, 22, 355, 99},
-		"1,2 words 3,4": {1, 2},
-		"1,2 中文 3,4,5":  {3, 4, 5},
-		"1,2 😀 3,4":     {1, 2, 3, 4},
-	} {
-		if got := parseNumbers(text); !reflect.DeepEqual(got, want) {
-			t.Fatalf("parse %q = %v, want %v", text, got, want)
-		}
-	}
-	if _, err := analyzeFingerprint([]fingerprintOutput{{strings.Repeat("42,", 164), 300}}); err == nil {
-		t.Fatal("short output was accepted")
-	}
-	if got, err := analyzeFingerprint([]fingerprintOutput{{strings.Repeat("42,", 165), 300}}); err != nil || got.Used != 1 || got.Decision != "not_model" || got.Results != nil {
-		t.Fatalf("repeated numbers = %+v, %v", got, err)
-	}
-	instructed, prefixed := 0, 0
-	for _, c := range fingerprintSuite {
-		if c.Instructions != "" {
-			instructed++
-		}
-		if strings.Contains(c.Prompt, "\n\nFinal task:\n") {
-			prefixed++
-		}
-	}
-	if len(fingerprintSuite) != 36 || instructed != 12 || prefixed != 9 {
-		t.Fatalf("suite: %d challenges, %d with instructions, %d with a user prefix", len(fingerprintSuite), instructed, prefixed)
-	}
-	seen := map[string]bool{}
-	for _, c := range fingerprintChallenges() {
-		if seen[c.Prompt] || !slices.Contains(fingerprintSuite, c) {
-			t.Fatalf("bad challenge: %+v", c)
-		}
-		seen[c.Prompt] = true
-	}
-	if fingerprintModelID("openai/GPT-6.1-sol") != "gpt-6-astra" || fingerprintModelID("deepseek/deepseek-flash") != "deepseek-v4.1-flash-1017" || fingerprintModelID("gpt-6-sol") != "gpt-6-sol" {
-		t.Fatal("aliased models must compare as their candidates")
-	}
-}
 
 func fingerprintTestHost(t *testing.T, answer func() (string, int)) {
 	t.Helper()
@@ -135,12 +39,11 @@ func fingerprintTestHost(t *testing.T, answer func() (string, int)) {
 func TestFingerprintRunAndPersistence(t *testing.T) {
 	setupTest(t)
 	var calls atomic.Int32
-	// The first challenge is refused on every attempt.
 	fingerprintTestHost(t, func() (string, int) {
 		if calls.Add(1) <= modelAttempts {
 			return "无法回答", 200
 		}
-		return fingerprintAnswer, 200
+		return strings.Repeat("10,340,", 160), 200
 	})
 	records.Candies.add("a", candyRecord{record: record{Model: "preserved"}})
 	records.Pelicans.add("a", pelicanRecord{record: record{Model: "preserved"}})
@@ -152,7 +55,7 @@ func TestFingerprintRunAndPersistence(t *testing.T) {
 	r := records.Fingerprints["a"][0]
 	if calls.Load() != 5 || r.Status != "partial" || r.Attribution.Decision != "partial" || r.Attribution.Prediction == "" || r.Attribution.Used != 2 || len(r.Samples) != 3 ||
 		r.Samples[0].Attempts != modelAttempts || r.Samples[0].Error != "有效数字不足" || r.Samples[0].Text != "无法回答" ||
-		r.Concurrency != 1 || r.InputTokens != 60 || r.OutputTokens != 15 || r.ReasoningTokens != 5 {
+		r.DetectorRevision != fingerprint.Revision || r.Concurrency != 1 || r.InputTokens != 60 || r.OutputTokens != 15 || r.ReasoningTokens != 5 {
 		t.Fatalf("result=%+v calls=%d", r, calls.Load())
 	}
 	if len(records.Fingerprints["off"]) != 0 {
@@ -160,8 +63,10 @@ func TestFingerprintRunAndPersistence(t *testing.T) {
 	}
 	records, loaded = emptyState(), false
 	loadState()
-	if len(records.Fingerprints["a"]) != 1 || records.Fingerprints["a"][0].Attribution.Prediction != r.Attribution.Prediction || records.Fingerprints["a"][0].ReasoningTokens != 5 || records.Fingerprints["a"][0].InputTokens != 60 || records.Fingerprints["a"][0].OutputTokens != 15 {
-		t.Fatal("history did not survive reload")
+	history := records.Fingerprints["a"]
+	if len(history) != 1 || history[0].usage != r.usage || history[0].DetectorRevision != r.DetectorRevision ||
+		!slices.Equal(history[0].Samples, r.Samples) || history[0].Attribution == nil || history[0].Attribution.Prediction != r.Attribution.Prediction {
+		t.Fatalf("history did not survive reload: %+v", history)
 	}
 	if summary := r.summary(); summary.Samples != nil || summary.Attribution.Results != nil || summary.Attribution.Prediction != r.Attribution.Prediction || len(r.Samples) != 3 {
 		t.Fatal("summaries must drop details without touching stored records")
@@ -187,7 +92,7 @@ func TestFingerprintLimitsAndHardFailure(t *testing.T) {
 		status int
 		reason string
 		calls  int32
-	}{{200, "有效数字不足", fingerprintTarget * modelAttempts}, {401, "拒答", fingerprintTarget}} {
+	}{{200, "有效数字不足", fingerprint.ChallengeCount * modelAttempts}, {401, "拒答", fingerprint.ChallengeCount}} {
 		t.Run(fmt.Sprint(tc.status), func(t *testing.T) {
 			setupTest(t)
 			var calls atomic.Int32
@@ -240,7 +145,7 @@ func TestFingerprintStopDuringLastRequest(t *testing.T) {
 			setupTest(t)
 			var calls atomic.Int32
 			fingerprintTestHost(t, func() (string, int) {
-				if calls.Add(1) == fingerprintTarget {
+				if calls.Add(1) == fingerprint.ChallengeCount {
 					cancelResponse([]byte(`{"credential_ids":["a"]}`))
 					return tc.answer, tc.status
 				}
@@ -249,7 +154,7 @@ func TestFingerprintStopDuringLastRequest(t *testing.T) {
 			fingerprintRunResponse([]byte(`{"all":true,"model":"test-model","concurrency":1}`))
 			tasks.Wait()
 			r := records.Fingerprints["a"][0]
-			if calls.Load() != fingerprintTarget || r.Status != tc.want || len(r.Samples) != fingerprintTarget || r.InputTokens != tc.answered*12 || r.OutputTokens != tc.answered*3 || r.ReasoningTokens != tc.answered {
+			if calls.Load() != fingerprint.ChallengeCount || r.Status != tc.want || len(r.Samples) != fingerprint.ChallengeCount || r.InputTokens != tc.answered*12 || r.OutputTokens != tc.answered*3 || r.ReasoningTokens != tc.answered {
 				t.Fatalf("calls=%d result=%+v", calls.Load(), r)
 			}
 		})
@@ -276,7 +181,7 @@ func TestFingerprintConcurrency(t *testing.T) {
 			setupTest(t)
 			want := concurrency
 			if want == 0 {
-				want = fingerprintTarget
+				want = fingerprint.ChallengeCount
 			}
 			started, release := make(chan struct{}, 3), make(chan struct{})
 			var active, peak atomic.Int32

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"cpa-codex-candy-eval/internal/fingerprint"
 )
 
 func setupTest(t *testing.T) {
@@ -73,7 +75,7 @@ func TestPage(t *testing.T) {
 	page := string(uiHTML)
 	variants, _ := json.Marshal(pelicanVariants)
 	for _, want := range []string{"版本 v" + pluginVersion, "<code>" + html.EscapeString(candyPrompt) + "</code>", "PELICAN_VARIANTS = " + string(variants) + ";",
-		`"requests":3`, `"gpt-6.1-sol":"gpt-6-astra"`, detectorLicense} {
+		`"requests":3`, `"gpt-6.1-sol":"gpt-6-astra"`, fingerprint.License} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page lacks %q", want)
 		}

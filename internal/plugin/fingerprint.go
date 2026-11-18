@@ -2,68 +2,27 @@ package plugin
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"cpa-codex-candy-eval/internal/fingerprint"
 )
 
-// Each run sends fingerprintTarget challenges, at most that many at once per credential and
-// fingerprintGlobalConcurrency across credentials. A challenge holds its slot through its retries.
 const (
-	fingerprintTarget            = 3
 	fingerprintGlobalConcurrency = 6
 	fingerprintMaxText           = 64000
 )
 
-type fingerprintChallenge struct {
-	Instructions  string `json:"instructions,omitempty"`
-	Prompt        string `json:"prompt"`
-	ExpectedCount int    `json:"expected_count"`
+var fingerprintAliases = map[string]string{
+	"gpt-6.1-sol":    "gpt-6-astra",
+	"deepseek-flash": "deepseek-v4.1-flash-1017",
 }
 
-//go:embed data/lm-detector/enrollment-suite.json
-var fingerprintSuiteJSON []byte
-
-// fingerprintSuite holds the challenges the reference answers were collected with: 12 prompt environments that
-// add a system prompt, a user prefix or nothing to their three challenges.
-var fingerprintSuite = func() []fingerprintChallenge {
-	var suite []fingerprintChallenge
-	for _, c := range mustDecode[[]struct {
-		System        string `json:"system"`
-		UserPrefix    string `json:"user_prefix"`
-		Prompt        string `json:"prompt"`
-		ExpectedCount int    `json:"expected_count"`
-	}](fingerprintSuiteJSON) {
-		prompt := c.Prompt
-		if c.UserPrefix != "" {
-			prompt = c.UserPrefix + "\n\nFinal task:\n" + c.Prompt
-		}
-		suite = append(suite, fingerprintChallenge{c.System, prompt, c.ExpectedCount})
-	}
-	return suite
-}()
-
-func fingerprintChallenges() []fingerprintChallenge {
-	challenges := make([]fingerprintChallenge, fingerprintTarget)
-	for i, j := range rand.Perm(len(fingerprintSuite))[:fingerprintTarget] {
-		challenges[i] = fingerprintSuite[j]
-	}
-	return challenges
-}
-
-// fingerprintAliases maps tested models to the candidate that stands for them: the bank enrolls gpt-6.1-sol
-// answers under gpt-6-astra, and deepseek-flash serves the model enrolled as deepseek-v4.1-flash-1017.
-// The page compares models with the same table.
-var fingerprintAliases = map[string]string{"gpt-6.1-sol": "gpt-6-astra", "deepseek-flash": "deepseek-v4.1-flash-1017"}
-
-// fingerprintModelID is the candidate a model name stands for, without a provider prefix such as "openai/".
 func fingerprintModelID(model string) string {
 	model = strings.ToLower(strings.TrimSpace(model))
 	model = model[strings.LastIndex(model, "/")+1:]
@@ -74,7 +33,7 @@ func fingerprintModelID(model string) string {
 }
 
 type fingerprintSample struct {
-	fingerprintChallenge
+	fingerprint.Challenge
 	Attempts int    `json:"attempts,omitempty"`
 	Text     string `json:"text,omitempty"`
 	Error    string `json:"error,omitempty"`
@@ -82,17 +41,14 @@ type fingerprintSample struct {
 	Valid    bool   `json:"accepted"`
 }
 
-// fingerprintRecord is one run of challenges: its status is completed, partial (only some answers valid),
-// failed, cancelled or skipped.
 type fingerprintRecord struct {
 	record
-	DetectorRevision string                  `json:"detector_revision"`
-	Concurrency      int                     `json:"concurrency,omitempty"`
-	Samples          []fingerprintSample     `json:"samples"`
-	Attribution      *fingerprintAttribution `json:"attribution,omitempty"`
+	DetectorRevision string                   `json:"detector_revision"`
+	Concurrency      int                      `json:"concurrency,omitempty"`
+	Samples          []fingerprintSample      `json:"samples"`
+	Attribution      *fingerprint.Attribution `json:"attribution,omitempty"`
 }
 
-// summary drops the samples and rankings that only the detail dialog shows.
 func (r fingerprintRecord) summary() fingerprintRecord {
 	r.Samples = nil
 	if r.Attribution != nil {
@@ -120,48 +76,41 @@ func fingerprintRunResponse(body []byte) managementResponse {
 		return jsonError(http.StatusBadRequest, "请选择不含推理强度后缀的模型")
 	}
 	if req.Concurrency == 0 {
-		req.Concurrency = fingerprintTarget
+		req.Concurrency = fingerprint.ChallengeCount
 	}
-	if req.Concurrency < 1 || req.Concurrency > fingerprintTarget {
-		return jsonError(http.StatusBadRequest, fmt.Sprintf("每凭证并发须为 1–%d", fingerprintTarget))
+	if req.Concurrency < 1 || req.Concurrency > fingerprint.ChallengeCount {
+		return jsonError(http.StatusBadRequest, fmt.Sprintf("每凭证并发须为 1–%d", fingerprint.ChallengeCount))
 	}
-	return startRuns("fingerprint", req.runRequest, fingerprintTarget,
+	return startRuns("fingerprint", req.runRequest, fingerprint.ChallengeCount,
 		func(id string) {
-			records.Fingerprints.add(id, fingerprintRecord{record: skippedRecord(req.Model), DetectorRevision: detectorRevision})
+			records.Fingerprints.add(id, fingerprintRecord{record: skippedRecord(req.Model), DetectorRevision: fingerprint.Revision})
 		},
 		func(ctx context.Context, auth credential, p *progress) { runFingerprint(ctx, auth, req, p) })
 }
 
 func runFingerprint(ctx context.Context, auth credential, req fingerprintRunRequest, p *progress) {
 	started := time.Now()
-	done := 0
-	r := fingerprintRecord{record: newRecord(req.Model, started), DetectorRevision: detectorRevision, Concurrency: req.Concurrency}
-	r.Status = "completed"
+	r := fingerprintRecord{record: newRecord(req.Model, started), DetectorRevision: fingerprint.Revision, Concurrency: req.Concurrency}
 	defer func() {
-		if ctx.Err() != nil && done < fingerprintTarget {
+		mu.Lock()
+		defer mu.Unlock()
+		if ctx.Err() != nil && p.Done < p.Total {
 			r.Status = "cancelled"
 		}
 		if recovered := recover(); recovered != nil {
 			r.Status, r.Error = "failed", fmt.Sprint(recovered)
 		}
 		r.DurationMS = time.Since(started).Milliseconds()
-		mu.Lock()
-		defer mu.Unlock()
 		records.Fingerprints.add(auth.ID, r)
 		_ = saveStateLocked()
 	}()
-	challenges := fingerprintChallenges()
-	type event struct {
-		index  int
-		sample fingerprintSample
-		output modelResponse
-		err    error
-	}
-	jobs, events := make(chan int, fingerprintTarget), make(chan event, fingerprintTarget)
+	challenges := fingerprint.Challenges()
+	jobs := make(chan int, len(challenges))
 	for i := range challenges {
 		jobs <- i
 	}
 	close(jobs)
+	var collected [fingerprint.ChallengeCount]collectedFingerprint
 	var workers sync.WaitGroup
 	for range req.Concurrency {
 		workers.Add(1)
@@ -173,82 +122,65 @@ func runFingerprint(ctx context.Context, auth credential, req fingerprintRunRequ
 				case <-ctx.Done():
 					return
 				}
-				sample, output, err := collectFingerprintSample(ctx, auth, req.Model, challenges[i])
+				result := collectFingerprintSample(ctx, auth, req.Model, challenges[i])
 				<-fingerprintSlots
-				if sample.Attempts > 0 {
-					events <- event{i, sample, output, err}
+				collected[i] = result
+				if result.finished {
+					mu.Lock()
+					p.Done++
+					mu.Unlock()
 				}
 			}
 		}()
 	}
-	go func() { workers.Wait(); close(events) }()
-	samples := make([]*fingerprintSample, fingerprintTarget)
-	for e := range events {
-		samples[e.index] = &e.sample
-		r.usage.add(e.output.usage)
-		if !errors.Is(e.err, context.Canceled) {
-			done++
+	workers.Wait()
+
+	var replies []fingerprint.Reply
+	for _, result := range collected {
+		if result.sample.Attempts > 0 {
+			r.Samples = append(r.Samples, result.sample)
+			replies = append(replies, result.reply)
+			r.usage.add(result.usage)
 		}
-		mu.Lock()
-		p.Done = done
-		mu.Unlock()
 	}
-	var outputs []fingerprintOutput
-	// Preserve challenge order even when requests complete out of order.
-	for _, sample := range samples {
-		if sample == nil {
-			continue
-		}
-		r.Samples = append(r.Samples, *sample)
-		outputs = append(outputs, fingerprintOutput{sample.Text, sample.ExpectedCount})
-	}
-	attr, err := analyzeFingerprint(outputs)
+	r.Attribution = fingerprint.Analyze(replies)
 	switch {
-	case err == nil:
-		r.Attribution = &attr
-		if attr.Used < fingerprintTarget {
-			r.Status = "partial"
+	case r.Attribution == nil:
+		r.Status, r.Error = "failed", "未采集到有效数字序列"
+		if n := len(r.Samples); n > 0 && r.Samples[n-1].Error != "" {
+			r.Error = r.Samples[n-1].Error
 		}
-	case len(r.Samples) > 0 && r.Samples[len(r.Samples)-1].Error != "":
-		// No answer was valid; the last request's error tells why.
-		r.Status, r.Error = "failed", r.Samples[len(r.Samples)-1].Error
+	case r.Attribution.Used < fingerprint.ChallengeCount:
+		r.Status = "partial"
 	default:
-		r.Status, r.Error = "failed", err.Error()
+		r.Status = "completed"
 	}
 }
 
-// collectFingerprintSample asks challenge until an answer can be scored. The sample keeps the last answer.
-func collectFingerprintSample(ctx context.Context, auth credential, model string, challenge fingerprintChallenge) (sample fingerprintSample, out modelResponse, err error) {
-	sample.fingerprintChallenge = challenge
-	out, sample.Attempts, err = askCodex(ctx, auth, model, "", challenge.Instructions, challenge.Prompt, challengeTimeout, func(answer string) (err error) {
-		sample.Text, sample.Parsed, err = fingerprintText(answer, challenge.ExpectedCount)
-		return err
+type collectedFingerprint struct {
+	sample   fingerprintSample
+	reply    fingerprint.Reply
+	usage    usage
+	finished bool
+}
+
+func collectFingerprintSample(ctx context.Context, auth credential, model string, challenge fingerprint.Challenge) collectedFingerprint {
+	empty := fingerprint.Prepare("", challenge.ExpectedCount)
+	reply := empty
+	out, attempts, err := askCodex(ctx, auth, model, "", challenge.Instructions, challenge.Prompt, challengeTimeout, func(answer string) error {
+		if len(answer) > fingerprintMaxText {
+			reply = empty
+			return errors.New("回答过长")
+		}
+		reply = fingerprint.Prepare(answer, challenge.ExpectedCount)
+		if !reply.Valid() {
+			return errors.New("有效数字不足")
+		}
+		return nil
 	})
-	sample.Valid = err == nil
+	sample := fingerprintSample{Challenge: challenge, Attempts: attempts, Text: reply.Text, Parsed: reply.Count(), Valid: reply.Valid()}
 	if err != nil {
 		sample.Error = truncate(err.Error(), 500)
 	}
-	return
-}
-
-// fingerprintText returns the text of answer that the detector scores and the count of its numbers, or why
-// the answer cannot be scored. Like the upstream detector, only the requested count is scored when an answer runs
-// longer.
-func fingerprintText(answer string, expected int) (text string, parsed int, err error) {
-	if len(answer) > fingerprintMaxText {
-		return "", 0, errors.New("回答过长")
-	}
-	text, numbers := answer, parseNumbers(answer)
-	if len(numbers) > expected {
-		numbers = numbers[:expected]
-		values := make([]string, len(numbers))
-		for i, n := range numbers {
-			values[i] = strconv.Itoa(n)
-		}
-		text = strings.Join(values, ", ")
-	}
-	if len(numbers) < minimumNumbers(expected) {
-		err = errors.New("有效数字不足")
-	}
-	return text, len(numbers), err
+	return collectedFingerprint{sample: sample, reply: reply, usage: out.usage, finished: !errors.Is(err, context.Canceled)}
 }

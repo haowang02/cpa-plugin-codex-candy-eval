@@ -6,7 +6,7 @@ Inspect relevant source before changing integration contracts. Keep changes focu
 
 - `../CLIProxyAPI/`: CPA host; `../Cli-Proxy-API-Management-Center/`: management console (CPAMC).
 - `cmd/cpa-codex-candy-eval/`: shared-library entry point and C ABI bridge; `internal/plugin/`: handlers, runners, persistence, and tests.
-- `internal/plugin/web/`: embedded UI and vendored renderers; `internal/plugin/data/`: embedded fingerprint detection data.
+- `internal/plugin/web/`: embedded UI and vendored renderers; `internal/fingerprint/`: fingerprint scoring and embedded reference data.
 - `install.sh`, `install.ps1`: public installers; `.github/workflows/release.yml`: release checks, builds, and packaging.
 
 ## Build and Checks

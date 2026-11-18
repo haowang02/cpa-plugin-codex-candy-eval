@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"html"
 	"strings"
+
+	"cpa-codex-candy-eval/internal/fingerprint"
 )
 
 //go:embed web/ui.html
@@ -65,15 +67,15 @@ var fingerprintScript string
 var pelicanScript string
 
 var uiHTML = func() []byte {
-	config, _ := json.Marshal(map[string]any{"requests": fingerprintTarget, "aliases": fingerprintAliases})
-	fingerprint := strings.Replace(fingerprintScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
+	config, _ := json.Marshal(map[string]any{"requests": fingerprint.ChallengeCount, "aliases": fingerprintAliases})
+	fingerprintUI := strings.Replace(fingerprintScript, `/*FINGERPRINT_CONFIG*/{}`, string(config), 1)
 	variants, _ := json.Marshal(pelicanVariants)
 	pelican := strings.Replace(pelicanScript, `/*PELICAN_VARIANTS*/[]`, string(variants), 1)
 	return []byte(strings.NewReplacer(
 		"/*APP_STYLES*/", temmlStyles+"\n"+uiThemes+"\n"+uiStyles,
 		"<!--PLUGIN_VERSION-->", pluginVersion,
 		"<!--CANDY_PROMPT-->", html.EscapeString(candyPrompt),
-		"<!--DETECTOR_LICENSE-->", "<!-- LM Fingerpoint Detector\n"+detectorLicense+"-->",
+		"<!--DETECTOR_LICENSE-->", "<!-- LM Fingerpoint Detector\n"+fingerprint.License+"-->",
 		"/*MARKDOWN_SCRIPT*/", markdownScript,
 		"/*CJK_FRIENDLY_SCRIPT*/", cjkFriendlyScript,
 		"/*TEXMATH_SCRIPT*/", texmathScript,
@@ -86,7 +88,7 @@ var uiHTML = func() []byte {
 		"/*COMPONENTS_SCRIPT*/", componentsScript,
 		"/*CANDY_SCRIPT*/", candyScript,
 		"/*SIWC_SCRIPT*/", siwcScript,
-		"/*FINGERPRINT_SCRIPT*/", fingerprint,
+		"/*FINGERPRINT_SCRIPT*/", fingerprintUI,
 		"/*PELICAN_SCRIPT*/", pelican,
 		"/*APP_SCRIPT*/", appScript,
 	).Replace(uiTemplate))
